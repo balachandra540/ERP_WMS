@@ -12,6 +12,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Options;
 using System.Data;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Encodings.Web;
 using static Domain.Common.Constants;
@@ -351,7 +352,8 @@ public class SecurityService : ISecurityService
                 Id = x.Id,
                 FirstName = x.FirstName,
                 LastName = x.LastName,
-                CompanyName = x.CompanyName
+                CompanyName = x.CompanyName,
+                PhoneNumber=x.PhoneNumber
             })
             .ToListAsync(cancellationToken);
 
@@ -362,6 +364,7 @@ public class SecurityService : ISecurityService
         string userId,
         string firstName,
         string lastName,
+        string phoneNumber,
         string companyName,
         CancellationToken cancellationToken
         )
@@ -376,7 +379,7 @@ public class SecurityService : ISecurityService
         user.FirstName = firstName;
         user.LastName = lastName;
         user.CompanyName = companyName;
-
+        user.PhoneNumber = phoneNumber;
         _context.Update(user);
         await _context.SaveChangesAsync();
     }
@@ -651,10 +654,10 @@ public class SecurityService : ISecurityService
             throw new Exception($"Unable to load user with id: {userId}");
         }
 
-        if (user.Email == _identitySettings.DefaultAdmin.Email)
-        {
-            throw new Exception($"Update default admin is not allowed.");
-        }
+        //if (user.Email == _identitySettings.DefaultAdmin.Email)
+        //{
+        //    throw new Exception($"Update default admin is not allowed.");
+        //}
 
         var currentRoles = await _userManager.GetRolesAsync(user);
         if (accessGranted)
@@ -708,5 +711,36 @@ public class SecurityService : ISecurityService
             throw new Exception(string.Join(", ", result.Errors.Select(e => e.Description)));
         }
     }
+    public DateTime? ConvertToIst(DateTime? input)
+    {
+        if (!input.HasValue)
+            return null;
+
+        // Get IST timezone (cross-platform)
+        var istZone = TimeZoneInfo.FindSystemTimeZoneById(
+            RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "India Standard Time" : "Asia/Kolkata"
+        );
+
+        var value = input.Value;
+
+        // Ensure input is treated as UTC
+        if (value.Kind != DateTimeKind.Utc)
+        {
+            value = DateTime.SpecifyKind(value, DateTimeKind.Utc);
+        }
+
+        // Convert to IST (full date + time)
+        var istDateTime = TimeZoneInfo.ConvertTimeFromUtc(value, istZone);
+
+        // Return naive timestamp (IST time values, without timezone): Kind=Unspecified
+        return DateTime.SpecifyKind(istDateTime, DateTimeKind.Unspecified);
+    }
+
+    public DateTime? ConvertToIstDateOnly(DateTime? input)
+    {
+        // Redirect to updated ConvertToIst (now full IST timestamp, naive)
+        return ConvertToIst(input);
+    }
 
 }
+

@@ -1,5 +1,6 @@
 ﻿using Domain.Entities;
 using Infrastructure.DataAccessManager.EFCore.Common;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using static Domain.Common.Constants;
 
@@ -17,7 +18,10 @@ public class PurchaseOrderItemConfiguration : BaseEntityConfiguration<PurchaseOr
         builder.Property(x => x.UnitPrice).IsRequired(false);
         builder.Property(x => x.Quantity).IsRequired(false);
         builder.Property(x => x.Total).IsRequired(false);
-
+        builder.Property(e => e.ReceivedQuantity) // NEW
+                   .HasColumnType("double precision")
+                   .IsRequired()
+                   .HasDefaultValue(0.0);
     }
 }
 

@@ -61,12 +61,10 @@ public class PurchaseOrderController : BaseApiController
     [HttpGet("GetPurchaseOrderList")]
     public async Task<ActionResult<ApiSuccessResult<GetPurchaseOrderListResult>>> GetPurchaseOrderListAsync(
         CancellationToken cancellationToken,
-        [FromQuery] bool isDeleted = false
-        )
+        [FromQuery] bool isDeleted = false)
     {
         var request = new GetPurchaseOrderListRequest { IsDeleted = isDeleted };
         var response = await _sender.Send(request, cancellationToken);
-
         return Ok(new ApiSuccessResult<GetPurchaseOrderListResult>
         {
             Code = StatusCodes.Status200OK,
@@ -75,7 +73,39 @@ public class PurchaseOrderController : BaseApiController
         });
     }
 
+    [Authorize]
+    [HttpGet("GetPurchaseOrder")]
+    public async Task<ActionResult<ApiSuccessResult<GetPurchaseOrderResult>>> GetPurchaseOrderAsync(
+    CancellationToken cancellationToken,
+    [FromQuery] string purchaseOrderId,
+    [FromQuery] bool isDeleted = false)
+    {
+        var request = new GetPurchaseOrderRequest
+        {
+            PurchaseOrderId = purchaseOrderId,
+            IsDeleted = isDeleted
+        };
 
+        var response = await _sender.Send(request, cancellationToken);
+
+        if (response.Data == null || response.Data.Count == 0)
+        {
+            return NotFound(new ApiErrorResult
+            {
+                Code = StatusCodes.Status404NotFound,
+                Message = !string.IsNullOrEmpty(purchaseOrderId)
+                    ? $"Purchase order with ID {purchaseOrderId} not found."
+                    : "No purchase orders found."
+            });
+        }
+
+        return Ok(new ApiSuccessResult<GetPurchaseOrderResult>
+        {
+            Code = StatusCodes.Status200OK,
+            Message = $"Success executing {nameof(GetPurchaseOrderAsync)}",
+            Content = response
+        });
+    }
     [Authorize]
     [HttpGet("GetPurchaseOrderStatusList")]
     public async Task<ActionResult<ApiSuccessResult<GetPurchaseOrderStatusListResult>>> GetPurchaseOrderStatusListAsync(
@@ -96,7 +126,7 @@ public class PurchaseOrderController : BaseApiController
     [Authorize]
     [HttpGet("GetPurchaseOrderSingle")]
     public async Task<ActionResult<ApiSuccessResult<GetPurchaseOrderSingleResult>>> GetPurchaseOrderSingleAsync(
-    CancellationToken cancellationToken,
+        CancellationToken cancellationToken,
     [FromQuery] string id
     )
     {
@@ -112,6 +142,6 @@ public class PurchaseOrderController : BaseApiController
     }
 
 
-}
+    }
 
 

@@ -9,7 +9,7 @@ namespace Application.Features.PurchaseOrderItemManager.Queries;
 
 public record GetPurchaseOrderItemByPurchaseOrderIdListDto
 {
-    public string? Id { get; init; }
+    //public string? Id { get; init; }
     public string? PurchaseOrderId { get; init; }
     public string? PurchaseOrderNumber { get; init; }
     public string? ProductId { get; init; }

@@ -2,14 +2,17 @@
 
 namespace Application.Common.Repositories;
 
-
 public interface ICommandRepository<T> where T : BaseEntity
 {
     Task CreateAsync(T entity, CancellationToken cancellationToken = default);
 
+    Task CreateRangeAsync(IEnumerable<T> entities, CancellationToken cancellationToken = default);
+
     void Create(T entity);
 
     void Update(T entity);
+
+    void UpdateRange(IEnumerable<T> entities);
 
     void Delete(T entity);
 
@@ -21,4 +24,3 @@ public interface ICommandRepository<T> where T : BaseEntity
 
     IQueryable<T> GetQuery();
 }
-

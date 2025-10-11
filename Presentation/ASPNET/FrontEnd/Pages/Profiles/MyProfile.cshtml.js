@@ -37,16 +37,17 @@
         const services = {
             getMainData: async () => {
                 try {
+                    debugger;
                     const response = await AxiosManager.get('/Security/GetMyProfileList?userId=' + StorageManager.getUserId(), {});
                     return response;
                 } catch (error) {
                     throw error;
                 }
             },
-            updateMainData: async (userId, firstName, lastName, companyName) => {
+            updateMainData: async (userId, firstName, lastName,phoneNumber, companyName) => {
                 try {
                     const response = await AxiosManager.post('/Security/UpdateMyProfile', {
-                        userId, firstName, lastName, companyName
+                        userId, firstName, lastName,phoneNumber, companyName
                     });
                     return response;
                 } catch (error) {
@@ -117,6 +118,8 @@
                         },
                         { field: 'firstName', headerText: 'First Name', width: 200, minWidth: 200 },
                         { field: 'lastName', headerText: 'Last Name', width: 200, minWidth: 200 },
+                        { field: 'phoneNumber', headerText: 'Phone Number', width: 200, minWidth: 200 },
+                        
                         { field: 'companyName', headerText: 'Company Name', width: 400, minWidth: 400 },
                     ],
                     toolbar: [
@@ -159,11 +162,14 @@
 
                         if (args.item.id === 'EditCustom') {
                             if (mainGrid.obj.getSelectedRecords().length) {
+                                debugger
                                 const selectedRecord = mainGrid.obj.getSelectedRecords()[0];
                                 state.userId = selectedRecord.id ?? '';
                                 state.firstName = selectedRecord.firstName ?? '';
                                 state.lastName = selectedRecord.lastName ?? '';
                                 state.companyName = selectedRecord.companyName ?? '';
+                                state.phoneNumber = selectedRecord.phoneNumber ?? '';
+
                                 mainModal.obj.show();
                             }
                         }
@@ -195,6 +201,7 @@
 
         const handler = {
             handleSubmit: async () => {
+                debugger
                 state.isSubmitting = true;
                 await new Promise(resolve => setTimeout(resolve, 200));
 
@@ -220,7 +227,7 @@
                 }
 
                 try {
-                    const response = await services.updateMainData(state.userId, state.firstName, state.lastName, state.companyName);
+                    const response = await services.updateMainData(state.userId, state.firstName, state.lastName,state.phoneNumber, state.companyName);
                     if (response.data.code === 200) {
                         await methods.populateMainData();
                         mainGrid.refresh();

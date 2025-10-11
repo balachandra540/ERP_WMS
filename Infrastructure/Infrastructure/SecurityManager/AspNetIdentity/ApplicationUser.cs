@@ -4,7 +4,6 @@ namespace Infrastructure.SecurityManager.AspNetIdentity;
 
 public class ApplicationUser : IdentityUser
 {
-
     public string? FirstName { get; set; }
     public string? LastName { get; set; }
     public string? CompanyName { get; set; }
@@ -16,6 +15,10 @@ public class ApplicationUser : IdentityUser
     public DateTime? UpdatedAt { get; set; }
     public string? UpdatedById { get; set; }
 
+    // NEW PROPERTY: Add this line for your new column
+    public string? PhoneNumber { get; set; }
+
+    public string? Test { get; set; }
 
     public ApplicationUser(
         string email,
@@ -35,7 +38,7 @@ public class ApplicationUser : IdentityUser
         LastName = lastName.Trim();
         CompanyName = companyName.Trim();
         CreatedById = createdById.Trim();
+        // Optional: Initialize the new property here if needed
+         PhoneNumber = "";
     }
-
 }
-

@@ -55,6 +55,7 @@ public interface ISecurityService
         string userId,
         string firstName,
         string lastName,
+        string phoneNumber,
         string companyName,
         CancellationToken cancellationToken
         );
@@ -128,4 +129,12 @@ public interface ISecurityService
         string avatar,
         CancellationToken cancellationToken
         );
+
+    DateTime? ConvertToIst(DateTime? input);
+
+    /// <summary>
+    /// Converts a DateTime? input (assumed UTC) to IST date-only (midnight IST, Kind=Unspecified).
+    /// For 'date' columns like ReceiveDate.
+    /// </summary>
+    DateTime? ConvertToIstDateOnly(DateTime? input);
 }

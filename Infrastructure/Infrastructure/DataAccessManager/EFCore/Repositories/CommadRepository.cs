@@ -22,6 +22,16 @@ public class CommandRepository<T> : ICommandRepository<T> where T : BaseEntity
         await _context.AddAsync(entity, cancellationToken);
     }
 
+    public async Task CreateRangeAsync(IEnumerable<T> entities, CancellationToken cancellationToken = default)
+    {
+        foreach (var entity in entities)
+        {
+            entity.CreatedAtUtc = DateTime.Now;
+        }
+
+        await _context.AddRangeAsync(entities, cancellationToken);
+    }
+
     public void Create(T entity)
     {
         entity.CreatedAtUtc = DateTime.Now;
@@ -32,6 +42,16 @@ public class CommandRepository<T> : ICommandRepository<T> where T : BaseEntity
     {
         entity.UpdatedAtUtc = DateTime.Now;
         _context.Update(entity);
+    }
+
+    public void UpdateRange(IEnumerable<T> entities)
+    {
+        foreach (var entity in entities)
+        {
+            entity.UpdatedAtUtc = DateTime.Now;
+        }
+
+        _context.UpdateRange(entities);
     }
 
     public void Delete(T entity)
@@ -70,6 +90,4 @@ public class CommandRepository<T> : ICommandRepository<T> where T : BaseEntity
 
         return query;
     }
-
-
 }

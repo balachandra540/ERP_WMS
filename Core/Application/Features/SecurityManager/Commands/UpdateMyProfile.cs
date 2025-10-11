@@ -17,6 +17,11 @@ public class UpdateMyProfileRequest : IRequest<UpdateMyProfileResult>
     public string? FirstName { get; init; }
     public string? LastName { get; init; }
     public string? CompanyName { get; init; }
+    public string? PhoneNumber { get; init; }
+
+    public string? Test { get; init; }
+
+
 }
 
 public class UpdateMyProfileValidator : AbstractValidator<UpdateMyProfileRequest>
@@ -44,6 +49,7 @@ public class UpdateMyProfileHandler : IRequestHandler<UpdateMyProfileRequest, Up
             request.UserId ?? "",
             request.FirstName ?? "",
             request.LastName ?? "",
+            request.PhoneNumber ?? "",
             request.CompanyName ?? "",
             cancellationToken
             );
