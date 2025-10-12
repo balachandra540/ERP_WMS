@@ -83,29 +83,28 @@
         const services = {
             getMainData: async () => {
                 try {
-                    const location = StorageManager.getLocation();
-                    const response = await AxiosManager.get('/Product/GetProductList', {
-                        params: { location }  
-                    });
+                    const warehouseId = StorageManager.getLocation();
+                    const response = await AxiosManager.get('/Product/GetProductList?warehouseId=' + warehouseId, {});
+                        
                     return response;
                 } catch (error) {
                     throw error;
                 }
             },
-            createMainData: async (name, unitPrice, physical, description, productGroupId, unitMeasureId, createdById, location) => {
+            createMainData: async (name, unitPrice, physical, description, productGroupId, unitMeasureId, createdById, warehouseId) => {
                 try {
                     const response = await AxiosManager.post('/Product/CreateProduct', {
-                        name, unitPrice, physical, description, productGroupId, unitMeasureId, createdById, location
+                        name, unitPrice, physical, description, productGroupId, unitMeasureId, createdById, warehouseId
                     });
                     return response;
                 } catch (error) {
                     throw error;
                 }
             },
-            updateMainData: async (id, name, unitPrice, physical, description, productGroupId, unitMeasureId, updatedById, location) => {
+            updateMainData: async (id, name, unitPrice, physical, description, productGroupId, unitMeasureId, updatedById, warehouseId) => {
                 try {
                     const response = await AxiosManager.post('/Product/UpdateProduct', {
-                        id, name, unitPrice, physical, description, productGroupId, unitMeasureId, updatedById, location
+                        id, name, unitPrice, physical, description, productGroupId, unitMeasureId, updatedById, warehouseId
                     });
                     return response;
                 } catch (error) {

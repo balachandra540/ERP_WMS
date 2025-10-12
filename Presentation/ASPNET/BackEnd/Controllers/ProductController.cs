@@ -60,11 +60,17 @@ public class ProductController : BaseApiController
     [Authorize]
     [HttpGet("GetProductList")]
     public async Task<ActionResult<ApiSuccessResult<GetProductListResult>>> GetProductListAsync(
-        CancellationToken cancellationToken,
-        [FromQuery] bool isDeleted = false
-        )
+    CancellationToken cancellationToken,
+    [FromQuery] string? warehouseId = null,
+      [FromQuery] bool isDeleted = false     
+)
     {
-        var request = new GetProductListRequest { IsDeleted = isDeleted };
+        var request = new GetProductListRequest
+        {
+            IsDeleted = isDeleted,
+            WarehouseId = warehouseId  //Add this line
+        };
+
         var response = await _sender.Send(request, cancellationToken);
 
         return Ok(new ApiSuccessResult<GetProductListResult>

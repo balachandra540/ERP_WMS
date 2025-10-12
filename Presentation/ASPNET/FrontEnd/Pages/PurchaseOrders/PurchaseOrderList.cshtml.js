@@ -16,6 +16,7 @@
             vendorId: null,
             taxId: null,
             orderStatus: null,
+            location:'',
             errors: {
                 orderDate: '',
                 vendorId: '',
@@ -92,7 +93,10 @@
         const services = {
             getMainData: async () => {
                 try {
-                    const response = await AxiosManager.get('/PurchaseOrder/GetPurchaseOrderList', {});
+                    const location = StorageManager.getLocation();
+                    const response = await AxiosManager.get('/PurchaseOrder/GetPurchaseOrderList', {
+                       params: { location }
+                    });
                     return response;
                 } catch (error) {
                     throw error;
@@ -942,6 +946,7 @@
                 await SecurityManager.authorizePage(['PurchaseOrders']);
                 await SecurityManager.validateToken();
 
+                state.location = StorageManager.getLocation();
                 await methods.populateMainData();
                 await mainGrid.create(state.mainData);
 

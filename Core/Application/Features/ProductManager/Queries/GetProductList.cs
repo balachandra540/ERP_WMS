@@ -47,8 +47,8 @@ public class GetProductListResult
 
 public class GetProductListRequest : IRequest<GetProductListResult>
 {
-    public bool IsDeleted { get; init; } = false;
     public string? WarehouseId { get; init; } // optional filter by location/warehouse
+    public bool IsDeleted { get; init; } = false;
 }
 
 
