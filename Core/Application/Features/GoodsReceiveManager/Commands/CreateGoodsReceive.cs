@@ -192,6 +192,7 @@ namespace Application.Features.GoodsReceiveManager.Commands
                     IsDeleted = false
                 };
                 await _goodsReceiveItemRepository.CreateAsync(grItem, cancellationToken);
+                await _unitOfWork.SaveAsync(cancellationToken);  // Save to generate Id
 
                 createdItems.Add(grItem);
 
