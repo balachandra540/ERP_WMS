@@ -9,7 +9,8 @@
     USER_ROLES: 'userRoles',
     MENU_NAVIGATION: 'menuNavigation',
     AVATAR: 'avatar',
-    COMPANY: 'company'
+    COMPANY: 'company',
+    LOCATION: 'location'
 };
 
 const StorageManager = {
@@ -91,6 +92,10 @@ const StorageManager = {
     getCompany: () => StorageManager.get(STORAGE_KEYS.COMPANY),
     removeCompany: () => StorageManager.remove(STORAGE_KEYS.COMPANY),
 
+    saveLocation: (location) => StorageManager.save(STORAGE_KEYS.LOCATION, location),
+    getLocation: () => StorageManager.get(STORAGE_KEYS.LOCATION),
+    removeLocation: () => StorageManager.remove(STORAGE_KEYS.LOCATION),
+
     saveLoginResult: (data) => {
         StorageManager.saveAccessToken(data?.content?.data?.accessToken);
         StorageManager.saveRefreshToken(data?.content?.data?.refreshToken);
@@ -99,6 +104,7 @@ const StorageManager = {
         StorageManager.saveEmail(data?.content?.data?.email);
         StorageManager.saveUserId(data?.content?.data?.userId);
         StorageManager.saveUserRoles(data?.content?.data?.roles);
+        StorageManager.saveLocation(data?.content?.data?.location);
         StorageManager.saveMenuNavigation(data?.content?.data?.menuNavigation);
         StorageManager.saveIsAuthenticated(StorageManager.getUserId() != null);
         StorageManager.saveAvatar(data?.content?.data?.avatar);

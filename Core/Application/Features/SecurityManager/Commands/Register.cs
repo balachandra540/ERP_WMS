@@ -16,6 +16,7 @@ public class RegisterRequest : IRequest<RegisterResult>
     public string? ConfirmPassword { get; init; }
     public string? FirstName { get; init; }
     public string? LastName { get; init; }
+    public string? warehouse { get; init; }
     public string? CompanyName { get; init; }
 }
 
@@ -48,6 +49,7 @@ public class RegisterHandler : IRequestHandler<RegisterRequest, RegisterResult>
             request.ConfirmPassword ?? "",
             request.FirstName ?? "",
             request.LastName ?? "",
+            request.warehouse ?? "",
             request.CompanyName ?? "",
             cancellationToken
             );

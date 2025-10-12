@@ -19,6 +19,7 @@ public interface ISecurityService
         string confirmPassword,
         string firstName,
         string lastName,
+        string warehouse = "",
         string companyName = "",
         CancellationToken cancellationToken = default
         );
@@ -82,6 +83,7 @@ public interface ISecurityService
         string confirmPassword,
         string firstName,
         string lastName,
+        string wareHouse ="",
         bool emailConfirmed = true,
         bool isBlocked = false,
         bool isDeleted = false,
@@ -93,11 +95,12 @@ public interface ISecurityService
         string userId,
         string firstName,
         string lastName,
+        string wareHouse = "",
         bool emailConfirmed = true,
         bool isBlocked = false,
         bool isDeleted = false,
         string updatedById = "",
-        CancellationToken cancellationToken = default
+         CancellationToken cancellationToken = default
         );
 
     public Task<DeleteUserResultDto> DeleteUserAsync(

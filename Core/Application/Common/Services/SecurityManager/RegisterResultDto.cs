@@ -7,4 +7,5 @@ public record RegisterResultDto
     public string? FirstName { get; init; }
     public string? LastName { get; init; }
     public string? CompanyName { get; init; }
+    public string? WareHouse { get; init; }
 }

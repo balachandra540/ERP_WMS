@@ -9,5 +9,6 @@ public record GetUserListResultDto
     public bool? IsBlocked { get; init; }
     public bool? IsDeleted { get; init; }
     public DateTime? CreatedAt { get; init; }
+    public string? wareHouse { get; init; }
 }
 

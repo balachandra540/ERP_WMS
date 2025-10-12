@@ -62,29 +62,28 @@ public class UserSeeder
 
     public async Task GenerateDataAsync()
     {
-        // Access the nested DefaultAdmin section
-        var defaultAdminSection = _configuration.GetSection("AspNetIdentity:DefaultAdmin");
-        if (!defaultAdminSection.Exists())
+        var userNames = new List<string>
+        {
+            "Alex", "Taylor", "Jordan", "Morgan", "Riley",
+            "Casey", "Peyton", "Cameron", "Jamie", "Drew",
+            "Dakota", "Avery", "Quinn", "Harper", "Rowan",
+            "Emerson", "Finley", "Skyler", "Charlie", "Sage"
+        };
+
+        var defaultPassword = "123456";
+        var domain = "@example.com";
+        var warehouse = "";
+        foreach (var name in userNames)
         {
             throw new InvalidOperationException("AspNetIdentity:DefaultAdmin section is missing in appsettings.json.");
         }
 
-        var adminEmail = defaultAdminSection["Email"];
-        var adminPassword = defaultAdminSection["Password"];// Check if the admin user already exists
-        if (await _userManager.FindByEmailAsync(adminEmail) == null)
-        {
-            // Create the admin user
-            // Check if admin user exists
-            if (await _userManager.FindByEmailAsync(adminEmail) == null)
+            if (await _userManager.FindByEmailAsync(email) == null)
             {
-                // Use the ApplicationUser constructor
-                var adminUser = new ApplicationUser(
-                    email: adminEmail,
-                    firstName: "Admin",
-                    lastName: "User"
-                   // companyName: "Root Inc.", // Optional: Customize as needed
-                    //createdById: "System"     // Optional: Indicate system creation
-                );
+                var applicationUser = new ApplicationUser(email, name, "User", warehouse)
+                {
+                    EmailConfirmed = true
+                };
 
                 // Create the user with the password
                 var createResult = await _userManager.CreateAsync(adminUser, adminPassword);

@@ -9,4 +9,6 @@ public record UpdateUserResultDto
     public bool? EmailConfirmed { get; init; }
     public bool? IsBlocked { get; init; }
     public bool? IsDeleted { get; init; }
+    public string? wareHouse { get; init; }
+
 }

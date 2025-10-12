@@ -20,6 +20,7 @@ public record GetProductListDto
     public string? ProductGroupId { get; init; }
     public string? ProductGroupName { get; init; }
     public DateTime? CreatedAtUtc { get; init; }
+    public string? WarehouseId { get; init; }
 }
 
 public class GetProductListProfile : Profile
@@ -47,6 +48,7 @@ public class GetProductListResult
 public class GetProductListRequest : IRequest<GetProductListResult>
 {
     public bool IsDeleted { get; init; } = false;
+    public string? WarehouseId { get; init; } // optional filter by location/warehouse
 }
 
 
@@ -71,6 +73,12 @@ public class GetProductListHandler : IRequestHandler<GetProductListRequest, GetP
             .Include(x => x.ProductGroup)
             .AsQueryable();
 
+        // Filter by WarehouseId if provided
+        if (!string.IsNullOrEmpty(request.WarehouseId))
+        {
+            query = query.Where(x => x.WarehouseId == request.WarehouseId);
+        }
+
         var entities = await query.ToListAsync(cancellationToken);
 
         var dtos = _mapper.Map<List<GetProductListDto>>(entities);
@@ -80,9 +88,9 @@ public class GetProductListHandler : IRequestHandler<GetProductListRequest, GetP
             Data = dtos
         };
     }
-
-
 }
+
+
 
 
 

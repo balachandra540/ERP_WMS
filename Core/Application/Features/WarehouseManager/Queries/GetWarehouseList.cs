@@ -14,6 +14,18 @@ public record GetWarehouseListDto
     public string? Description { get; init; }
     public bool? SystemWarehouse { get; init; }
     public DateTime? CreatedAtUtc { get; init; }
+    public string? Currency { get; init; }
+    public string? Street { get; init; }
+    public string? City { get; init; }
+    public string? State { get; init; }
+    public string? ZipCode { get; init; }
+    public string? Country { get; init; }
+    public string? PhoneNumber { get; init; }
+    public string? FaxNumber { get; init; }
+    public string? EmailAddress { get; init; }
+    public string? Type { get; init; }
+    public string? GstNumber { get; init; }
+    public string? Logo { get; init; }
 }
 
 public class GetWarehouseListProfile : Profile

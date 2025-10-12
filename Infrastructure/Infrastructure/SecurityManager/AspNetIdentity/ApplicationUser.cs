@@ -14,6 +14,7 @@ public class ApplicationUser : IdentityUser
     public string? CreatedById { get; set; }
     public DateTime? UpdatedAt { get; set; }
     public string? UpdatedById { get; set; }
+    public string? wareHouse { get; set; }
 
     // NEW PROPERTY: Add this line for your new column
     public string? PhoneNumber { get; set; }
@@ -24,6 +25,7 @@ public class ApplicationUser : IdentityUser
         string email,
         string firstName,
         string lastName,
+        string wareHouse ,
         string companyName = "",
         string createdById = ""
         )
@@ -40,5 +42,6 @@ public class ApplicationUser : IdentityUser
         CreatedById = createdById.Trim();
         // Optional: Initialize the new property here if needed
          PhoneNumber = "";
+        this.wareHouse = wareHouse != null ? wareHouse.Trim() : "";
     }
 }

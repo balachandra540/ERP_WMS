@@ -59,7 +59,8 @@ public class GetInventoryStockListHandler : IRequestHandler<GetInventoryStockLis
             .Include(x => x.Product)
             .Where(x =>
                 x.Product!.Physical == true &&
-                x.Warehouse!.SystemWarehouse == false &&
+                //x.Warehouse!.SystemWarehouse == false &&
+                (x.Warehouse!.Type == "Store" || x.Warehouse!.Type == "Store&Sales") && 
                 x.Status == Domain.Enums.InventoryTransactionStatus.Confirmed
             )
             .GroupBy(x => new { x.WarehouseId, x.ProductId })

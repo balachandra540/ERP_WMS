@@ -14,6 +14,7 @@
             productGroupId: null,
             unitMeasureId: null,
             physical: false,
+            location: '', // 👈 add this
             errors: {
                 name: '',
                 unitPrice: '',
@@ -82,26 +83,29 @@
         const services = {
             getMainData: async () => {
                 try {
-                    const response = await AxiosManager.get('/Product/GetProductList', {});
-                    return response;
-                } catch (error) {
-                    throw error;
-                }
-            },
-            createMainData: async (name, unitPrice, physical, description, productGroupId, unitMeasureId, createdById) => {
-                try {
-                    const response = await AxiosManager.post('/Product/CreateProduct', {
-                        name, unitPrice, physical, description, productGroupId, unitMeasureId, createdById
+                    const location = StorageManager.getLocation();
+                    const response = await AxiosManager.get('/Product/GetProductList', {
+                        params: { location }  
                     });
                     return response;
                 } catch (error) {
                     throw error;
                 }
             },
-            updateMainData: async (id, name, unitPrice, physical, description, productGroupId, unitMeasureId, updatedById) => {
+            createMainData: async (name, unitPrice, physical, description, productGroupId, unitMeasureId, createdById, location) => {
+                try {
+                    const response = await AxiosManager.post('/Product/CreateProduct', {
+                        name, unitPrice, physical, description, productGroupId, unitMeasureId, createdById, location
+                    });
+                    return response;
+                } catch (error) {
+                    throw error;
+                }
+            },
+            updateMainData: async (id, name, unitPrice, physical, description, productGroupId, unitMeasureId, updatedById, location) => {
                 try {
                     const response = await AxiosManager.post('/Product/UpdateProduct', {
-                        id, name, unitPrice, physical, description, productGroupId, unitMeasureId, updatedById
+                        id, name, unitPrice, physical, description, productGroupId, unitMeasureId, updatedById, location
                     });
                     return response;
                 } catch (error) {
@@ -304,10 +308,9 @@
                     }
 
                     const response = state.id === ''
-                        ? await services.createMainData(state.name, state.unitPrice, state.physical, state.description, state.productGroupId, state.unitMeasureId, StorageManager.getUserId())
-                        : state.deleteMode
+                        ? await services.createMainData(state.name, state.unitPrice, state.physical, state.description, state.productGroupId, state.unitMeasureId, StorageManager.getUserId(), state.location) : state.deleteMode
                             ? await services.deleteMainData(state.id, StorageManager.getUserId())
-                            : await services.updateMainData(state.id, state.name, state.unitPrice, state.physical, state.description, state.productGroupId, state.unitMeasureId, StorageManager.getUserId());
+                            : await services.updateMainData(state.id, state.name, state.unitPrice, state.physical, state.description, state.productGroupId, state.unitMeasureId, StorageManager.getUserId(), state.location);
 
                     if (response.data.code === 200) {
                         await methods.populateMainData();
@@ -375,6 +378,11 @@
             try {
                 await SecurityManager.authorizePage(['Products']);
                 await SecurityManager.validateToken();
+
+                //  Get location from localStorage (JSON array or single)
+                let selectedLocation = StorageManager.getLocation();
+                state.location = selectedLocation;
+
 
                 await methods.populateMainData();
                 await mainGrid.create(state.mainData);

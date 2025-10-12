@@ -12,7 +12,16 @@
     <!-- Right navbar links -->
 
     <span class="mt-0" id="topbarContent">Currency: </span>
-    <ul class="navbar-nav ml-auto">
+    <ul class="navbar-nav ml-auto align-items-center">
+
+        <!-- Location Dropdown -->
+        <li class="nav-item dropdown mr-3">
+            <select id="locationDropdown" class="form-control form-control-sm" style="min-width: 150px;">
+                <option selected disabled>Select Location</option>
+            </select>
+        </li>
+
+        <!-- Profile Dropdown -->
         <li class="nav-item dropdown">
             <a class="nav-link" data-toggle="dropdown" href="#">
                 <i class="fas fa-th-large"></i>
@@ -32,3 +41,89 @@
         </li>
     </ul>
 </nav>
+<script>
+    document.addEventListener('DOMContentLoaded', async function () {
+        debugger;
+
+        const locationDropdown = document.getElementById("locationDropdown");
+        if (!locationDropdown) return;
+
+        // Step 1️⃣: Get stored warehouse IDs (string like "W001,W002")
+        let storedIds = StorageManager.getLocation();
+
+        if (!storedIds) return;
+
+        // Step 2️⃣: Convert to array (split by comma)
+        if (typeof storedIds === "string") {
+            storedIds = storedIds
+                .split(',')              // split by comma
+                .map(id => id.trim())    // remove spaces
+                .filter(id => id !== ""); // remove empty values
+        }
+
+        if (!Array.isArray(storedIds) || storedIds.length === 0) return;
+
+        try {
+            // Step 3️⃣: Fetch all warehouses
+            const response = await AxiosManager.get('/Warehouse/GetWarehouseList');
+            const warehouses = response?.data?.content?.data || [];
+
+            // Step 4️⃣: Add matching warehouses to dropdown
+            warehouses.forEach(wh => {
+                if (storedIds.includes(wh.id)) {
+                    const opt = document.createElement("option");
+                    opt.value = wh.id;
+                    opt.textContent = wh.name;
+                    locationDropdown.appendChild(opt);
+                }
+            });
+
+            // Optional: auto-select first if only one
+            if (locationDropdown.options.length === 2) {
+                locationDropdown.selectedIndex = 1;
+            }
+
+        } catch (error) {
+            console.error("❌ Failed to load warehouse names:", error);
+        }
+    });
+
+
+
+    // document.addEventListener('DOMContentLoaded', function () {
+    //     debugger;
+
+    //     let locationDropdown = document.getElementById("locationDropdown");
+    //     debugger;
+    //     if (!locationDropdown) return;
+
+    //     let locations =[];
+    //     // ✅ Get location data from localStorage
+    //      locations = StorageManager.getLocation();
+
+       
+    //     // ✅ Populate dropdown dynamically
+    //     if (Array.isArray(locations) && locations.length > 0) {
+    //         locations.forEach(loc => {
+    //             const opt = document.createElement("option");
+    //             opt.value = loc;
+    //             opt.textContent = loc;
+    //             locationDropdown.appendChild(opt);
+    //         });
+    //     }
+
+    //     // // ✅ Preselect previously chosen location
+    //     // const selected = localStorage.getItem("selectedLocation");
+    //     // if (selected) {
+    //     //     locationDropdown.value = selected;
+    //     // }
+
+    //     // ✅ Handle change
+    //     // locationDropdown.addEventListener("change", function () {
+    //     //     const value = this.value;
+    //     //     localStorage.setItem("selectedLocation", value);
+    //     //     console.log("Selected location:", value);
+    //     // });
+    // });
+</script>
+

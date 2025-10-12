@@ -29,7 +29,8 @@ public class UserAdminSeeder
             var applicationUser = new ApplicationUser(
                 adminEmail,
                 "Root",
-                "Admin"
+                "Admin",
+                ""
                 );
 
             applicationUser.EmailConfirmed = true;

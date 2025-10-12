@@ -74,6 +74,19 @@ public class WarehouseController : BaseApiController
             Content = response
         });
     }
+    [Authorize]
+    [HttpPost("UpdateLogo")]
+    public async Task<ActionResult<ApiSuccessResult<UpdateWarehouseLogoResult>>> UpdateLogoAsync(UpdateWarehouseLogoRequest request, CancellationToken cancellationToken)
+    {
+        var response = await _sender.Send(request, cancellationToken);
+
+        return Ok(new ApiSuccessResult<UpdateWarehouseLogoResult>
+        {
+            Code = StatusCodes.Status200OK,
+            Message = $"Success executing {nameof(UpdateLogoAsync)}",
+            Content = response
+        });
+    }
 
 
 }

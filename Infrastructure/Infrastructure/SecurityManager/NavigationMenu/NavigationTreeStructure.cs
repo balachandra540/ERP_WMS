@@ -128,11 +128,6 @@ public static class NavigationTreeStructure
                     "IsModule": false
                 },
                 {
-                    "URL": "/Warehouses/WarehouseList",
-                    "Name": "Warehouse",
-                    "IsModule": false
-                },
-                {
                     "URL": "/DeliveryOrders/DeliveryOrderList",
                     "Name": "Delivery Order",
                     "IsModule": false
@@ -253,6 +248,11 @@ public static class NavigationTreeStructure
                 {
                     "URL": "/Companies/MyCompany",
                     "Name": "My Company",
+                    "IsModule": false
+                },
+                {
+                    "URL": "/Warehouses/WarehouseList",
+                    "Name": "Location",
                     "IsModule": false
                 },
                 {
