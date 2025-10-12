@@ -7,4 +7,7 @@ public record GetMyProfileListResultDto
     public string? LastName { get; init; }
     public string? CompanyName { get; init; }
     public string? Location { get; init; }
+    public string PhoneNumber { get; init; } // Add this
+
+
 }

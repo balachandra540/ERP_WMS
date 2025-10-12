@@ -42,7 +42,13 @@
                                             </div>
                                         </div>
                                         <div class="row mb-0">
-                                            <div class="col-12">
+                                            <div class="col-md-6">
+                                                <label for="phoneNumber">Phone Number</label>
+                                                <input ref="phoneNumberRef" v-model="state.phoneNumber" type="text" class="form-control" placeholder="">
+                                                <label class="text-danger">{{ state.errors.phoneNumber }}</label>
+                                            </div>
+
+                                            <div class="col-md-6">
                                                 <label for="CompanyName">Company Name</label>
                                                 <textarea ref="companyNameRef" v-model="state.companyName" class="form-control" rows="3"></textarea>
                                             </div>

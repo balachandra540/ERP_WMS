@@ -76,6 +76,23 @@ public class GoodsReceiveController : BaseApiController
     }
 
 
+    [Authorize]
+    [HttpGet("GetGoodsReceiveItemList")]
+    public async Task<ActionResult<ApiSuccessResult<GetGoodsReceiveItemListResult>>> GetGoodsReceiveItemListAsync(
+    [FromQuery] string goodsReceiveId,
+    CancellationToken cancellationToken
+)
+    {
+        var request = new GetGoodsReceiveItemListRequest { GoodsReceiveId = goodsReceiveId };
+        var response = await _sender.Send(request, cancellationToken);
+
+        return Ok(new ApiSuccessResult<GetGoodsReceiveItemListResult>
+        {
+            Code = StatusCodes.Status200OK,
+            Message = $"Success executing {nameof(GetGoodsReceiveItemListAsync)}",
+            Content = response
+        });
+    }
 
     [Authorize]
     [HttpGet("GetGoodsReceiveStatusList")]

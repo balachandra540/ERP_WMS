@@ -1,4 +1,5 @@
 ﻿using Application.Common.Repositories;
+using Application.Common.Services.SecurityManager;
 using Application.Features.NumberSequenceManager;
 using Domain.Entities;
 using Domain.Enums;
@@ -39,18 +40,22 @@ public class CreatePurchaseOrderHandler : IRequestHandler<CreatePurchaseOrderReq
     private readonly IUnitOfWork _unitOfWork;
     private readonly NumberSequenceService _numberSequenceService;
     private readonly PurchaseOrderService _purchaseOrderService;
+    private readonly ISecurityService _securityService;
 
     public CreatePurchaseOrderHandler(
         ICommandRepository<PurchaseOrder> repository,
         IUnitOfWork unitOfWork,
         NumberSequenceService numberSequenceService,
-        PurchaseOrderService purchaseOrderService
+        PurchaseOrderService purchaseOrderService,
+        ISecurityService securityService
+
         )
     {
         _repository = repository;
         _unitOfWork = unitOfWork;
         _numberSequenceService = numberSequenceService;
         _purchaseOrderService = purchaseOrderService;
+        _securityService = securityService;
     }
 
     public async Task<CreatePurchaseOrderResult> Handle(CreatePurchaseOrderRequest request, CancellationToken cancellationToken = default)
@@ -59,7 +64,7 @@ public class CreatePurchaseOrderHandler : IRequestHandler<CreatePurchaseOrderReq
         entity.CreatedById = request.CreatedById;
 
         entity.Number = _numberSequenceService.GenerateNumber(nameof(PurchaseOrder), "", "PO");
-        entity.OrderDate = request.OrderDate;
+        entity.OrderDate = _securityService.ConvertToIst(request.OrderDate); 
         entity.OrderStatus = (PurchaseOrderStatus)int.Parse(request.OrderStatus!);
         entity.Description = request.Description;
         entity.VendorId = request.VendorId;

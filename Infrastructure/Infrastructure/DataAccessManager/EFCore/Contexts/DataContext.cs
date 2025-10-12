@@ -51,6 +51,7 @@ public class DataContext : IdentityDbContext<ApplicationUser>, IEntityDbSet
     public DbSet<NegativeAdjustment> NegativeAdjustment { get; set; }
     public DbSet<PositiveAdjustment> PositiveAdjustment { get; set; }
     public DbSet<Scrapping> Scrapping { get; set; }
+    public DbSet<GoodsReceiveItem> GoodsReceiveItem{ get; set; } // NEW
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -104,7 +105,7 @@ public class DataContext : IdentityDbContext<ApplicationUser>, IEntityDbSet
         modelBuilder.ApplyConfiguration(new NegativeAdjustmentConfiguration());
         modelBuilder.ApplyConfiguration(new PositiveAdjustmentConfiguration());
         modelBuilder.ApplyConfiguration(new ScrappingConfiguration());
-
+        modelBuilder.ApplyConfiguration(new GoodsReceiveItemConfiguration()); // NEW
     }
 
 }
