@@ -1,4 +1,5 @@
 ﻿using Application.Common.Repositories;
+using Application.Common.Services.SecurityManager;
 using Application.Features.NumberSequenceManager;
 using Domain.Entities;
 using Domain.Enums;
@@ -38,16 +39,19 @@ public class CreateTransferOutHandler : IRequestHandler<CreateTransferOutRequest
     private readonly ICommandRepository<TransferOut> _repository;
     private readonly IUnitOfWork _unitOfWork;
     private readonly NumberSequenceService _numberSequenceService;
+    private readonly ISecurityService _securityService;
 
     public CreateTransferOutHandler(
         ICommandRepository<TransferOut> repository,
         IUnitOfWork unitOfWork,
-        NumberSequenceService numberSequenceService
+        NumberSequenceService numberSequenceService,
+          ISecurityService securityService
         )
     {
         _repository = repository;
         _unitOfWork = unitOfWork;
         _numberSequenceService = numberSequenceService;
+        _securityService = securityService;
     }
 
     public async Task<CreateTransferOutResult> Handle(CreateTransferOutRequest request, CancellationToken cancellationToken = default)
@@ -56,7 +60,7 @@ public class CreateTransferOutHandler : IRequestHandler<CreateTransferOutRequest
         entity.CreatedById = request.CreatedById;
 
         entity.Number = _numberSequenceService.GenerateNumber(nameof(TransferOut), "", "OUT");
-        entity.TransferReleaseDate = request.TransferReleaseDate;
+        entity.TransferReleaseDate = _securityService.ConvertToIst(request.TransferReleaseDate);
         entity.Status = (TransferStatus)int.Parse(request.Status!);
         entity.Description = request.Description;
         entity.WarehouseFromId = request.WarehouseFromId;

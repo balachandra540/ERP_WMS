@@ -1,4 +1,5 @@
-﻿using Infrastructure.SecurityManager.AspNetIdentity;
+﻿using Domain.Entities;
+using Infrastructure.SecurityManager.AspNetIdentity;
 using Infrastructure.SecurityManager.Roles;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Configuration;
@@ -59,7 +60,6 @@ public class UserSeeder
         _userManager = userManager;
         _configuration = configuration;
     }
-
     public async Task GenerateDataAsync()
     {
         // Access the nested DefaultAdmin section
@@ -70,6 +70,7 @@ public class UserSeeder
         }
 
         var adminEmail = defaultAdminSection["Email"];
+        var warehouse = "";
         var adminPassword = defaultAdminSection["Password"];// Check if the admin user already exists
         if (await _userManager.FindByEmailAsync(adminEmail) == null)
         {
@@ -77,18 +78,13 @@ public class UserSeeder
             // Check if admin user exists
             if (await _userManager.FindByEmailAsync(adminEmail) == null)
             {
-                // Use the ApplicationUser constructor
-                var adminUser = new ApplicationUser(
-                    email: adminEmail,
-                    firstName: "Admin",
-                    lastName: "User",
-                    wareHouse :""
-                // companyName: "Root Inc.", // Optional: Customize as needed
-                //createdById: "System"     // Optional: Indicate system creation
-                );
-
+                
+                var applicationUser = new ApplicationUser(adminEmail, "Admin", "User", warehouse)
+                {
+                    EmailConfirmed = true
+                };
                 // Create the user with the password
-                var createResult = await _userManager.CreateAsync(adminUser, adminPassword);
+                var createResult = await _userManager.CreateAsync(applicationUser, adminPassword);
                 if (!createResult.Succeeded)
                 {
                     var errors = string.Join(", ", createResult.Errors.Select(e => e.Description));
@@ -97,9 +93,9 @@ public class UserSeeder
 
                 // Assign the "Admin" role (or use RoleHelper.GetProfileRole() if needed)
                 var role = RoleHelper.GetProfileRole();
-                if (!await _userManager.IsInRoleAsync(adminUser, role))
+                if (!await _userManager.IsInRoleAsync(applicationUser, role))
                 {
-                    var roleResult = await _userManager.AddToRoleAsync(adminUser, role);
+                    var roleResult = await _userManager.AddToRoleAsync(applicationUser, role);
                     if (!roleResult.Succeeded)
                     {
                         var roleErrors = string.Join(", ", roleResult.Errors.Select(e => e.Description));
@@ -109,4 +105,5 @@ public class UserSeeder
             }
         }
     }
+    
 }
