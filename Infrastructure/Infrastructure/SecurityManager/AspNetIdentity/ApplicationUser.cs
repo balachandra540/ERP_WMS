@@ -15,12 +15,14 @@ public class ApplicationUser : IdentityUser
     public string? CreatedById { get; set; }
     public DateTime? UpdatedAt { get; set; }
     public string? UpdatedById { get; set; }
+    public string? wareHouse { get; set; }
 
 
     public ApplicationUser(
         string email,
         string firstName,
         string lastName,
+        string wareHouse ,
         string companyName = "",
         string createdById = ""
         )
@@ -35,6 +37,7 @@ public class ApplicationUser : IdentityUser
         LastName = lastName.Trim();
         CompanyName = companyName.Trim();
         CreatedById = createdById.Trim();
+        this.wareHouse = wareHouse != null ? wareHouse.Trim() : "";
     }
 
 }

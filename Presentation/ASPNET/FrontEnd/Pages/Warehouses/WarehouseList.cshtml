@@ -32,20 +32,110 @@
                                         <div class="row mb-2">
                                             <div class="col-md-6">
                                                 <label for="Name">Name</label>
-                                                <input ref="nameRef" v-model="state.name">
+                                                <input ref="nameRef" v-model="state.name" id="Name" name="Name" class="form-control">
                                                 <label class="text-danger">{{ state.errors.name }}</label>
                                             </div>
-                                            <div class="col-md-6">
+                                            @* <div class="col-md-6">
                                                 <div class="form-check mt-4">
                                                     <input v-model="state.isSystemWarehouse" id="SystemWarehouse" name="SystemWarehouse" type="checkbox" class="form-check-input" disabled>
                                                     <label for="SystemWarehouse" class="form-check-label">Is System Warehouse?</label>
                                                 </div>
+                                            </div> *@
+                                        </div>
+                                        <div class="row mb-2">
+                                            <div class="col-md-6">
+                                                <label for="Currency">Currency</label>
+                                                <input v-model="state.currency" id="Currency" name="Currency" class="form-control">
+                                                <label class="text-danger">{{ state.errors.currency }}</label>
                                             </div>
+                                            <div class="col-md-6">
+                                                <label for="Type">Type</label>
+                                                <select v-model="state.type" id="Type" name="Type" class="form-control">
+                                                    <option value="">Select Type</option>
+                                                    <option value="Store">Store</option>
+                                                    <option value="Sales">Sales</option>
+                                                    <option value="Store&Sales">Store&Sales</option>
+                                                </select>
+                                                <label class="text-danger">{{ state.errors.type }}</label>
+                                            </div>
+                                        </div>
+                                        <div class="row mb-2">
+                                            <div class="col-md-6">
+                                                <label for="Street">Street</label>
+                                                <input v-model="state.street" id="Street" name="Street" class="form-control">
+                                                <label class="text-danger">{{ state.errors.street }}</label>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <label for="City">City</label>
+                                                <input v-model="state.city" id="City" name="City" class="form-control">
+                                                <label class="text-danger">{{ state.errors.city }}</label>
+                                            </div>
+                                        </div>
+                                        <div class="row mb-2">
+                                            <div class="col-md-6">
+                                                <label for="State">State</label>
+                                                <input v-model="state.state" id="State" name="State" class="form-control">
+                                                <label class="text-danger">{{ state.errors.state }}</label>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <label for="ZipCode">Zip Code</label>
+                                                <input v-model="state.zipCode" id="ZipCode" name="ZipCode" class="form-control">
+                                                <label class="text-danger">{{ state.errors.zipCode }}</label>
+                                            </div>
+                                        </div>
+                                        <div class="row mb-2">
+                                            <div class="col-md-6">
+                                                <label for="Country">Country</label>
+                                                <input v-model="state.country" id="Country" name="Country" class="form-control">
+                                                <label class="text-danger">{{ state.errors.country }}</label>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <label for="PhoneNumber">Phone Number</label>
+                                                <input v-model="state.phoneNumber" id="PhoneNumber" name="PhoneNumber" class="form-control" type="tel">
+                                                <label class="text-danger">{{ state.errors.phoneNumber }}</label>
+                                            </div>
+                                        </div>
+                                        <div class="row mb-2">
+                                            <div class="col-md-6">
+                                                <label for="FaxNumber">Fax Number</label>
+                                                <input v-model="state.faxNumber" id="FaxNumber" name="FaxNumber" class="form-control" type="tel">
+                                                <label class="text-danger">{{ state.errors.faxNumber }}</label>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <label for="EmailAddress">Email Address</label>
+                                                <input v-model="state.emailAddress" id="EmailAddress" name="EmailAddress" class="form-control" type="email">
+                                                <label class="text-danger">{{ state.errors.emailAddress }}</label>
+                                            </div>
+                                        </div>
+                                        <div class="row mb-2">
+                                            <div class="col-md-6">
+                                                <label for="GstNumber">GST Number</label>
+                                                <input v-model="state.gstNumber" id="GstNumber" name="GstNumber" class="form-control">
+                                                <label class="text-danger">{{ state.errors.gstNumber }}</label>
+                                            </div>
+                                            @* <div class="col-md-6">
+                                                <label for="Logo">Logo</label>
+                                                <input ref="logoInput"
+                                                       v-on:change="onLogoChange"
+                                                       v-on:click="resetFileInput"
+                                                       id="Logo"
+                                                       name="Logo"
+                                                       class="form-control"
+                                                       type="file"
+                                                       accept="image/*" />
+                                                <img v-if="state.logoPreview"
+                                                     :src="state.logoPreview"
+                                                     alt="Logo Preview"
+                                                     class="img-fluid mt-2"
+                                                     style="max-width: 100px;" />
+                                                <label class="text-danger">{{ state.errors.logo }}</label>
+                                            </div> *@
                                         </div>
                                         <div class="row mb-2">
                                             <div class="col-12">
                                                 <label for="Description">Description</label>
                                                 <textarea v-model="state.description" id="Description" name="Description" class="form-control" rows="3"></textarea>
+                                                <label class="text-danger">{{ state.errors.description }}</label>
                                             </div>
                                         </div>
                                     </div>
@@ -70,6 +160,40 @@
             </div>
         </div>
     </div>
+    <!-- Modal untuk Change Logo -->
+    <div class="modal fade" ref="changeLogoModalRef" id="ChangeLogoModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">{{ state.changeAvatarTitle }}</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" v-model="state.id" id="Id" name="WarehouseId" />
+                    <div class="row">
+                        <div class="col-md-12">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h5>Uploader Area</h5>
+                                    <img :src="state.previewImage || ''"
+                                         alt="Logo Preview"
+                                         class="img-thumbnail mb-3"
+                                         style="max-width: 200px;" />
+                                </div>
+                                <div class="card-body">
+                                    <form ref="imageUploadRef" id="ImageUpload" class="dropzone"></form>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
 </div>
 
 @section scripts {

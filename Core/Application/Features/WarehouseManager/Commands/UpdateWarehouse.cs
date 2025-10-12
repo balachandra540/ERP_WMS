@@ -16,6 +16,18 @@ public class UpdateWarehouseRequest : IRequest<UpdateWarehouseResult>
     public string? Name { get; init; }
     public string? Description { get; init; }
     public string? UpdatedById { get; init; }
+    public string? Currency { get; init; }
+    public string? Street { get; init; }
+    public string? City { get; init; }
+    public string? State { get; init; }
+    public string? ZipCode { get; init; }
+    public string? Country { get; init; }
+    public string? PhoneNumber { get; init; }
+    public string? FaxNumber { get; init; }
+    public string? EmailAddress { get; init; }
+    public string? Type { get; init; }
+    public string? GstNumber { get; init; }
+    public string? Logo { get; init; }
 }
 
 public class UpdateWarehouseValidator : AbstractValidator<UpdateWarehouseRequest>
@@ -60,6 +72,20 @@ public class UpdateWarehouseHandler : IRequestHandler<UpdateWarehouseRequest, Up
 
         entity.Name = request.Name;
         entity.Description = request.Description;
+        entity.City = request.City;
+        entity.Country = request.Country;
+        entity.Street = request.Street;
+        entity.State = request.State;
+        entity.Currency = request.Currency;
+        entity.EmailAddress = request.EmailAddress;
+        entity.FaxNumber = request.FaxNumber;
+        entity.GstNumber = request.GstNumber;
+        entity.PhoneNumber = request.PhoneNumber;
+        entity.Logo = request.Logo;
+        entity.State = request.State;
+        entity.ZipCode = request.ZipCode;
+        entity.Type = request.Type;
+
 
         _repository.Update(entity);
         await _unitOfWork.SaveAsync(cancellationToken);

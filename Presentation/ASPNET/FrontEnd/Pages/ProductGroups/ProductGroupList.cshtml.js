@@ -1,4 +1,4 @@
-﻿const App = {
+﻿const App = {   
     setup() {
         const state = Vue.reactive({
             mainData: [],
@@ -64,6 +64,7 @@
 
         const services = {
             getMainData: async () => {
+                debugger;
                 try {
                     const response = await AxiosManager.get('/ProductGroup/GetProductGroupList', {});
                     return response;

@@ -25,14 +25,14 @@ public class UserSeeder
 
         var defaultPassword = "123456";
         var domain = "@example.com";
-
+        var warehouse = "";
         foreach (var name in userNames)
         {
             var email = $"{name.ToLower()}{domain}";
 
             if (await _userManager.FindByEmailAsync(email) == null)
             {
-                var applicationUser = new ApplicationUser(email, name, "User")
+                var applicationUser = new ApplicationUser(email, name, "User", warehouse)
                 {
                     EmailConfirmed = true
                 };

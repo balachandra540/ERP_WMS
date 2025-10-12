@@ -21,6 +21,7 @@ public class CreateUserRequest : IRequest<CreateUserResult>
     public bool? IsBlocked { get; init; }
     public bool? IsDeleted { get; init; }
     public string? CreatedById { get; init; }
+    public string? wareHouse { get; init; }
 }
 
 public class CreateUserValidator : AbstractValidator<CreateUserRequest>
@@ -32,6 +33,7 @@ public class CreateUserValidator : AbstractValidator<CreateUserRequest>
         RuleFor(x => x.ConfirmPassword).NotEmpty();
         RuleFor(x => x.FirstName).NotEmpty();
         RuleFor(x => x.LastName).NotEmpty();
+        RuleFor(x => x.wareHouse).NotEmpty();
     }
 }
 
@@ -52,6 +54,7 @@ public class CreateUserHandler : IRequestHandler<CreateUserRequest, CreateUserRe
             request.ConfirmPassword ?? "",
             request.FirstName ?? "",
             request.LastName ?? "",
+            request.wareHouse ?? "",
             request.EmailConfirmed ?? true,
             request.IsBlocked ?? false,
             request.IsDeleted ?? false,

@@ -33,6 +33,7 @@
 
                     try {
                         const refreshToken = StorageManager.getRefreshToken();
+                        debugger;
                         const response = await axiosInstance.post('/Security/RefreshToken', { refreshToken });
 
                         if (response?.data?.code === 200) {

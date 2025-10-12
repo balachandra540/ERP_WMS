@@ -26,7 +26,11 @@ public class ProductGroupSeeder
             new ProductGroup { Name = "Storage" },
             new ProductGroup { Name = "Device" },
             new ProductGroup { Name = "Software" },
-            new ProductGroup { Name = "Service" }
+            new ProductGroup { Name = "Service" },
+            new ProductGroup { Name = "Mobile" },
+            new ProductGroup { Name = "Accessories" }
+
+
         };
 
         foreach (var productGroup in productGroups)

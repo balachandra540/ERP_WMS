@@ -47,21 +47,41 @@
                                         <label class="text-danger">{{ state.errors.email }}</label>
                                     </div>
                                     <div class="col-md-6">
-                                        <div class="form-check mt-4">
+                                        <label for="Warehouse">Location</label>
+                                        <select v-model="state.wareHouse" class="form-control" id="Warehouse" name="wareHouse">
+                                            <option value="">Select Location</option>
+
+                                            <!--  Check if warehouses list is available and not empty -->
+                                            <option v-if="Array.isArray(state.warehouses) && state.warehouses.length"
+                                                    v-for="warehouse in state.warehouses"
+                                                    :key="warehouse.id"
+                                                    :value="warehouse.id">
+                                                {{ warehouse.name }}
+                                            </option>
+
+                                            <!-- Optional: fallback if no warehouses are loaded -->
+                                            <option v-else disabled>No warehouses available</option>
+                                        </select>
+
+                                        <!--  Validation error -->
+                                        <label class="text-danger">{{ state.errors.wareHouse }}</label>
+
+                                    </div>
+                                </div>
+                                <div class="row mb-2">
+                                    <div class="col-md-4">
+                                        <div class="form-check">
                                             <input v-model="state.emailConfirmed" id="EmailConfirmed" name="EmailConfirmed" type="checkbox" class="form-check-input">
                                             <label for="EmailConfirmed" class="form-check-label">Email Confirmed</label>
                                         </div>
                                     </div>
-                                </div>
-
-                                <div class="row mb-2">
-                                    <div class="col-md-6">
+                                    <div class="col-md-4">
                                         <div class="form-check">
                                             <input v-model="state.isBlocked" id="IsBlocked" name="IsBlocked" type="checkbox" class="form-check-input">
                                             <label for="IsBlocked" class="form-check-label">Is Blocked</label>
                                         </div>
                                     </div>
-                                    <div class="col-md-6">
+                                    <div class="col-md-4">
                                         <div class="form-check">
                                             <input v-model="state.isDeleted" id="IsDeleted" name="IsDeleted" type="checkbox" class="form-check-input">
                                             <label for="IsDeleted" class="form-check-label">Is Deleted</label>

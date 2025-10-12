@@ -19,6 +19,7 @@ public class UpdateUserRequest : IRequest<UpdateUserResult>
     public bool? IsBlocked { get; init; }
     public bool? IsDeleted { get; init; }
     public string? UpdatedById { get; init; }
+    public string? wareHouse { get; init; }
 }
 
 public class UpdateUserValidator : AbstractValidator<UpdateUserRequest>
@@ -46,10 +47,11 @@ public class UpdateUserHandler : IRequestHandler<UpdateUserRequest, UpdateUserRe
             request.UserId ?? "",
             request.FirstName ?? "",
             request.LastName ?? "",
+            request.wareHouse ?? "",
             request.EmailConfirmed ?? true,
             request.IsBlocked ?? false,
             request.IsDeleted ?? false,
-            request.UpdatedById ?? "",
+            request.UpdatedById ?? "",           
             cancellationToken
             );
 

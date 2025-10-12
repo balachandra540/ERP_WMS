@@ -85,6 +85,22 @@ public class GetInventoryTransactionListHandler : IRequestHandler<GetInventoryTr
 
     public async Task<GetInventoryTransactionListResult> Handle(GetInventoryTransactionListRequest request, CancellationToken cancellationToken)
     {
+        //var query = _context
+        //    .InventoryTransaction
+        //    .AsNoTracking()
+        //    .ApplyIsDeletedFilter(request.IsDeleted)
+        //    .Include(x => x.Warehouse)
+        //    .Include(x => x.Product)
+        //    .Include(x => x.WarehouseFrom)
+        //    .Include(x => x.WarehouseTo)
+        //    .Where(x =>
+        //        x.Product!.Physical == true &&
+        //        x.Warehouse!.SystemWarehouse == false &&
+        //        x.Status == Domain.Enums.InventoryTransactionStatus.Confirmed
+        //    )
+        //    .OrderByDescending(x => x.CreatedAtUtc)
+        //    .AsQueryable();
+
         var query = _context
             .InventoryTransaction
             .AsNoTracking()
@@ -95,11 +111,12 @@ public class GetInventoryTransactionListHandler : IRequestHandler<GetInventoryTr
             .Include(x => x.WarehouseTo)
             .Where(x =>
                 x.Product!.Physical == true &&
-                x.Warehouse!.SystemWarehouse == false &&
+                (x.Warehouse!.Type == "Store" || x.Warehouse!.Type == "Store&Sales") &&
                 x.Status == Domain.Enums.InventoryTransactionStatus.Confirmed
             )
             .OrderByDescending(x => x.CreatedAtUtc)
             .AsQueryable();
+
 
         var entities = await query.ToListAsync(cancellationToken);
 

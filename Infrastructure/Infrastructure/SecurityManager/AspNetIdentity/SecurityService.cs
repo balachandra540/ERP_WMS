@@ -1,5 +1,7 @@
 ﻿using Application.Common.Services.EmailManager;
 using Application.Common.Services.SecurityManager;
+using Application.Features.WarehouseManager;
+using Application.Features.WarehouseManager.Commands;
 using Domain.Entities;
 using Infrastructure.DataAccessManager.EFCore.Contexts;
 using Infrastructure.SecurityManager.NavigationMenu;
@@ -18,17 +20,18 @@ using static Domain.Common.Constants;
 
 namespace Infrastructure.SecurityManager.AspNetIdentity;
 
-public class SecurityService : ISecurityService
-{
-    private readonly UserManager<ApplicationUser> _userManager;
-    private readonly SignInManager<ApplicationUser> _signInManager;
-    private readonly ITokenService _tokenService;
-    private readonly DataContext _context;
-    private readonly IdentitySettings _identitySettings;
-    private readonly IEmailService _emailService;
-    private readonly IHttpContextAccessor _httpContextAccessor;
-    private readonly RoleManager<IdentityRole> _roleManager;
-    private readonly IConfiguration _configuration;
+    public class SecurityService : ISecurityService
+    {
+        private readonly UserManager<ApplicationUser> _userManager;
+        private readonly SignInManager<ApplicationUser> _signInManager;
+        private readonly ITokenService _tokenService;
+        private readonly DataContext _context;
+        private readonly IdentitySettings _identitySettings;
+        private readonly IEmailService _emailService;
+        private readonly IHttpContextAccessor _httpContextAccessor;
+        private readonly RoleManager<IdentityRole> _roleManager;
+        private readonly IConfiguration _configuration;
+        private readonly UpdateWarehouseLogoHandler _warehouseconfiguration;
 
     public SecurityService(
         UserManager<ApplicationUser> userManager,
@@ -39,7 +42,8 @@ public class SecurityService : ISecurityService
         IEmailService emailService,
         IHttpContextAccessor httpContextAccessor,
         RoleManager<IdentityRole> roleManager,
-        IConfiguration configuration
+        IConfiguration configuration,
+        UpdateWarehouseLogoHandler warehouseconfiguration // Injecting WarehouseService
         )
     {
         _userManager = userManager;
@@ -51,6 +55,7 @@ public class SecurityService : ISecurityService
         _httpContextAccessor = httpContextAccessor;
         _roleManager = roleManager;
         _configuration = configuration;
+        _warehouseconfiguration = warehouseconfiguration; // Initializing WarehouseService
     }
 
     public async Task<LoginResultDto> LoginAsync(
@@ -120,7 +125,9 @@ public class SecurityService : ISecurityService
             RefreshToken = refreshToken,
             MenuNavigation = NavigationTreeStructure.GetCompleteMenuNavigationTreeNode(),
             Roles = roles.ToList(),
-            Avatar = user.ProfilePictureName
+            Avatar = user.ProfilePictureName,
+            Location = user.wareHouse,
+
         };
     }
 
@@ -159,6 +166,7 @@ public class SecurityService : ISecurityService
         string confirmPassword,
         string firstName,
         string lastName,
+        string warehouse,
         string companyName = "",
         CancellationToken cancellationToken = default
         )
@@ -172,7 +180,8 @@ public class SecurityService : ISecurityService
             email,
             firstName,
             lastName,
-            companyName
+            warehouse,
+            companyName            
         );
 
         user.EmailConfirmed = !_identitySettings.SignIn.RequireConfirmedEmail;
@@ -443,7 +452,8 @@ public class SecurityService : ISecurityService
                 IsBlocked = x.IsBlocked,
                 IsDeleted = x.IsDeleted,
                 EmailConfirmed = x.EmailConfirmed,
-                CreatedAt = x.CreatedAt
+                CreatedAt = x.CreatedAt,
+                wareHouse = x.wareHouse,
             })
             .ToListAsync(cancellationToken);
 
@@ -456,10 +466,11 @@ public class SecurityService : ISecurityService
         string confirmPassword,
         string firstName,
         string lastName,
+        string warehouse,
         bool emailConfirmed = true,
         bool isBlocked = false,
         bool isDeleted = false,
-        string createdById = "",
+        string createdById = "",      
         CancellationToken cancellationToken = default
         )
     {
@@ -471,14 +482,15 @@ public class SecurityService : ISecurityService
         var user = new ApplicationUser(
             email,
             firstName,
-            lastName
+            lastName,
+             warehouse
         );
 
         user.EmailConfirmed = emailConfirmed;
         user.IsBlocked = isBlocked;
         user.IsDeleted = isDeleted;
         user.CreatedById = createdById;
-
+        user.wareHouse = warehouse;
         var result = await _userManager.CreateAsync(user, password);
 
         if (!result.Succeeded)
@@ -507,6 +519,7 @@ public class SecurityService : ISecurityService
         string userId,
         string firstName,
         string lastName,
+        string warehouse = "",
         bool emailConfirmed = true,
         bool isBlocked = false,
         bool isDeleted = false,
@@ -532,6 +545,7 @@ public class SecurityService : ISecurityService
         user.IsBlocked = isBlocked;
         user.IsDeleted = isDeleted;
         user.UpdatedById = updatedById;
+        user.wareHouse = warehouse;
 
         var result = await _userManager.UpdateAsync(user);
 
@@ -549,6 +563,7 @@ public class SecurityService : ISecurityService
             EmailConfirmed = user.EmailConfirmed,
             IsBlocked = user.IsBlocked,
             IsDeleted = user.IsDeleted,
+            wareHouse=user.wareHouse,
         };
     }
 
@@ -687,10 +702,10 @@ public class SecurityService : ISecurityService
 
 
     public async Task ChangeAvatarAsync(
-        string userId,
-        string avatar,
-        CancellationToken cancellationToken
-        )
+       string userId,
+       string avatar,
+       CancellationToken cancellationToken
+       )
     {
         var user = await _context.Users.Where(x => x.Id == userId).SingleOrDefaultAsync(cancellationToken);
 
@@ -708,5 +723,38 @@ public class SecurityService : ISecurityService
             throw new Exception(string.Join(", ", result.Errors.Select(e => e.Description)));
         }
     }
+
+//    public async Task ChangeLogoAsync(
+//    string warehouseId, // Warehouse identifier
+//    string avatar,      // New profile picture or logo name
+//    CancellationToken cancellationToken
+//)
+//    {
+//        // Get the warehouse from the database using _queryContext
+//        var warehouse = await _warehouseconfiguration.Set<Warehouse>()
+//            .Where(x => x.Id == warehouseId)
+//            .SingleOrDefaultAsync(cancellationToken);
+
+//        // Check if the warehouse exists
+//        if (warehouse == null)
+//        {
+//            throw new Exception($"Unable to load warehouse with id: {warehouseId}");
+//        }
+
+//        // Set the new avatar or logo (you can change property names accordingly)
+//        warehouse.Logo = avatar;  // assuming `Logo` is the property name
+
+//        // Save changes to the database
+//        var result = await _warehouseconfiguration.UpdateAsync(warehouse);
+
+//        // If the update didn't succeed, throw an error
+//        if (result == 0)
+//        {
+//            throw new Exception("Failed to update warehouse logo.");
+//        }
+//    }
+
+
+
 
 }

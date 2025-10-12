@@ -18,6 +18,8 @@
             confirmPassword: '',
             newPassword: '',
             userId: '',
+            wareHouse: '',   // Bound to the dropdown
+            warehouses: [], 
             errors: {
                 firstName: '',
                 lastName: '',
@@ -25,6 +27,7 @@
                 password: '',
                 confirmPassword: '',
                 newPassword: '',
+                wareHouse: ''
             },
             isSubmitting: false,
             isChangePasswordSubmitting: false,
@@ -114,6 +117,7 @@
             state.errors.email = '';
             state.errors.password = '';
             state.errors.confirmPassword = '';
+            state.errors.wareHouse = '';  //  new error key
 
             let isValid = true;
 
@@ -132,7 +136,14 @@
                 state.errors.email = 'Please enter a valid email address.';
                 isValid = false;
             }
-            if (state.id === '') {
+
+            //  Validate warehouse selection
+            if (!state.wareHouse) {
+                state.errors.wareHouse = 'Location is required.';
+                isValid = false;
+            }
+
+            if (!state.id) {
                 if (!state.password) {
                     state.errors.password = 'Password is required.';
                     isValid = false;
@@ -176,12 +187,14 @@
             state.isDeleted = false;
             state.password = '';
             state.confirmPassword = '';
+            state.wareHouse = '';
             state.errors = {
                 firstName: '',
                 lastName: '',
                 email: '',
                 password: '',
                 confirmPassword: '',
+                wareHouse:'',
             };
         };
 
@@ -190,6 +203,33 @@
             state.errors = {
                 newPassword: '',
             };
+        };
+
+        const resetSecondaryFormState = () => {
+            state.userId = '';
+            state.secondaryData = [];
+            state.changeRoleTitle = 'Change Roles';
+
+            if (secondaryGrid.obj) {
+                secondaryGrid.obj.clearSelection();
+                secondaryGrid.refresh();
+            }
+        };
+
+        const getLocations = async () => {
+            try {
+                const response = await AxiosManager.get('/Warehouse/GetWarehouseList');
+
+                if (response.data.code === 200) {
+                    state.warehouses = response.data.content.data || [];
+                } else {
+                    console.error('Failed to load warehouses:', response.data.message);
+                    state.warehouses = [];
+                }
+            } catch (error) {
+                console.error('Error fetching warehouses:', error);
+                state.warehouses = [];
+            }
         };
 
         const services = {
@@ -201,20 +241,37 @@
                     throw error;
                 }
             },
-            createMainData: async (firstName, lastName, email, emailConfirmed, isBlocked, isDeleted, password, confirmPassword, createdById) => {
+            createMainData: async (firstName, lastName, email, emailConfirmed, isBlocked, isDeleted, password, confirmPassword, createdById, wareHouse) => {
                 try {
                     const response = await AxiosManager.post('/Security/CreateUser', {
-                        firstName, lastName, email, emailConfirmed, isBlocked, isDeleted, password, confirmPassword, createdById
+                        firstName,
+                        lastName,
+                        email,
+                        emailConfirmed,
+                        isBlocked,
+                        isDeleted,
+                        password,
+                        confirmPassword,
+                        createdById,
+                        wareHouse  
                     });
                     return response;
                 } catch (error) {
                     throw error;
                 }
             },
-            updateMainData: async (userId, firstName, lastName, emailConfirmed, isBlocked, isDeleted, updatedById) => {
+
+            updateMainData: async (userId, firstName, lastName, emailConfirmed, isBlocked, isDeleted, updatedById, wareHouse) => {
                 try {
                     const response = await AxiosManager.post('/Security/UpdateUser', {
-                        userId, firstName, lastName, emailConfirmed, isBlocked, isDeleted, updatedById
+                        userId,
+                        firstName,
+                        lastName,
+                        emailConfirmed,
+                        isBlocked,
+                        isDeleted,
+                        updatedById,
+                        wareHouse  
                     });
                     return response;
                 } catch (error) {
@@ -274,15 +331,20 @@
             populateMainData: async () => {
                 try {
                     const response = await services.getMainData();
-                    state.mainData = response?.data?.content?.data.map(item => ({
-                        ...item,
-                        createdAt: new Date(item.createdAt)
-                    }));
+                    
+                    state.mainData = response?.data?.content?.data.map(user => {
+                        const warehouse = state.warehouses.find(w => w.id === user.wareHouse);
+                        return {
+                            ...user,
+                            createdAt: new Date(user.createdAt),
+                            wareHouse: warehouse ? warehouse.name : ''
+                        };
+                    });
                 } catch (error) {
                     console.error("Error populating main data:", error);
                     state.mainData = [];
                 }
-            },
+            },            
             populateSecondaryData: async (userId) => {
                 try {
                     const rolesResponse = await services.getRolesData();
@@ -315,10 +377,30 @@
                     }
 
                     const response = state.id === ''
-                        ? await services.createMainData(state.firstName, state.lastName, state.email, state.emailConfirmed, state.isBlocked, state.isDeleted, state.password, state.confirmPassword, StorageManager.getUserId())
+                        ? await services.createMainData(
+                            state.firstName,
+                            state.lastName,
+                            state.email,
+                            state.emailConfirmed,
+                            state.isBlocked,
+                            state.isDeleted,
+                            state.password,
+                            state.confirmPassword,
+                            StorageManager.getUserId(),
+                            state.wareHouse 
+                        )
                         : state.deleteMode
                             ? await services.deleteMainData(state.id, StorageManager.getUserId())
-                            : await services.updateMainData(state.id, state.firstName, state.lastName, state.emailConfirmed, state.isBlocked, state.isDeleted, StorageManager.getUserId());
+                            : await services.updateMainData(
+                                state.id,
+                                state.firstName,
+                                state.lastName,
+                                state.emailConfirmed,
+                                state.isBlocked,
+                                state.isDeleted,
+                                StorageManager.getUserId(),
+                                state.wareHouse 
+                            );
 
                     if (response.data.code === 200) {
                         await methods.populateMainData();
@@ -333,6 +415,8 @@
                             state.emailConfirmed = response?.data?.content?.data.emailConfirmed ?? false;
                             state.isBlocked = response?.data?.content?.data.isBlocked ?? false;
                             state.isDeleted = response?.data?.content?.data.isDeleted ?? false;
+                            state.wareHouse = response?.data?.content?.data.wareHouse ?? ''; //  Add this
+
 
                             Swal.fire({
                                 icon: 'success',
@@ -429,9 +513,10 @@
                 await SecurityManager.authorizePage(['Users']);
                 await SecurityManager.validateToken();
 
+                await getLocations();
                 await methods.populateMainData();
                 await mainGrid.create(state.mainData);
-                await secondaryGrid.create(state.secondaryData);
+                await secondaryGrid.create(state.secondaryData); 
 
                 firstNameText.create();
                 lastNameText.create();
@@ -447,6 +532,9 @@
                 changePasswordModalRef.value?.addEventListener('hidden.bs.modal', () => {
                     resetChangePasswordFormState();
                 });
+                changeRoleModalRef.value?.addEventListener('hidden.bs.modal', () => {
+                    resetSecondaryFormState();
+                });
 
             } catch (e) {
                 console.error('page init error:', e);
@@ -458,6 +546,8 @@
         Vue.onUnmounted(() => {
             mainModalRef.value?.removeEventListener('hidden.bs.modal', resetFormState);
             changePasswordModalRef.value?.removeEventListener('hidden.bs.modal', resetChangePasswordFormState);
+            changeRoleModalRef.value?.removeEventListener('hidden.bs.modal', resetSecondaryFormState);
+
         });
 
         const mainGrid = {
@@ -483,13 +573,13 @@
                     gridLines: 'Horizontal',
                     columns: [
                         { type: 'checkbox', width: 60 },
-                        {
-                            field: 'id', isPrimaryKey: true, headerText: 'Id', visible: false
-                        },
+                        { field: 'id', isPrimaryKey: true, headerText: 'Id', visible: false },
                         { field: 'firstName', headerText: 'First Name', width: 150, minWidth: 150 },
                         { field: 'lastName', headerText: 'Last Name', width: 150, minWidth: 150 },
                         { field: 'email', headerText: 'Email', width: 150, minWidth: 150 },
                         { field: 'emailConfirmed', headerText: 'Email Confirmed', textAlign: 'Center', width: 150, minWidth: 150, type: 'boolean', displayAsCheckBox: true },
+                        //  New column for Warehouse
+                        { field: 'wareHouse', headerText: 'Location', width: 150, minWidth: 150 },
                         { field: 'isBlocked', headerText: 'Is Blocked', textAlign: 'Center', width: 150, minWidth: 150, type: 'boolean', displayAsCheckBox: true },
                         { field: 'isDeleted', headerText: 'Is Deleted', textAlign: 'Center', width: 150, minWidth: 150, type: 'boolean', displayAsCheckBox: true },
                         { field: 'createdAt', headerText: 'Created At', width: 150, format: 'yyyy-MM-dd HH:mm' }
@@ -553,6 +643,8 @@
                                 state.emailConfirmed = selectedRecord.emailConfirmed ?? false;
                                 state.isBlocked = selectedRecord.isBlocked ?? false;
                                 state.isDeleted = selectedRecord.isDeleted ?? false;
+                                const selectedWarehouse = state.warehouses.find(w => w.name === selectedRecord.wareHouse);
+                                state.wareHouse = selectedWarehouse?.id ?? '';
                                 mainModal.obj.show();
                             }
                         }
@@ -569,6 +661,8 @@
                                 state.emailConfirmed = selectedRecord.emailConfirmed ?? false;
                                 state.isBlocked = selectedRecord.isBlocked ?? false;
                                 state.isDeleted = selectedRecord.isDeleted ?? false;
+                                const selectedWarehouse = state.warehouses.find(w => w.name === selectedRecord.wareHouse);
+                                state.wareHouse = selectedWarehouse?.id ?? '';
                                 mainModal.obj.show();
                             }
                         }
@@ -632,39 +726,94 @@
                         { field: 'roleName', headerText: 'Role', allowEditing: false, width: 200, minWidth: 200 },
                         { field: 'accessGranted', headerText: 'Access Granted', textAlign: 'Center', width: 150, minWidth: 150, editType: 'booleanedit', displayAsCheckBox: true, type: 'boolean', allowEditing: true },
                     ],
+                    //toolbar: [
+                    //    'ExcelExport',
+                    //    { type: 'Separator' },
+                    //    'Edit', 'Update', 'Cancel',
+                    //],
                     toolbar: [
-                        'ExcelExport',
+                        'ExcelExport', 'Search',
                         { type: 'Separator' },
-                        'Edit', 'Update', 'Cancel',
+                        { text: 'Edit', tooltipText: 'Edit', prefixIcon: 'e-edit', id: 'EditRoleCustom' },
+                        { text: 'Update', tooltipText: 'Update', id: 'UpdateRoleCustom' },
+                        { text: 'Cancel', tooltipText: 'Cancel', id: 'CancelRoleCustom' },
                     ],
                     beforeDataBound: () => { },
                     dataBound: function () {
                         secondaryGrid.obj.autoFitColumns(['roleName', 'accessGranted']);
+                        // Disable Edit button initially
+                        secondaryGrid.obj.toolbarModule.enableItems(['EditRoleCustom', 'UpdateRoleCustom','CancelRoleCustom'], false);
                     },
                     excelExportComplete: () => { },
                     rowSelected: () => {
                         if (secondaryGrid.obj.getSelectedRecords().length == 1) {
-                            secondaryGrid.obj.toolbarModule.enableItems(['Edit'], true);
+                            secondaryGrid.obj.toolbarModule.enableItems(['EditRoleCustom', 'CancelRoleCustom'], true);
                         } else {
-                            secondaryGrid.obj.toolbarModule.enableItems(['Edit'], false);
+                            secondaryGrid.obj.toolbarModule.enableItems(['EditRoleCustom', 'CancelRoleCustom'], false);
                         }
                     },
                     rowDeselected: () => {
                         if (secondaryGrid.obj.getSelectedRecords().length == 1) {
-                            secondaryGrid.obj.toolbarModule.enableItems(['Edit'], true);
+                            secondaryGrid.obj.toolbarModule.enableItems(['EditRoleCustom', 'CancelRoleCustom'], true);
                         } else {
-                            secondaryGrid.obj.toolbarModule.enableItems(['Edit'], false);
+                            secondaryGrid.obj.toolbarModule.enableItems(['EditRoleCustom', 'CancelRoleCustom'], false);
                         }
-                    },
+                    },                  
                     rowSelecting: () => {
                         if (secondaryGrid.obj.getSelectedRecords().length) {
                             secondaryGrid.obj.clearSelection();
                         }
                     },
-                    toolbarClick: (args) => {
+                    toolbarClick: async (args) => {
                         if (args.item.id === 'SecondaryGrid_excelexport') {
                             secondaryGrid.obj.excelExport();
                         }
+                        else if (args.item.id === 'EditRoleCustom') {
+                            if (secondaryGrid.obj.getSelectedRecords().length) {
+                                const selectedRecord = secondaryGrid.obj.getSelectedRecords()[0];
+                                secondaryGrid.obj.toolbarModule.enableItems(['UpdateRoleCustom', 'CancelRoleCustom'], true);
+                                secondaryGrid.obj.toolbarModule.enableItems(['EditRoleCustom'], false);
+                            }
+                        }
+                        //else if (args.item.id === 'UpdateRoleCustom') {
+                        //        try {
+                        //            const roleName = args?.data?.roleName;
+                        //            const accessGranted = args?.data?.accessGranted;
+                        //            const response = await services.updateUserRoleData(state.userId, roleName, accessGranted);
+
+                        //            if (response.data.code === 200) {
+                        //                await methods.populateSecondaryData(state.userId);
+                        //                secondaryGrid.refresh();
+                        //                secondaryGrid.obj.clearSelection();
+                        //                Swal.fire({
+                        //                    icon: 'success',
+                        //                    title: 'Save Successful',
+                        //                    timer: 1000,
+                        //                    showConfirmButton: false
+                        //                });
+                        //            } else {
+                        //                Swal.fire({
+                        //                    icon: 'error',
+                        //                    title: 'Save Failed',
+                        //                    text: response.data.message ?? 'Please check your data.',
+                        //                    confirmButtonText: 'Try Again'
+                        //                });
+                        //            }
+                        //        }
+                        //        catch (error) {
+                        //            Swal.fire({
+                        //                icon: 'error',
+                        //                title: 'An Error Occurred',
+                        //                text: error.response?.data?.message ?? 'Please try again.',
+                        //                confirmButtonText: 'OK'
+                        //            });
+                        //        }     
+                        //}
+                        else if (args.item.id === 'CancelRoleCustom') {
+                            resetSecondaryFormState();
+                        }
+
+
                     },
                     actionComplete: async (args) => {
                         if (args.requestType === 'save' && args.action === 'edit') {
@@ -699,7 +848,7 @@
                                     confirmButtonText: 'OK'
                                 });
                             }
-                        }
+                        }                       
                     }
                 });
                 secondaryGrid.obj.appendTo(secondaryGridRef.value);

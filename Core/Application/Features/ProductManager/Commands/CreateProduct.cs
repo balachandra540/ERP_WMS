@@ -3,6 +3,7 @@ using Application.Features.NumberSequenceManager;
 using Domain.Entities;
 using FluentValidation;
 using MediatR;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace Application.Features.ProductManager.Commands;
 
@@ -20,8 +21,11 @@ public class CreateProductRequest : IRequest<CreateProductResult>
     public bool? Physical { get; init; } = true;
     public string? UnitMeasureId { get; init; }
     public string? ProductGroupId { get; init; }
+    public string? WarehouseId { get; init; }  
     public string? CreatedById { get; init; }
+   
 }
+
 
 public class CreateProductValidator : AbstractValidator<CreateProductRequest>
 {
@@ -54,16 +58,21 @@ public class CreateProductHandler : IRequestHandler<CreateProductRequest, Create
 
     public async Task<CreateProductResult> Handle(CreateProductRequest request, CancellationToken cancellationToken = default)
     {
-        var entity = new Product();
-        entity.CreatedById = request.CreatedById;
-
-        entity.Number = _numberSequenceService.GenerateNumber(nameof(Product), "", "ART");
-        entity.Name = request.Name;
-        entity.UnitPrice = request.UnitPrice;
-        entity.Physical = request.Physical;
-        entity.Description = request.Description;
-        entity.UnitMeasureId = request.UnitMeasureId;
-        entity.ProductGroupId = request.ProductGroupId;
+        // Map request to entity
+        var entity = new Product
+        {
+            CreatedById = request.CreatedById,
+            Number = string.IsNullOrWhiteSpace(request.Number)
+                        ? _numberSequenceService.GenerateNumber(nameof(Product), "", "ART")
+                        : request.Number,
+            Name = request.Name,
+            UnitPrice = request.UnitPrice,
+            Physical = request.Physical ?? true,
+            Description = request.Description,
+            UnitMeasureId = request.UnitMeasureId,
+            ProductGroupId = request.ProductGroupId,
+            WarehouseId = request.WarehouseId  // new field added
+        };
 
         await _repository.CreateAsync(entity, cancellationToken);
         await _unitOfWork.SaveAsync(cancellationToken);

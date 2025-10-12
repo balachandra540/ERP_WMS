@@ -1,3 +1,4 @@
+using Application.Features.WarehouseManager.Commands;
 using ASPNET.BackEnd;
 using ASPNET.BackEnd.Common.Middlewares;
 using ASPNET.FrontEnd;
@@ -13,6 +14,8 @@ if (!Directory.Exists(logPath))
 
 builder.Services.AddBackEndServices(builder.Configuration);
 builder.Services.AddFrontEndServices();
+//  Register the handler if you're injecting it manually
+builder.Services.AddScoped<UpdateWarehouseLogoHandler>();
 
 var app = builder.Build();
 
