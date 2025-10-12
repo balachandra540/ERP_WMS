@@ -1,4 +1,5 @@
-﻿using Infrastructure.SecurityManager.AspNetIdentity;
+﻿using Domain.Entities;
+using Infrastructure.SecurityManager.AspNetIdentity;
 using Infrastructure.SecurityManager.Roles;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Configuration;
@@ -59,34 +60,31 @@ public class UserSeeder
         _userManager = userManager;
         _configuration = configuration;
     }
-
     public async Task GenerateDataAsync()
     {
-        var userNames = new List<string>
-        {
-            "Alex", "Taylor", "Jordan", "Morgan", "Riley",
-            "Casey", "Peyton", "Cameron", "Jamie", "Drew",
-            "Dakota", "Avery", "Quinn", "Harper", "Rowan",
-            "Emerson", "Finley", "Skyler", "Charlie", "Sage"
-        };
-
-        var defaultPassword = "123456";
-        var domain = "@example.com";
-        var warehouse = "";
-        foreach (var name in userNames)
+        // Access the nested DefaultAdmin section
+        var defaultAdminSection = _configuration.GetSection("AspNetIdentity:DefaultAdmin");
+        if (!defaultAdminSection.Exists())
         {
             throw new InvalidOperationException("AspNetIdentity:DefaultAdmin section is missing in appsettings.json.");
         }
 
-            if (await _userManager.FindByEmailAsync(email) == null)
+        var adminEmail = defaultAdminSection["Email"];
+        var warehouse = "";
+        var adminPassword = defaultAdminSection["Password"];// Check if the admin user already exists
+        if (await _userManager.FindByEmailAsync(adminEmail) == null)
+        {
+            // Create the admin user
+            // Check if admin user exists
+            if (await _userManager.FindByEmailAsync(adminEmail) == null)
             {
-                var applicationUser = new ApplicationUser(email, name, "User", warehouse)
+                
+                var applicationUser = new ApplicationUser(adminEmail, "Admin", "User", warehouse)
                 {
                     EmailConfirmed = true
                 };
-
                 // Create the user with the password
-                var createResult = await _userManager.CreateAsync(adminUser, adminPassword);
+                var createResult = await _userManager.CreateAsync(applicationUser, adminPassword);
                 if (!createResult.Succeeded)
                 {
                     var errors = string.Join(", ", createResult.Errors.Select(e => e.Description));
@@ -95,9 +93,9 @@ public class UserSeeder
 
                 // Assign the "Admin" role (or use RoleHelper.GetProfileRole() if needed)
                 var role = RoleHelper.GetProfileRole();
-                if (!await _userManager.IsInRoleAsync(adminUser, role))
+                if (!await _userManager.IsInRoleAsync(applicationUser, role))
                 {
-                    var roleResult = await _userManager.AddToRoleAsync(adminUser, role);
+                    var roleResult = await _userManager.AddToRoleAsync(applicationUser, role);
                     if (!roleResult.Succeeded)
                     {
                         var roleErrors = string.Join(", ", roleResult.Errors.Select(e => e.Description));
@@ -107,4 +105,5 @@ public class UserSeeder
             }
         }
     }
+    
 }
