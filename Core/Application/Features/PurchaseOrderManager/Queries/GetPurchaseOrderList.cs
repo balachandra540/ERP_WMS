@@ -16,7 +16,6 @@ namespace Application.Features.PurchaseOrderManager.Queries
         public string? Number { get; init; }
         public DateTime? OrderDate { get; init; }
         public string? OrderStatusName { get; init; }
-        public DateTime? OrderDate { get; init; }
         public string? Description { get; init; }
         public string? VendorId { get; init; }
         public string? VendorName { get; init; }
