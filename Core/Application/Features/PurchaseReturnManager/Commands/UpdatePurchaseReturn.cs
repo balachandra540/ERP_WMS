@@ -1,4 +1,5 @@
 ﻿using Application.Common.Repositories;
+using Application.Common.Services.SecurityManager;
 using Application.Features.InventoryTransactionManager;
 using Domain.Entities;
 using Domain.Enums;
@@ -38,16 +39,20 @@ public class UpdatePurchaseReturnHandler : IRequestHandler<UpdatePurchaseReturnR
     private readonly ICommandRepository<PurchaseReturn> _repository;
     private readonly IUnitOfWork _unitOfWork;
     private readonly InventoryTransactionService _inventoryTransactionService;
+    private readonly ISecurityService _securityService;
 
     public UpdatePurchaseReturnHandler(
         ICommandRepository<PurchaseReturn> repository,
         IUnitOfWork unitOfWork,
-        InventoryTransactionService inventoryTransactionService
+        InventoryTransactionService inventoryTransactionService,
+         ISecurityService securityservice
         )
     {
         _repository = repository;
         _unitOfWork = unitOfWork;
         _inventoryTransactionService = inventoryTransactionService;
+         _securityService = securityservice;
+
     }
 
     public async Task<UpdatePurchaseReturnResult> Handle(UpdatePurchaseReturnRequest request, CancellationToken cancellationToken)
@@ -62,7 +67,8 @@ public class UpdatePurchaseReturnHandler : IRequestHandler<UpdatePurchaseReturnR
 
         entity.UpdatedById = request.UpdatedById;
 
-        entity.ReturnDate = request.ReturnDate;
+        entity.ReturnDate = _securityService.ConvertToIst(request.ReturnDate);
+
         entity.Status = (PurchaseReturnStatus)int.Parse(request.Status!);
         entity.Description = request.Description;
         entity.GoodsReceiveId = request.GoodsReceiveId;

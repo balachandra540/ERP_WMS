@@ -12,8 +12,9 @@ namespace Application.Features.PurchaseOrderManager.Queries
 
     public class GetPurchaseOrderListDto
     {
-        public string Id { get; init; }
+        public string? Id { get; init; }
         public string? Number { get; init; }
+        public DateTime? OrderDate { get; init; }
         public string? OrderStatusName { get; init; }
         public string? Description { get; init; }
         public string? VendorId { get; init; }
@@ -25,15 +26,17 @@ namespace Application.Features.PurchaseOrderManager.Queries
         public double? AfterTaxAmount { get; init; }
         public DateTime? CreatedAtUtc { get; init; }
 
+        public string? LocationId { get; set; }
+
         // Only populated when PurchaseOrderId is passed
         public List<PurchaseOrderItemDto>? Items { get; init; }
     }
 
     public class PurchaseOrderItemDto
     {
-        public string Id { get; init; }
+        public string? Id { get; init; }
 
-        public string ProductId { get; init; }
+        public string? ProductId { get; init; }
         public string? ProductName { get; init; }
         public string? Summary { get; init; }
         public double? UnitPrice { get; init; }
@@ -88,7 +91,9 @@ namespace Application.Features.PurchaseOrderManager.Queries
     public class GetPurchaseOrderListRequest : IRequest<GetPurchaseOrderListResult>
     {
         public bool IsDeleted { get; init; } = false;
+        public string? LocationId { get; init; }   // ✅ added
     }
+
 
     public class GetPurchaseOrderListResult
     {
@@ -110,16 +115,27 @@ namespace Application.Features.PurchaseOrderManager.Queries
         {
             var allowedStatuses = new[]
             {
-                PurchaseOrderStatus.Confirmed,
-                PurchaseOrderStatus.Archived,
-                PurchaseOrderStatus.PartiallyReceived
-            };
+        PurchaseOrderStatus.Confirmed,
+        PurchaseOrderStatus.Archived,
+        PurchaseOrderStatus.PartiallyReceived
+    };
 
             var query = _context
                 .PurchaseOrder
                 .AsNoTracking()
                 .ApplyIsDeletedFilter(request.IsDeleted)
-                .Where(x => x.OrderStatus.HasValue && allowedStatuses.Contains(x.OrderStatus.Value))
+                .Where(x => x.OrderStatus.HasValue && allowedStatuses.Contains(x.OrderStatus.Value));
+                
+            // ✅ Apply location filter
+            if (!string.IsNullOrEmpty(request.LocationId))
+            {
+                query = query.Where(x => x.LocationId == request.LocationId);
+            }
+
+            // ✅ Add includes (do this after all Where filters)
+            query = query
+                .Include(x => x.PurchaseOrderItemList)
+                    .ThenInclude(i => i.Product)
                 .Include(x => x.Vendor)
                 .Include(x => x.Tax);
 
@@ -138,7 +154,9 @@ namespace Application.Features.PurchaseOrderManager.Queries
     {
         public string? PurchaseOrderId { get; init; }
         public bool IsDeleted { get; init; } = false;
+        public string? LocationId { get; init; }   // ✅ added
     }
+
 
     public class GetPurchaseOrderResult
     {
@@ -165,29 +183,31 @@ namespace Application.Features.PurchaseOrderManager.Queries
                 PurchaseOrderStatus.PartiallyReceived
             };
 
+            // Base query
             var query = _context
                 .PurchaseOrder
                 .AsNoTracking()
                 .ApplyIsDeletedFilter(request.IsDeleted)
-                .Where(x => x.OrderStatus.HasValue && allowedStatuses.Contains(x.OrderStatus.Value))
-                .Include(x => x.Vendor)
-                .Include(x => x.Tax);
+                .Where(x => x.OrderStatus.HasValue && allowedStatuses.Contains(x.OrderStatus.Value));
 
+            // ✅ Apply location filter
+            if (!string.IsNullOrEmpty(request.LocationId))
+            {
+                query = query.Where(x => x.LocationId == request.LocationId);
+            }
+
+            // ✅ Apply purchase order ID filter
             if (!string.IsNullOrEmpty(request.PurchaseOrderId))
             {
-                query = query
-                    .Where(x => x.Id == request.PurchaseOrderId)
-                    .Include(x => x.PurchaseOrderItemList)      // one include path
-                        .ThenInclude(i => i.Product)            // continuation of that path
-                    .Include(x => x.Vendor)                     // separate include
-                    .Include(x => x.Tax);                       // separate include
+                query = query.Where(x => x.Id == request.PurchaseOrderId);
             }
-            else
-            {
-                query = query
-                    .Include(x => x.Vendor)
-                    .Include(x => x.Tax);
-            }
+
+            // ✅ Add includes (do this after all Where filters)
+            query = query
+                .Include(x => x.PurchaseOrderItemList)
+                    .ThenInclude(i => i.Product)
+                .Include(x => x.Vendor)
+                .Include(x => x.Tax);
 
             var entities = await query.ToListAsync(cancellationToken);
             var dtos = _mapper.Map<List<GetPurchaseOrderListDto>>(entities);

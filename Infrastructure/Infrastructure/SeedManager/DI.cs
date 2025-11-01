@@ -39,8 +39,8 @@ public static class DI
             var companySeeder = serviceProvider.GetRequiredService<CompanySeeder>();
             companySeeder.GenerateDataAsync().Wait();
 
-            var systemWarehouseSeeder = serviceProvider.GetRequiredService<SystemWarehouseSeeder>();
-            systemWarehouseSeeder.GenerateDataAsync().Wait();
+            //var systemWarehouseSeeder = serviceProvider.GetRequiredService<SystemWarehouseSeeder>();
+            //systemWarehouseSeeder.GenerateDataAsync().Wait();
 
         }
 

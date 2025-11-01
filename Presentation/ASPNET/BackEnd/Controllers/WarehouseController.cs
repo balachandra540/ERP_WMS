@@ -61,10 +61,11 @@ public class WarehouseController : BaseApiController
     [HttpGet("GetWarehouseList")]
     public async Task<ActionResult<ApiSuccessResult<GetWarehouseListResult>>> GetWarehouseListAsync(
         CancellationToken cancellationToken,
-        [FromQuery] bool isDeleted = false
+        [FromQuery] bool isDeleted = false,
+        [FromQuery] string? id = null
         )
     {
-        var request = new GetWarehouseListRequest { IsDeleted = isDeleted };
+        var request = new GetWarehouseListRequest { IsDeleted = isDeleted ,wareHouseId = id };
         var response = await _sender.Send(request, cancellationToken);
 
         return Ok(new ApiSuccessResult<GetWarehouseListResult>

@@ -1,4 +1,5 @@
 ﻿using Application.Common.Repositories;
+using Application.Common.Services.SecurityManager;
 using Application.Features.NumberSequenceManager;
 using Domain.Entities;
 using Domain.Enums;
@@ -20,6 +21,7 @@ public class CreateSalesOrderRequest : IRequest<CreateSalesOrderResult>
     public string? CustomerId { get; init; }
     public string? TaxId { get; init; }
     public string? CreatedById { get; init; }
+    public string? LocationId { get; init; }
 }
 
 public class CreateSalesOrderValidator : AbstractValidator<CreateSalesOrderRequest>
@@ -39,18 +41,22 @@ public class CreateSalesOrderHandler : IRequestHandler<CreateSalesOrderRequest, 
     private readonly IUnitOfWork _unitOfWork;
     private readonly NumberSequenceService _numberSequenceService;
     private readonly SalesOrderService _salesOrderService;
+    private readonly ISecurityService _securityService;
 
     public CreateSalesOrderHandler(
         ICommandRepository<SalesOrder> repository,
         IUnitOfWork unitOfWork,
         NumberSequenceService numberSequenceService,
-        SalesOrderService salesOrderService
+        SalesOrderService salesOrderService,
+        ISecurityService securityService
         )
     {
         _repository = repository;
         _unitOfWork = unitOfWork;
         _numberSequenceService = numberSequenceService;
         _salesOrderService = salesOrderService;
+        _securityService = securityService;
+
     }
 
     public async Task<CreateSalesOrderResult> Handle(CreateSalesOrderRequest request, CancellationToken cancellationToken = default)
@@ -59,11 +65,12 @@ public class CreateSalesOrderHandler : IRequestHandler<CreateSalesOrderRequest, 
         entity.CreatedById = request.CreatedById;
 
         entity.Number = _numberSequenceService.GenerateNumber(nameof(SalesOrder), "", "SO");
-        entity.OrderDate = request.OrderDate;
+        entity.OrderDate = _securityService.ConvertToIst(request.OrderDate); ;
         entity.OrderStatus = (SalesOrderStatus)int.Parse(request.OrderStatus!);
         entity.Description = request.Description;
         entity.CustomerId = request.CustomerId;
         entity.TaxId = request.TaxId;
+        entity.LocationId = request.LocationId;
 
         await _repository.CreateAsync(entity, cancellationToken);
         await _unitOfWork.SaveAsync(cancellationToken);

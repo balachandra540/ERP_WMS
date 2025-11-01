@@ -15,6 +15,8 @@ public class UpdateProductGroupRequest : IRequest<UpdateProductGroupResult>
     public string? Id { get; init; }
     public string? Name { get; init; }
     public string? Description { get; init; }
+    public bool? HasAttributes { get; set; }
+
     public string? UpdatedById { get; init; }
 }
 
@@ -55,6 +57,7 @@ public class UpdateProductGroupHandler : IRequestHandler<UpdateProductGroupReque
 
         entity.Name = request.Name;
         entity.Description = request.Description;
+        entity.HasAttributes = request.HasAttributes ?? false;
 
         _repository.Update(entity);
         await _unitOfWork.SaveAsync(cancellationToken);

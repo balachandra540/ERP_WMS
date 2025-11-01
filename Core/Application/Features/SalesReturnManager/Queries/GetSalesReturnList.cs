@@ -46,6 +46,8 @@ public class GetSalesReturnListResult
 public class GetSalesReturnListRequest : IRequest<GetSalesReturnListResult>
 {
     public bool IsDeleted { get; init; } = false;
+    public string? LocationId { get; init; }
+
 }
 
 
@@ -67,7 +69,17 @@ public class GetSalesReturnListHandler : IRequestHandler<GetSalesReturnListReque
             .AsNoTracking()
             .ApplyIsDeletedFilter(request.IsDeleted)
             .Include(x => x.DeliveryOrder)
+                .ThenInclude(d => d.SalesOrder)
             .AsQueryable();
+
+        // ✅ Filter by LocationId if provided
+        if (!string.IsNullOrEmpty(request.LocationId))
+        {
+            query = query.Where(x =>
+                x.DeliveryOrder != null &&
+                x.DeliveryOrder.SalesOrder != null &&
+                x.DeliveryOrder.SalesOrder.LocationId == request.LocationId);
+        }
 
         var entities = await query.ToListAsync(cancellationToken);
 

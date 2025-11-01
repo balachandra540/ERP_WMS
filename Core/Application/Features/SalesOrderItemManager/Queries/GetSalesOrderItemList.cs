@@ -21,6 +21,7 @@ public record GetSalesOrderItemListDto
     public double? Quantity { get; init; }
     public double? Total { get; init; }
     public DateTime? CreatedAtUtc { get; init; }
+    public string? LocationId { get; init; }  // ✅ existing
 }
 
 public class GetSalesOrderItemListProfile : Profile
@@ -43,8 +44,11 @@ public class GetSalesOrderItemListProfile : Profile
             .ForMember(
                 dest => dest.ProductNumber,
                 opt => opt.MapFrom(src => src.Product != null ? src.Product.Number : string.Empty)
-            );
-
+            )
+            .ForMember(
+                dest => dest.LocationId,
+                opt => opt.MapFrom(src => src.SalesOrder != null ? src.SalesOrder.LocationId : null)
+            );  // ✅ map location from parent order
     }
 }
 
@@ -56,8 +60,10 @@ public class GetSalesOrderItemListResult
 public class GetSalesOrderItemListRequest : IRequest<GetSalesOrderItemListResult>
 {
     public bool IsDeleted { get; init; } = false;
-}
+    //public string[]? LocationIds { get; init; }   // ✅ added multi-location support
+    public string? LocationIds { get; init; }   // ✅ added location support
 
+}
 
 public class GetSalesOrderItemListHandler : IRequestHandler<GetSalesOrderItemListRequest, GetSalesOrderItemListResult>
 {
@@ -81,8 +87,13 @@ public class GetSalesOrderItemListHandler : IRequestHandler<GetSalesOrderItemLis
             .Include(x => x.Product)
             .AsQueryable();
 
-        var entities = await query.ToListAsync(cancellationToken);
+        // ✅ Apply location filter (through SalesOrder)
+        if (request.LocationIds != null && request.LocationIds.Length > 0)
+        {
+            query = query.Where(x => x.SalesOrder != null && request.LocationIds.Contains(x.SalesOrder.LocationId!));
+        }
 
+        var entities = await query.ToListAsync(cancellationToken);
         var dtos = _mapper.Map<List<GetSalesOrderItemListDto>>(entities);
 
         return new GetSalesOrderItemListResult
@@ -90,9 +101,4 @@ public class GetSalesOrderItemListHandler : IRequestHandler<GetSalesOrderItemLis
             Data = dtos
         };
     }
-
-
 }
-
-
-

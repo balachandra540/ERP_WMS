@@ -186,7 +186,8 @@
         const services = {
             getMainData: async () => {
                 try {
-                    const response = await AxiosManager.get('/PurchaseReturn/GetPurchaseReturnList', {});
+                    const locationid = StorageManager.getLocation();
+                    const response = await AxiosManager.get('/PurchaseReturn/GetPurchaseReturnList?location=' + locationid, {});
                     return response;
                 } catch (error) {
                     throw error;
@@ -224,7 +225,9 @@
             },
             getGoodsReceiveListLookupData: async () => {
                 try {
-                    const response = await AxiosManager.get('/GoodsReceive/GetGoodsReceiveList', {});
+                    const locationId = StorageManager.getLocation();
+
+                    const response = await AxiosManager.get('/GoodsReceive/GetGoodsReceiveList?locationId=' + locationId, {});
                     return response;
                 } catch (error) {
                     throw error;
@@ -278,7 +281,8 @@
             },
             getProductListLookupData: async () => {
                 try {
-                    const response = await AxiosManager.get('/Product/GetProductList', {});
+                    const locationId = StorageManager.getLocation();
+                    const response = await AxiosManager.get('/Product/GetProductList?WarehouseId =' + locationId, {});
                     return response;
                 } catch (error) {
                     throw error;
@@ -286,7 +290,8 @@
             },
             getWarehouseListLookupData: async () => {
                 try {
-                    const response = await AxiosManager.get('/Warehouse/GetWarehouseList', {});
+                    const locationId = StorageManager.getLocation();
+                    const response = await AxiosManager.get('/Warehouse/GetWarehouseList?id=' + locationId, {});
                     return response;
                 } catch (error) {
                     throw error;

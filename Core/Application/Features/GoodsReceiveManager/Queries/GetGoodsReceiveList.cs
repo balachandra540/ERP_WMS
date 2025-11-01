@@ -18,6 +18,7 @@ public record GetGoodsReceiveListDto
     public string? Description { get; init; }
     public string? PurchaseOrderId { get; init; }
     public string? PurchaseOrderNumber { get; init; }
+    public string? LocationId { get; init; }
     public DateTime? CreatedAtUtc { get; init; }
 }
 
@@ -46,6 +47,7 @@ public class GetGoodsReceiveListResult
 public class GetGoodsReceiveListRequest : IRequest<GetGoodsReceiveListResult>
 {
     public bool IsDeleted { get; init; } = false;
+    public string? LocationId { get; init; }
 }
 
 
@@ -68,6 +70,26 @@ public class GetGoodsReceiveListHandler : IRequestHandler<GetGoodsReceiveListReq
             .ApplyIsDeletedFilter(request.IsDeleted)
             .Include(x => x.PurchaseOrder)
             .AsQueryable();
+
+        // ✅ Handle Location filter (single or multiple comma-separated IDs)
+        // ✅ Location filter via PurchaseOrder.LocationId
+        if (!string.IsNullOrEmpty(request.LocationId))
+        {
+            var locationIds = request.LocationId
+                .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Select(x => x.Trim().ToLower())
+                .ToList();
+
+            query = query.Where(x =>
+                x.PurchaseOrder != null &&
+                x.PurchaseOrder.LocationId != null &&
+                locationIds.Contains(x.PurchaseOrder.LocationId.Trim().ToLower()));
+        }
+        // ✅ Apply location filter
+        //if (!string.IsNullOrEmpty(request.LocationId))
+        //{
+        //    query = query.Where(x => x.PurchaseOrder !=null && x.PurchaseOrder.LocationId == request.LocationId);
+        //}
 
         var entities = await query.ToListAsync(cancellationToken);
 

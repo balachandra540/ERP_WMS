@@ -21,6 +21,7 @@ public class UpdatePurchaseOrderRequest : IRequest<UpdatePurchaseOrderResult>
     public string? VendorId { get; init; }
     public string? TaxId { get; init; }
     public string? UpdatedById { get; init; }
+    public string? LocationId { get; init; }
 }
 
 public class UpdatePurchaseOrderValidator : AbstractValidator<UpdatePurchaseOrderRequest>
@@ -74,7 +75,7 @@ public class UpdatePurchaseOrderHandler : IRequestHandler<UpdatePurchaseOrderReq
         entity.Description = request.Description;
         entity.VendorId = request.VendorId;
         entity.TaxId = request.TaxId;
-
+        entity.LocationId = request.LocationId;
         _repository.Update(entity);
         await _unitOfWork.SaveAsync(cancellationToken);
 

@@ -46,6 +46,7 @@ public class GetDeliveryOrderListResult
 public class GetDeliveryOrderListRequest : IRequest<GetDeliveryOrderListResult>
 {
     public bool IsDeleted { get; init; } = false;
+    public string? LocationId { get; init; } = null;
 }
 
 
@@ -68,6 +69,13 @@ public class GetDeliveryOrderListHandler : IRequestHandler<GetDeliveryOrderListR
             .ApplyIsDeletedFilter(request.IsDeleted)
             .Include(x => x.SalesOrder)
             .AsQueryable();
+
+
+        // ✅ Add location filter (SalesOrder.LocationId)
+        if (!string.IsNullOrEmpty(request.LocationId))
+        {
+            query = query.Where(x => x.SalesOrder != null && x.SalesOrder.LocationId == request.LocationId);
+        }
 
         var entities = await query.ToListAsync(cancellationToken);
 

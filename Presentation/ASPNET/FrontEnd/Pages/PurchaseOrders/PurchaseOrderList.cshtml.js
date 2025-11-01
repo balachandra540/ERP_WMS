@@ -16,7 +16,7 @@
             vendorId: null,
             taxId: null,
             orderStatus: null,
-            location:'',
+            locationId:'',
             errors: {
                 orderDate: '',
                 vendorId: '',
@@ -90,23 +90,21 @@
             state.showComplexDiv = false;
         };
 
-        const services = {
+        const services = {           
             getMainData: async () => {
                 try {
-                    const location = StorageManager.getLocation();
-                    const response = await AxiosManager.get('/PurchaseOrder/GetPurchaseOrderList', {
-                       params: { location }
-                    });
+                    const locationId = StorageManager.getLocation();
+                    const response = await AxiosManager.get('/PurchaseOrder/GetPurchaseOrderList?LocationId=' + locationId);
                     return response;
                 } catch (error) {
                     throw error;
                 }
             },
             createMainData: async (orderDate, description, orderStatus, taxId, vendorId, createdById) => {
-                debugger;
                 try {
+                    const locationId = StorageManager.getLocation();
                     const response = await AxiosManager.post('/PurchaseOrder/CreatePurchaseOrder', {
-                        orderDate, description, orderStatus, taxId, vendorId, createdById
+                        orderDate, description, orderStatus, taxId, vendorId, createdById, locationId
                     });
                     return response;
                 } catch (error) {
@@ -115,8 +113,9 @@
             },
             updateMainData: async (id, orderDate, description, orderStatus, taxId, vendorId, updatedById) => {
                 try {
+                    const locationId = StorageManager.getLocation();
                     const response = await AxiosManager.post('/PurchaseOrder/UpdatePurchaseOrder', {
-                        id, orderDate, description, orderStatus, taxId, vendorId, updatedById
+                        id, orderDate, description, orderStatus, taxId, vendorId, updatedById, locationId
                     });
                     return response;
                 } catch (error) {
@@ -125,8 +124,9 @@
             },
             deleteMainData: async (id, deletedById) => {
                 try {
+                    const locationId = StorageManager.getLocation();
                     const response = await AxiosManager.post('/PurchaseOrder/DeletePurchaseOrder', {
-                        id, deletedById
+                        id, deletedById, locationId
                     });
                     return response;
                 } catch (error) {
@@ -197,7 +197,8 @@
             },
             getProductListLookupData: async () => {
                 try {
-                    const response = await AxiosManager.get('/Product/GetProductList', {});
+                    const locationId = StorageManager.getLocation();
+                    const response = await AxiosManager.get('/Product/GetProductList?warehouseId=' + locationId, {});
                     return response;
                 } catch (error) {
                     throw error;
@@ -222,8 +223,8 @@
                 const response = await services.getMainData();
                 state.mainData = response?.data?.content?.data.map(item => ({
                     ...item,
-                    orderDate: new Date(item.orderDate),
-                    createdAtUtc: new Date(item.createdAtUtc)
+                    orderDate: item.orderDate ? new Date(item.orderDate).toISOString().split('T')[0] : '',
+                    createdAtUtc: item.createdAtUtc ? new Date(item.createdAtUtc).toISOString().replace('T', ' ').split('.')[0] : '', 
                 }));
             },
             populateSecondaryData: async (purchaseOrderId) => {
@@ -279,7 +280,7 @@
                             state.vendorId = response?.data?.content?.data.vendorId ?? '';
                             state.taxId = response?.data?.content?.data.taxId ?? '';
                             taxListLookup.trackingChange = true;
-                            state.orderStatus = String(response?.data?.content?.data.orderStatus ?? '');
+                            state.orderStatus = String(response?.data?.content?.data.orderStatusName ?? '');
                             state.showComplexDiv = true;
 
                             await methods.refreshPaymentSummary(state.id);
@@ -571,7 +572,7 @@
                                 state.vendorId = selectedRecord.vendorId ?? '';
                                 state.taxId = selectedRecord.taxId ?? '';
                                 taxListLookup.trackingChange = true;
-                                state.orderStatus = String(selectedRecord.orderStatus ?? '');
+                                state.orderStatus = String(selectedRecord.orderStatusName ?? '');
                                 state.showComplexDiv = true;
 
                                 await methods.populateSecondaryData(selectedRecord.id);
@@ -592,7 +593,7 @@
                                 state.description = selectedRecord.description ?? '';
                                 state.vendorId = selectedRecord.vendorId ?? '';
                                 state.taxId = selectedRecord.taxId ?? '';
-                                state.orderStatus = String(selectedRecord.orderStatus ?? '');
+                                state.orderStatus = String(selectedRecord.orderStatusName ?? '');
                                 state.showComplexDiv = false;
 
                                 await methods.populateSecondaryData(selectedRecord.id);

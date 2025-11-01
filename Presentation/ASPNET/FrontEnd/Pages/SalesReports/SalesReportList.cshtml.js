@@ -2,6 +2,7 @@
     setup() {
         const state = Vue.reactive({
             mainData: [],
+            locationId:'',
         });
 
         const mainGridRef = Vue.ref(null);
@@ -9,7 +10,8 @@
         const services = {
             getMainData: async () => {
                 try {
-                    const response = await AxiosManager.get('/SalesOrderItem/GetSalesOrderItemList', {});
+                    const locationId = StorageManager.getLocation();
+                    const response = await AxiosManager.get('/SalesOrderItem/GetSalesOrderItemList?locationId=' + locationId, {});
                     return response;
                 } catch (error) {
                     throw error;
@@ -109,6 +111,7 @@
 
         Vue.onMounted(async () => {
             try {
+                state.locationId = StorageManager.getLocation();
                 await SecurityManager.authorizePage(['SalesReports']);
                 await SecurityManager.validateToken();
                 await methods.populateMainData();

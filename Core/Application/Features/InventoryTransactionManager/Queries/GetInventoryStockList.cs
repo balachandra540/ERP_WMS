@@ -35,7 +35,9 @@ public class GetInventoryStockListResult
 public class GetInventoryStockListRequest : IRequest<GetInventoryStockListResult>
 {
     public bool IsDeleted { get; init; } = false;
+    public string? WarehouseId { get; init; }  // <-- add this
 }
+
 
 
 public class GetInventoryStockListHandler : IRequestHandler<GetInventoryStockListRequest, GetInventoryStockListResult>
@@ -59,10 +61,18 @@ public class GetInventoryStockListHandler : IRequestHandler<GetInventoryStockLis
             .Include(x => x.Product)
             .Where(x =>
                 x.Product!.Physical == true &&
-                //x.Warehouse!.SystemWarehouse == false &&
-                (x.Warehouse!.Type == "Store" || x.Warehouse!.Type == "Store&Sales") && 
+                (x.Warehouse!.Type == "Store" || x.Warehouse!.Type == "Store&Sales") &&
                 x.Status == Domain.Enums.InventoryTransactionStatus.Confirmed
             )
+            .AsQueryable();
+
+        // ✅ Location filter
+        if (!string.IsNullOrEmpty(request.WarehouseId))
+        {
+            query = query.Where(x => x.WarehouseId == request.WarehouseId);
+        }
+
+        var groupedQuery = query
             .GroupBy(x => new { x.WarehouseId, x.ProductId })
             .Select(group => new GetInventoryStockListDto
             {
@@ -74,10 +84,9 @@ public class GetInventoryStockListHandler : IRequestHandler<GetInventoryStockLis
                 Stock = group.Sum(x => x.Stock),
                 StatusName = group.Max(x => x.Status.ToString()),
                 CreatedAtUtc = group.Max(x => x.CreatedAtUtc)
-            })
-            .AsQueryable();
+            });
 
-        var entities = await query.ToListAsync(cancellationToken);
+        var entities = await groupedQuery.ToListAsync(cancellationToken);
 
         return new GetInventoryStockListResult
         {

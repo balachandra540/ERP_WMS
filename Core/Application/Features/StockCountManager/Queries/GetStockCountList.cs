@@ -46,7 +46,9 @@ public class GetStockCountListResult
 public class GetStockCountListRequest : IRequest<GetStockCountListResult>
 {
     public bool IsDeleted { get; init; } = false;
+    public string? WarehouseId { get; init; }  // <-- add this
 }
+
 
 
 public class GetStockCountListHandler : IRequestHandler<GetStockCountListRequest, GetStockCountListResult>
@@ -69,8 +71,12 @@ public class GetStockCountListHandler : IRequestHandler<GetStockCountListRequest
             .Include(x => x.Warehouse)
             .AsQueryable();
 
-        var entities = await query.ToListAsync(cancellationToken);
+        if (!string.IsNullOrEmpty(request.WarehouseId))
+        {
+            query = query.Where(x => x.WarehouseId == request.WarehouseId);
+        }
 
+        var entities = await query.ToListAsync(cancellationToken);
         var dtos = _mapper.Map<List<GetStockCountListDto>>(entities);
 
         return new GetStockCountListResult
@@ -78,7 +84,6 @@ public class GetStockCountListHandler : IRequestHandler<GetStockCountListRequest
             Data = dtos
         };
     }
-
 
 }
 

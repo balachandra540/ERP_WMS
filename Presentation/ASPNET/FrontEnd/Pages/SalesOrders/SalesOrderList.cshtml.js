@@ -16,6 +16,7 @@
             customerId: null,
             taxId: null,
             orderStatus: null,
+            locationId:'',
             errors: {
                 orderDate: '',
                 customerId: '',
@@ -92,7 +93,8 @@
         const services = {
             getMainData: async () => {
                 try {
-                    const response = await AxiosManager.get('/SalesOrder/GetSalesOrderList', {});
+                    const locationId = StorageManager.getLocation();
+                    const response = await AxiosManager.get('/SalesOrder/GetSalesOrderList?LocationId=' + locationId, {});
                     return response;
                 } catch (error) {
                     throw error;
@@ -100,8 +102,9 @@
             },
             createMainData: async (orderDate, description, orderStatus, taxId, customerId, createdById) => {
                 try {
+                    const locationId = StorageManager.getLocation();
                     const response = await AxiosManager.post('/SalesOrder/CreateSalesOrder', {
-                        orderDate, description, orderStatus, taxId, customerId, createdById
+                        orderDate, description, orderStatus, taxId, customerId, createdById, locationId
                     });
                     return response;
                 } catch (error) {
@@ -110,8 +113,9 @@
             },
             updateMainData: async (id, orderDate, description, orderStatus, taxId, customerId, updatedById) => {
                 try {
+                    const locationId = StorageManager.getLocation();
                     const response = await AxiosManager.post('/SalesOrder/UpdateSalesOrder', {
-                        id, orderDate, description, orderStatus, taxId, customerId, updatedById
+                        id, orderDate, description, orderStatus, taxId, customerId, updatedById, locationId
                     });
                     return response;
                 } catch (error) {
@@ -192,7 +196,8 @@
             },
             getProductListLookupData: async () => {
                 try {
-                    const response = await AxiosManager.get('/Product/GetProductList', {});
+                    const locationId = StorageManager.getLocation();
+                    const response = await AxiosManager.get('/Product/GetProductList?warehouseId=' + locationId, {});
                     return response;
                 } catch (error) {
                     throw error;
@@ -940,6 +945,7 @@
             try {
                 await SecurityManager.authorizePage(['SalesOrders']);
                 await SecurityManager.validateToken();
+                state.location = StorageManager.getLocation();
 
                 await methods.populateMainData();
                 await mainGrid.create(state.mainData);

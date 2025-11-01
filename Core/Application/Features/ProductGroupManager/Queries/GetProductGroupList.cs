@@ -12,6 +12,8 @@ public record GetProductGroupListDto
     public string? Id { get; init; }
     public string? Name { get; init; }
     public string? Description { get; init; }
+    public bool HasAttributes { get; init; }
+
     public DateTime? CreatedAtUtc { get; init; }
 }
 

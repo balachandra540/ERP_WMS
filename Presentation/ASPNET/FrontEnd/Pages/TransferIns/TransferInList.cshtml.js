@@ -185,7 +185,8 @@
         const services = {
             getMainData: async () => {
                 try {
-                    const response = await AxiosManager.get('/TransferIn/GetTransferInList', {});
+                    const locationId = StorageManager.getLocation();
+                    const response = await AxiosManager.get('/TransferIn/GetTransferInList?locationId=' + locationId, {});
                     return response;
                 } catch (error) {
                     throw error;
@@ -223,7 +224,8 @@
             },
             getTransferOutListLookupData: async () => {
                 try {
-                    const response = await AxiosManager.get('/TransferOut/GetTransferOutList', {});
+                    const locationId = StorageManager.getLocation();
+                    const response = await AxiosManager.get('/TransferOut/GetTransferOutList?wareHouseId=' + locationId, {});
                     return response;
                 } catch (error) {
                     throw error;
@@ -277,7 +279,8 @@
             },
             getProductListLookupData: async () => {
                 try {
-                    const response = await AxiosManager.get('/Product/GetProductList', {});
+                    const locationId = StorageManager.getLocation();
+                    const response = await AxiosManager.get('/Product/GetProductList?WarehouseId =' + locationId, {});
                     return response;
                 } catch (error) {
                     throw error;
@@ -465,6 +468,8 @@
                         { field: 'number', headerText: 'Number', width: 150, minWidth: 150 },
                         { field: 'transferReceiveDate', headerText: 'Receive Date', width: 150, format: 'yyyy-MM-dd' },
                         { field: 'transferOutNumber', headerText: 'Transfer Out', width: 150, minWidth: 150 },
+                        //{ field: 'warehouseFrom', headerText: 'Warehouse From', minWidth: 150},
+                        //{ field: 'warehouseTo', headerText: 'Warehouse To',   minWidth: 150 },
                         { field: 'statusName', headerText: 'Status', width: 150, minWidth: 150 },
                         { field: 'createdAtUtc', headerText: 'Created At UTC', width: 150, format: 'yyyy-MM-dd HH:mm' }
                     ],

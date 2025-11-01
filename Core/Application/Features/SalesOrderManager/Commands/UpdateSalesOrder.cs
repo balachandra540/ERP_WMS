@@ -1,4 +1,5 @@
 ﻿using Application.Common.Repositories;
+using Application.Common.Services.SecurityManager;
 using Domain.Entities;
 using Domain.Enums;
 using FluentValidation;
@@ -20,6 +21,8 @@ public class UpdateSalesOrderRequest : IRequest<UpdateSalesOrderResult>
     public string? CustomerId { get; init; }
     public string? TaxId { get; init; }
     public string? UpdatedById { get; init; }
+    public string? LocationId { get; init; }
+
 }
 
 public class UpdateSalesOrderValidator : AbstractValidator<UpdateSalesOrderRequest>
@@ -39,16 +42,20 @@ public class UpdateSalesOrderHandler : IRequestHandler<UpdateSalesOrderRequest, 
     private readonly ICommandRepository<SalesOrder> _repository;
     private readonly IUnitOfWork _unitOfWork;
     private readonly SalesOrderService _salesOrderService;
+    private readonly ISecurityService _securityService;
+
 
     public UpdateSalesOrderHandler(
         ICommandRepository<SalesOrder> repository,
         SalesOrderService salesOrderService,
-        IUnitOfWork unitOfWork
+        IUnitOfWork unitOfWork,
+        ISecurityService securityService
         )
     {
         _repository = repository;
         _unitOfWork = unitOfWork;
         _salesOrderService = salesOrderService;
+        _securityService = securityService;
     }
 
     public async Task<UpdateSalesOrderResult> Handle(UpdateSalesOrderRequest request, CancellationToken cancellationToken)
@@ -63,11 +70,12 @@ public class UpdateSalesOrderHandler : IRequestHandler<UpdateSalesOrderRequest, 
 
         entity.UpdatedById = request.UpdatedById;
 
-        entity.OrderDate = request.OrderDate;
+        entity.OrderDate = _securityService.ConvertToIst(request.OrderDate); ;
         entity.OrderStatus = (SalesOrderStatus)int.Parse(request.OrderStatus!);
         entity.Description = request.Description;
         entity.CustomerId = request.CustomerId;
         entity.TaxId = request.TaxId;
+        entity.LocationId = request.LocationId;
 
         _repository.Update(entity);
         await _unitOfWork.SaveAsync(cancellationToken);

@@ -890,6 +890,7 @@ const App = {
             description: '',
             purchaseOrderId: null,
             status: null,
+            locationId: '',
             errors: {
                 receiveDate: '',
                 purchaseOrderId: '',
@@ -1158,9 +1159,21 @@ const App = {
 
         // **UPDATED SERVICES FOR GOODS RECEIVE ITEMS**
         const services = {
+            //getMainData: async () => {
+            //    try {
+            //        const response = await AxiosManager.get('/GoodsReceive/GetGoodsReceiveList', {});
+            //        return response;
+            //    } catch (error) {
+            //        throw error;
+            //    }
+            //},
             getMainData: async () => {
                 try {
-                    const response = await AxiosManager.get('/GoodsReceive/GetGoodsReceiveList', {});
+                    debugger;
+                    const locationId = StorageManager.getLocation();
+                    const response = await AxiosManager.get('/GoodsReceive/GetGoodsReceiveList?LocationId=' + locationId, {
+                        // <-- add this
+                    });
                     return response;
                 } catch (error) {
                     throw error;
@@ -1168,6 +1181,7 @@ const App = {
             },
             createMainData: async (receiveDate, description, status, purchaseOrderId, userId, items = [], defaultWarehouseId = null) => {
                 try {
+                    const locationId = StorageManager.getLocation();
                     const payload = {
                         ReceiveDate: receiveDate,
                         Description: description,
@@ -1175,7 +1189,8 @@ const App = {
                         PurchaseOrderId: purchaseOrderId,
                         CreatedById: userId,
                         Items: items,
-                        DefaultWarehouseId: defaultWarehouseId
+                        DefaultWarehouseId: defaultWarehouseId,
+                        LocationId: locationId  // <-- add here
                     };
                     const response = await AxiosManager.post('/GoodsReceive/CreateGoodsReceive', payload);
                     return response;
@@ -1186,8 +1201,10 @@ const App = {
 
             updateMainData: async (id, receiveDate, description, status, purchaseOrderId, updatedById, items, defaultWarehouseId) => {
                 try {
+                    const locationId = StorageManager.getLocation();
                     const response = await AxiosManager.post('/GoodsReceive/UpdateGoodsReceive', {
-                        id, receiveDate, description, status, purchaseOrderId, updatedById, Items: items, DefaultWarehouseId: defaultWarehouseId
+                        id, receiveDate, description, status, purchaseOrderId, updatedById,
+                        Items: items, DefaultWarehouseId: defaultWarehouseId, LocationId: locationId
                     });
                     return response;
                 } catch (error) {
@@ -1204,14 +1221,18 @@ const App = {
                     throw error;
                 }
             },
-            getPurchaseOrderListLookupData: async () => {
+            getPurchaseOrderListLookupData: async (purchaseOrderId = '', isDeleted = false) => {
                 try {
-                    const response = await AxiosManager.get('/PurchaseOrder/GetPurchaseOrder', {});
+                    const locationId = StorageManager.getLocation(); // could be null or string
+                    const response = await AxiosManager.get('/PurchaseOrder/GetPurchaseOrder?purchaseOrderId=' + purchaseOrderId + '&isDeleted=' + isDeleted + '&LocationId=' + locationId, {
+                        
+                    });
                     return response;
                 } catch (error) {
                     throw error;
                 }
             },
+
             getPurchaseOrderById: async (id) => {
                 try {
                     const response = await AxiosManager.get('/PurchaseOrder/GetPurchaseOrder?purchaseOrderId=' + id, {});
@@ -1270,7 +1291,9 @@ const App = {
             },
             getProductListLookupData: async () => {
                 try {
-                    const response = await AxiosManager.get('/Product/GetProductList', {});
+                    debugger;
+                    const locationId = StorageManager.getLocation();
+                    const response = await AxiosManager.get('/Product/GetProductList?WarehouseId =' + locationId, {});
                     return response;
                 } catch (error) {
                     throw error;
@@ -1798,6 +1821,7 @@ const App = {
        
         Vue.onMounted(async () => {
             try {
+                state.locationId = StorageManager.getLocation();
                 await SecurityManager.authorizePage(['GoodsReceives']);
                 await SecurityManager.validateToken();
                 await methods.populateMainData();

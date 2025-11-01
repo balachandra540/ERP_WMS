@@ -187,7 +187,8 @@
         const services = {
             getMainData: async () => {
                 try {
-                    const response = await AxiosManager.get('/SalesReturn/GetSalesReturnList', {});
+                    const locationId = StorageManager.getLocation();
+                    const response = await AxiosManager.get('/SalesReturn/GetSalesReturnList?LocationId='+locationId, {});
                     return response;
                 } catch (error) {
                     throw error;
@@ -225,7 +226,9 @@
             },
             getDeliveryOrderListLookupData: async () => {
                 try {
-                    const response = await AxiosManager.get('/DeliveryOrder/GetDeliveryOrderList', {});
+                    //const response = await AxiosManager.get('/DeliveryOrder/GetDeliveryOrderList', {});
+                    const locationId = StorageManager.getLocation();
+                    const response = await AxiosManager.get('/DeliveryOrder/GetDeliveryOrderList?LocationId=' + locationId, {});
                     return response;
                 } catch (error) {
                     throw error;
@@ -279,7 +282,8 @@
             },
             getProductListLookupData: async () => {
                 try {
-                    const response = await AxiosManager.get('/Product/GetProductList', {});
+                    const locationId = StorageManager.getLocation();
+                    const response = await AxiosManager.get('/Product/GetProductList?WarehouseId =' + locationId, {});
                     return response;
                 } catch (error) {
                     throw error;
@@ -287,7 +291,8 @@
             },
             getWarehouseListLookupData: async () => {
                 try {
-                    const response = await AxiosManager.get('/Warehouse/GetWarehouseList', {});
+                    const locationId = StorageManager.getLocation();
+                    const response = await AxiosManager.get('/Warehouse/GetWarehouseList?id=' + locationId, {});
                     return response;
                 } catch (error) {
                     throw error;

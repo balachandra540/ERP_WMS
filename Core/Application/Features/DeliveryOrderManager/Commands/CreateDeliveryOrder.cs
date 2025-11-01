@@ -1,5 +1,6 @@
 ﻿using Application.Common.Extensions;
 using Application.Common.Repositories;
+using Application.Common.Services.SecurityManager;
 using Application.Features.InventoryTransactionManager;
 using Application.Features.NumberSequenceManager;
 using Domain.Entities;
@@ -37,72 +38,82 @@ public class CreateDeliveryOrderValidator : AbstractValidator<CreateDeliveryOrde
 public class CreateDeliveryOrderHandler : IRequestHandler<CreateDeliveryOrderRequest, CreateDeliveryOrderResult>
 {
     private readonly ICommandRepository<DeliveryOrder> _deliveryOrderRepository;
+    private readonly ICommandRepository<SalesOrder> _salesOrderRepository;
     private readonly ICommandRepository<SalesOrderItem> _salesOrderItemRepository;
     private readonly ICommandRepository<Warehouse> _warehouseRepository;
     private readonly IUnitOfWork _unitOfWork;
     private readonly NumberSequenceService _numberSequenceService;
     private readonly InventoryTransactionService _inventoryTransactionService;
+    private readonly ISecurityService _securityService;
+
 
     public CreateDeliveryOrderHandler(
         ICommandRepository<DeliveryOrder> deliveryOrderRepository,
+        ICommandRepository<SalesOrder> salesOrderRepository,
         ICommandRepository<SalesOrderItem> salesOrderItemRepository,
         ICommandRepository<Warehouse> warehouseRepository,
         IUnitOfWork unitOfWork,
         NumberSequenceService numberSequenceService,
-        InventoryTransactionService inventoryTransactionService
+        InventoryTransactionService inventoryTransactionService,
+        ISecurityService securityService
         )
     {
         _deliveryOrderRepository = deliveryOrderRepository;
+        _salesOrderRepository = salesOrderRepository;
         _salesOrderItemRepository = salesOrderItemRepository;
         _warehouseRepository = warehouseRepository;
         _unitOfWork = unitOfWork;
         _numberSequenceService = numberSequenceService;
         _inventoryTransactionService = inventoryTransactionService;
+        _securityService = securityService;
+
     }
 
     public async Task<CreateDeliveryOrderResult> Handle(CreateDeliveryOrderRequest request, CancellationToken cancellationToken = default)
     {
-        var entity = new DeliveryOrder();
-        entity.CreatedById = request.CreatedById;
-
-        entity.Number = _numberSequenceService.GenerateNumber(nameof(DeliveryOrder), "", "DO");
-        entity.DeliveryDate = request.DeliveryDate;
-        entity.Status = (DeliveryOrderStatus)int.Parse(request.Status!);
-        entity.Description = request.Description;
-        entity.SalesOrderId = request.SalesOrderId;
+        var entity = new DeliveryOrder
+        {
+            CreatedById = request.CreatedById,
+            Number = _numberSequenceService.GenerateNumber(nameof(DeliveryOrder), "", "DO"),
+            DeliveryDate = _securityService.ConvertToIst(request.DeliveryDate),
+            Status = (DeliveryOrderStatus)int.Parse(request.Status!),
+            Description = request.Description,
+            SalesOrderId = request.SalesOrderId
+        };
 
         await _deliveryOrderRepository.CreateAsync(entity, cancellationToken);
         await _unitOfWork.SaveAsync(cancellationToken);
 
-        var defaultWarehouse = await _warehouseRepository
+        // ✅ Get related SalesOrder (to read LocationId)
+        var salesOrder = await _salesOrderRepository
+            .GetQuery()
+            .AsNoTracking()
+            .FirstOrDefaultAsync(x => x.Id == entity.SalesOrderId, cancellationToken);
+
+        if (salesOrder == null)
+            throw new Exception("Sales Order not found.");
+
+        // ✅ Get items of that SalesOrder
+        var items = await _salesOrderItemRepository
             .GetQuery()
             .ApplyIsDeletedFilter(false)
-            .Where(x => x.SystemWarehouse == false)
-            .FirstOrDefaultAsync(cancellationToken);
+            .Where(x => x.SalesOrderId == entity.SalesOrderId)
+            .Include(x => x.Product)
+            .ToListAsync(cancellationToken);
 
-        if (defaultWarehouse != null)
+        // ✅ Create inventory transactions using SalesOrder.LocationId
+        foreach (var item in items)
         {
-            var items = await _salesOrderItemRepository
-                .GetQuery()
-                .ApplyIsDeletedFilter(false)
-                .Where(x => x.SalesOrderId == entity.SalesOrderId)
-                .Include(x => x.Product)
-                .ToListAsync(cancellationToken);
-
-            foreach (var item in items)
+            if (item?.Product?.Physical ?? false)
             {
-                if (item?.Product?.Physical ?? false)
-                {
-                    await _inventoryTransactionService.DeliveryOrderCreateInvenTrans(
-                        entity.Id,
-                        defaultWarehouse.Id,
-                        item.ProductId,
-                        item.Quantity,
-                        entity.CreatedById,
-                        cancellationToken
-                        );
-
-                }
+                await _inventoryTransactionService.DeliveryOrderCreateInvenTrans(
+                    entity.Id,
+                    salesOrder.LocationId,   // 👈 directly use SaleOrder.LocationId here
+                    item.ProductId,
+                    item.Quantity,
+                    entity.CreatedById,
+                    cancellationToken
+                );
             }
         }
 

@@ -61,10 +61,11 @@ public class DeliveryOrderController : BaseApiController
     [HttpGet("GetDeliveryOrderList")]
     public async Task<ActionResult<ApiSuccessResult<GetDeliveryOrderListResult>>> GetDeliveryOrderListAsync(
         CancellationToken cancellationToken,
-        [FromQuery] bool isDeleted = false
+        [FromQuery] bool isDeleted = false,
+        [FromQuery] string? LocationId = null
         )
     {
-        var request = new GetDeliveryOrderListRequest { IsDeleted = isDeleted };
+        var request = new GetDeliveryOrderListRequest { IsDeleted = isDeleted , LocationId = LocationId };
         var response = await _sender.Send(request, cancellationToken);
 
         return Ok(new ApiSuccessResult<GetDeliveryOrderListResult>

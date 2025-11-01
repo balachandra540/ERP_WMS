@@ -61,10 +61,11 @@ public class PurchaseReturnController : BaseApiController
     [HttpGet("GetPurchaseReturnList")]
     public async Task<ActionResult<ApiSuccessResult<GetPurchaseReturnListResult>>> GetPurchaseReturnListAsync(
         CancellationToken cancellationToken,
-        [FromQuery] bool isDeleted = false
+        [FromQuery] bool isDeleted = false,
+        [FromQuery] string? location = null
         )
     {
-        var request = new GetPurchaseReturnListRequest { IsDeleted = isDeleted };
+        var request = new GetPurchaseReturnListRequest { IsDeleted = isDeleted,LocationId = location };
         var response = await _sender.Send(request, cancellationToken);
 
         return Ok(new ApiSuccessResult<GetPurchaseReturnListResult>

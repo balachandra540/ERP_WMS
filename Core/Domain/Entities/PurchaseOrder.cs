@@ -16,5 +16,6 @@ public class PurchaseOrder : BaseEntity
     public double? BeforeTaxAmount { get; set; }
     public double? TaxAmount { get; set; }
     public double? AfterTaxAmount { get; set; }
+    public string? LocationId { get; set; }
     public ICollection<PurchaseOrderItem> PurchaseOrderItemList { get; set; } = new List<PurchaseOrderItem>();
 }

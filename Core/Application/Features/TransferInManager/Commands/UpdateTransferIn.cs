@@ -1,4 +1,5 @@
 ﻿using Application.Common.Repositories;
+using Application.Common.Services.SecurityManager;
 using Application.Features.InventoryTransactionManager;
 using Domain.Entities;
 using Domain.Enums;
@@ -39,18 +40,21 @@ public class UpdateTransferInHandler : IRequestHandler<UpdateTransferInRequest, 
     private readonly IUnitOfWork _unitOfWork;
     private readonly InventoryTransactionService _inventoryTransactionService;
     private readonly ICommandRepository<TransferOut> _transferOutRepository;
+    private readonly ISecurityService _securityService;
 
     public UpdateTransferInHandler(
         ICommandRepository<TransferIn> repository,
         IUnitOfWork unitOfWork,
         InventoryTransactionService inventoryTransactionService,
-        ICommandRepository<TransferOut> transferOutRepository
+        ICommandRepository<TransferOut> transferOutRepository,
+        ISecurityService securityService
         )
     {
         _repository = repository;
         _unitOfWork = unitOfWork;
         _inventoryTransactionService = inventoryTransactionService;
         _transferOutRepository = transferOutRepository;
+        _securityService = securityService;
     }
 
     public async Task<UpdateTransferInResult> Handle(UpdateTransferInRequest request, CancellationToken cancellationToken)
@@ -64,8 +68,8 @@ public class UpdateTransferInHandler : IRequestHandler<UpdateTransferInRequest, 
         }
 
         entity.UpdatedById = request.UpdatedById;
+        entity.TransferReceiveDate = _securityService.ConvertToIst(request.TransferReceiveDate);
 
-        entity.TransferReceiveDate = request.TransferReceiveDate;
         entity.Status = (TransferStatus)int.Parse(request.Status!);
         entity.Description = request.Description;
         entity.TransferOutId = request.TransferOutId;

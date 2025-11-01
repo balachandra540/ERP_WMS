@@ -17,8 +17,10 @@ public class PurchaseOrderController : BaseApiController
 
     [Authorize]
     [HttpPost("CreatePurchaseOrder")]
-    public async Task<ActionResult<ApiSuccessResult<CreatePurchaseOrderResult>>> CreatePurchaseOrderAsync(CreatePurchaseOrderRequest request, CancellationToken cancellationToken)
+    public async Task<ActionResult<ApiSuccessResult<CreatePurchaseOrderResult>>> CreatePurchaseOrderAsync([FromBody] CreatePurchaseOrderRequest request,
+        CancellationToken cancellationToken)
     {
+        // ✅ locationId should come from frontend request body (you already have it there)
         var response = await _sender.Send(request, cancellationToken);
 
         return Ok(new ApiSuccessResult<CreatePurchaseOrderResult>
@@ -31,7 +33,8 @@ public class PurchaseOrderController : BaseApiController
 
     [Authorize]
     [HttpPost("UpdatePurchaseOrder")]
-    public async Task<ActionResult<ApiSuccessResult<UpdatePurchaseOrderResult>>> UpdatePurchaseOrderAsync(UpdatePurchaseOrderRequest request, CancellationToken cancellationToken)
+    public async Task<ActionResult<ApiSuccessResult<UpdatePurchaseOrderResult>>> UpdatePurchaseOrderAsync([FromBody] UpdatePurchaseOrderRequest request,
+        CancellationToken cancellationToken)
     {
         var response = await _sender.Send(request, cancellationToken);
 
@@ -45,8 +48,11 @@ public class PurchaseOrderController : BaseApiController
 
     [Authorize]
     [HttpPost("DeletePurchaseOrder")]
-    public async Task<ActionResult<ApiSuccessResult<DeletePurchaseOrderResult>>> DeletePurchaseOrderAsync(DeletePurchaseOrderRequest request, CancellationToken cancellationToken)
+    public async Task<ActionResult<ApiSuccessResult<DeletePurchaseOrderResult>>> DeletePurchaseOrderAsync(
+        [FromBody] DeletePurchaseOrderRequest request,
+        CancellationToken cancellationToken)
     {
+        // ✅ locationId can be logged or used for auditing if needed
         var response = await _sender.Send(request, cancellationToken);
 
         return Ok(new ApiSuccessResult<DeletePurchaseOrderResult>
@@ -60,11 +66,18 @@ public class PurchaseOrderController : BaseApiController
     [Authorize]
     [HttpGet("GetPurchaseOrderList")]
     public async Task<ActionResult<ApiSuccessResult<GetPurchaseOrderListResult>>> GetPurchaseOrderListAsync(
-        CancellationToken cancellationToken,
-        [FromQuery] bool isDeleted = false)
+        [FromQuery] bool isDeleted = false,
+        [FromQuery] string? locationId = null,
+        CancellationToken cancellationToken = default)
     {
-        var request = new GetPurchaseOrderListRequest { IsDeleted = isDeleted };
+        var request = new GetPurchaseOrderListRequest
+        {
+            IsDeleted = isDeleted,
+            LocationId = locationId   //  handled here
+        };
+
         var response = await _sender.Send(request, cancellationToken);
+
         return Ok(new ApiSuccessResult<GetPurchaseOrderListResult>
         {
             Code = StatusCodes.Status200OK,
@@ -76,14 +89,16 @@ public class PurchaseOrderController : BaseApiController
     [Authorize]
     [HttpGet("GetPurchaseOrder")]
     public async Task<ActionResult<ApiSuccessResult<GetPurchaseOrderResult>>> GetPurchaseOrderAsync(
-    CancellationToken cancellationToken,
-    [FromQuery] string purchaseOrderId,
-    [FromQuery] bool isDeleted = false)
+        CancellationToken cancellationToken,
+        [FromQuery] string purchaseOrderId,
+        [FromQuery] bool isDeleted = false,
+        [FromQuery] string? locationId = null)  // ✅ added
     {
         var request = new GetPurchaseOrderRequest
         {
             PurchaseOrderId = purchaseOrderId,
-            IsDeleted = isDeleted
+            IsDeleted = isDeleted,
+            LocationId = locationId   // ✅ handled here
         };
 
         var response = await _sender.Send(request, cancellationToken);
@@ -127,8 +142,8 @@ public class PurchaseOrderController : BaseApiController
     [HttpGet("GetPurchaseOrderSingle")]
     public async Task<ActionResult<ApiSuccessResult<GetPurchaseOrderSingleResult>>> GetPurchaseOrderSingleAsync(
         CancellationToken cancellationToken,
-    [FromQuery] string id
-    )
+        [FromQuery] string id
+        )
     {
         var request = new GetPurchaseOrderSingleRequest { Id = id };
         var response = await _sender.Send(request, cancellationToken);
@@ -142,6 +157,6 @@ public class PurchaseOrderController : BaseApiController
     }
 
 
-    }
+}
 
 

@@ -1,5 +1,6 @@
 ﻿using Application.Common.Extensions;
 using Application.Common.Repositories;
+using Application.Common.Services.SecurityManager;
 using Application.Features.InventoryTransactionManager;
 using Application.Features.NumberSequenceManager;
 using Domain.Entities;
@@ -31,13 +32,16 @@ public class CreateSalesReturnHandler : IRequestHandler<CreateSalesReturnRequest
     private readonly IUnitOfWork _unitOfWork;
     private readonly NumberSequenceService _numberSequenceService;
     private readonly InventoryTransactionService _inventoryTransactionService;
+    private readonly ISecurityService _securityService;
+
 
     public CreateSalesReturnHandler(
         ICommandRepository<SalesReturn> deliveryOrderRepository,
         ICommandRepository<InventoryTransaction> itemRepository,
         IUnitOfWork unitOfWork,
         NumberSequenceService numberSequenceService,
-        InventoryTransactionService inventoryTransactionService
+        InventoryTransactionService inventoryTransactionService,
+        ISecurityService securityService
         )
     {
         _deliveryOrderRepository = deliveryOrderRepository;
@@ -45,6 +49,7 @@ public class CreateSalesReturnHandler : IRequestHandler<CreateSalesReturnRequest
         _unitOfWork = unitOfWork;
         _numberSequenceService = numberSequenceService;
         _inventoryTransactionService = inventoryTransactionService;
+        _securityService = securityService;
     }
 
     public async Task<CreateSalesReturnResult> Handle(CreateSalesReturnRequest request, CancellationToken cancellationToken = default)
@@ -53,7 +58,7 @@ public class CreateSalesReturnHandler : IRequestHandler<CreateSalesReturnRequest
         entity.CreatedById = request.CreatedById;
 
         entity.Number = _numberSequenceService.GenerateNumber(nameof(SalesReturn), "", "SRN");
-        entity.ReturnDate = request.ReturnDate;
+        entity.ReturnDate = _securityService.ConvertToIst(request.ReturnDate);
         entity.Status = (SalesReturnStatus)int.Parse(request.Status!);
         entity.Description = request.Description;
         entity.DeliveryOrderId = request.DeliveryOrderId;

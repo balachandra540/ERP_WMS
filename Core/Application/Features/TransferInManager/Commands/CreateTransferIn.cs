@@ -1,5 +1,6 @@
 ﻿using Application.Common.Extensions;
 using Application.Common.Repositories;
+using Application.Common.Services.SecurityManager;
 using Application.Features.InventoryTransactionManager;
 using Application.Features.NumberSequenceManager;
 using Domain.Entities;
@@ -41,13 +42,15 @@ public class CreateTransferInHandler : IRequestHandler<CreateTransferInRequest, 
     private readonly IUnitOfWork _unitOfWork;
     private readonly NumberSequenceService _numberSequenceService;
     private readonly InventoryTransactionService _inventoryTransactionService;
+    private readonly ISecurityService _securityService;
 
     public CreateTransferInHandler(
         ICommandRepository<TransferIn> deliveryOrderRepository,
         ICommandRepository<InventoryTransaction> itemRepository,
         IUnitOfWork unitOfWork,
         NumberSequenceService numberSequenceService,
-        InventoryTransactionService inventoryTransactionService
+        InventoryTransactionService inventoryTransactionService,
+         ISecurityService securityService
         )
     {
         _deliveryOrderRepository = deliveryOrderRepository;
@@ -55,6 +58,7 @@ public class CreateTransferInHandler : IRequestHandler<CreateTransferInRequest, 
         _unitOfWork = unitOfWork;
         _numberSequenceService = numberSequenceService;
         _inventoryTransactionService = inventoryTransactionService;
+        _securityService = securityService;
     }
 
     public async Task<CreateTransferInResult> Handle(CreateTransferInRequest request, CancellationToken cancellationToken = default)
@@ -63,7 +67,7 @@ public class CreateTransferInHandler : IRequestHandler<CreateTransferInRequest, 
         entity.CreatedById = request.CreatedById;
 
         entity.Number = _numberSequenceService.GenerateNumber(nameof(TransferIn), "", "IN");
-        entity.TransferReceiveDate = request.TransferReceiveDate;
+        entity.TransferReceiveDate = _securityService.ConvertToIst(request.TransferReceiveDate);
         entity.Status = (TransferStatus)int.Parse(request.Status!);
         entity.Description = request.Description;
         entity.TransferOutId = request.TransferOutId;

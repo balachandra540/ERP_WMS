@@ -35,6 +35,13 @@
                                                 <input ref="nameRef" v-model="state.name">
                                                 <label class="text-danger">{{ state.errors.name }}</label>
                                             </div>
+                                            <div class="col-md-5" style="display:none">
+                                                <div class="form-check">
+                                                    <input v-model="state.hasAttributes" id="HasAttributes" name="HasAttributes"
+                                                           type="checkbox" class="form-check-input">
+                                                    <label for="HasAttributes" class="form-check-label">Has Attributes</label>
+                                                </div>
+                                            </div>
                                         </div>
                                         <div class="row mb-2">
                                             <div class="col-12">
@@ -62,6 +69,65 @@
                     </button>
                 </div>
             </div> 
+        </div>
+    </div>
+
+    <!-- Attributes Modal -->
+    <div class="modal fade"
+         ref="attributesModalRef"
+         id="AttributesModal"
+         tabindex="-1"
+         data-bs-focus="false"
+         data-bs-backdrop="static">
+        <div class="modal-dialog modal-lg modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Product Attributes</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+
+                <div class="modal-body">
+                    <table class="table table-bordered">
+                        <thead>
+                            <tr>
+                                <th>Attribute Name</th>
+                                <th style="width: 120px;">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- Vue loop creates one row per attribute in array -->
+                            <tr v-for="(attr, index) in state.attributes" :key="index">
+                                <td>
+                                    <input v-model="attr.name"
+                                           type="text"
+                                           class="form-control"
+                                           placeholder="Enter attribute name">
+                                </td>
+                                <td>
+                                    <button type="button"
+                                            class="btn btn-danger btn-sm"
+                                            v-on:click="handler.removeAttribute(index)">
+                                        <i class="bi bi-trash"></i> Remove
+                                    </button>
+
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                    <!-- Add new row button -->
+                    <button type="button"
+                            class="btn btn-primary btn-sm"
+                            v-on:click="handler.addAttribute">
+                        <i class="bi bi-plus-circle"></i> Add Attribute
+                    </button>
+
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <button type="button" class="btn btn-success">Save</button>
+                </div>
+            </div>
         </div>
     </div>
 </div>

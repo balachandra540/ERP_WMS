@@ -9,7 +9,8 @@
         const services = {
             getMainData: async () => {
                 try {
-                    const response = await AxiosManager.get('/PurchaseOrderItem/GetPurchaseOrderItemList', {});
+                    const locationId = StorageManager.getLocation();
+                    const response = await AxiosManager.get('/PurchaseOrderItem/GetPurchaseOrderItemList?LocationId=' + locationId, {});
                     return response;
                 } catch (error) {
                     throw error;
