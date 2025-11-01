@@ -31,7 +31,7 @@ public class TransferInController : BaseApiController
 
     [Authorize]
     [HttpPost("UpdateTransferIn")]
-    public async Task<ActionResult<ApiSuccessResult<UpdateTransferInResult>>> UpdateTransferInAsync(UpdateTransferInRequest request, CancellationToken cancellationToken)
+    public async Task<ActionResult<ApiSuccessResult<UpdateTransferInResult>>> UpdateTransferInAsync([FromBody] UpdateTransferInRequest request, CancellationToken cancellationToken)
     {
         var response = await _sender.Send(request, cancellationToken);
 

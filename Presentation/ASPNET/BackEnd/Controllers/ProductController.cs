@@ -80,7 +80,29 @@ public class ProductController : BaseApiController
             Content = response
         });
     }
+    [Authorize]
+    [HttpGet("GetInventoryProductList")]
+    public async Task<ActionResult<ApiSuccessResult<GetProductListResult>>> GetInventoryProductListAsync(
+    CancellationToken cancellationToken,
+    [FromQuery] string? warehouseId = null,
+    [FromQuery] bool isDeleted = false
+)
+    {
+        var request = new GetInventoryProductListRequest
+        {
+            IsDeleted = isDeleted,
+            WarehouseId = warehouseId
+        };
 
+        var response = await _sender.Send(request, cancellationToken);
+
+        return Ok(new ApiSuccessResult<GetProductListResult>
+        {
+            Code = StatusCodes.Status200OK,
+            Message = $"Success executing {nameof(GetInventoryProductListAsync)}",
+            Content = response
+        });
+    }
 
 }
 

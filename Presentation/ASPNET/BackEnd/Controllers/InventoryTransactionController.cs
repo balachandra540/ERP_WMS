@@ -340,10 +340,12 @@ public class InventoryTransactionController : BaseApiController
     [HttpGet("TransferOutGetInvenTransList")]
     public async Task<ActionResult<ApiSuccessResult<TransferOutGetInvenTransListResult>>> TransferOutGetInvenTransListAsync(
         CancellationToken cancellationToken,
-        [FromQuery] string moduleId
+        [FromQuery] string moduleId,
+        [FromQuery] bool onlyConfirmed = false
+
         )
     {
-        var request = new TransferOutGetInvenTransListRequest { ModuleId = moduleId };
+        var request = new TransferOutGetInvenTransListRequest { ModuleId = moduleId,OnlyConfirmed=onlyConfirmed };
         var response = await _sender.Send(request, cancellationToken);
 
         return Ok(new ApiSuccessResult<TransferOutGetInvenTransListResult>
@@ -353,7 +355,23 @@ public class InventoryTransactionController : BaseApiController
             Content = response
         });
     }
+    [Authorize]
+    [HttpGet("FromWarehouseId")]
+    public async Task<ActionResult<ApiSuccessResult<FromWarehouseIdResult>>> FromWarehouseIdAsync(
+            CancellationToken cancellationToken,
+            [FromQuery] string warehouseId)
+    {
+        var request = new FromWarehouseIdRequest { WarehouseId = warehouseId };
+        var response = await _sender.Send(request, cancellationToken);
 
+        return Ok(new ApiSuccessResult<FromWarehouseIdResult>
+        {
+            Code = StatusCodes.Status200OK,
+            Message = $"Success executing {nameof(FromWarehouseIdAsync)}",
+            Content = response
+        });
+    }
+    
     [Authorize]
     [HttpPost("TransferInCreateInvenTrans")]
     public async Task<ActionResult<ApiSuccessResult<TransferInCreateInvenTransResult>>> TransferInCreateInvenTransAsync(TransferInCreateInvenTransRequest request, CancellationToken cancellationToken)

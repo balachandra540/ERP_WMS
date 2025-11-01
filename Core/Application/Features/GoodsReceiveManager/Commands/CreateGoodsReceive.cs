@@ -108,8 +108,7 @@ namespace Application.Features.GoodsReceiveManager.Commands
 
             var poStatus = po.OrderStatus.GetValueOrDefault();
             if (poStatus == PurchaseOrderStatus.Cancelled ||
-                poStatus == PurchaseOrderStatus.Closed ||
-                poStatus == PurchaseOrderStatus.Archived)
+                poStatus == PurchaseOrderStatus.Pending)
                 throw new InvalidOperationException($"Cannot create goods receive for a {poStatus} purchase order.");
 
             // Step 2: Parse incoming GoodsReceive status
@@ -176,9 +175,11 @@ namespace Application.Features.GoodsReceiveManager.Commands
 
                 if (reqItem.ReceivedQuantity <= 0)
                     continue;
-
-                // Update PO item received quantity (tracked entity)
+                // ✅ Update PO item ReceivedQuantity in DB (tracked)
                 poItem.ReceivedQuantity += reqItem.ReceivedQuantity;
+                poItem.UpdatedById = request.CreatedById;
+                _purchaseOrderItemRepository.Update(poItem);  // Ensure EF marks it as modified
+
 
                 // Create GoodsReceiveItem
                 var grItem = new GoodsReceiveItem
@@ -228,9 +229,7 @@ namespace Application.Features.GoodsReceiveManager.Commands
             // Step 7: Save all items and updated PO items
             await _unitOfWork.SaveAsync(cancellationToken);
 
-            // Step 8: Update PurchaseOrder status (reloads from DB to reflect updates)
-            await UpdatePurchaseOrderStatus(request.PurchaseOrderId!, request.CreatedById!, cancellationToken);
-
+            
             // Step 9: Final save for PO status if changed
             await _unitOfWork.SaveAsync(cancellationToken);
 
@@ -261,13 +260,7 @@ namespace Application.Features.GoodsReceiveManager.Commands
             var currentStatus = po.OrderStatus.GetValueOrDefault();
             var newStatus = currentStatus;
 
-            if (isFullyReceived && currentStatus != PurchaseOrderStatus.FullyReceived)
-                newStatus = PurchaseOrderStatus.FullyReceived;
-            else if (isPartiallyReceived &&
-                     (currentStatus == PurchaseOrderStatus.Confirmed ||
-                      currentStatus == PurchaseOrderStatus.Approved))
-                newStatus = PurchaseOrderStatus.PartiallyReceived;
-
+            
             if (newStatus != currentStatus)
             {
                 po.OrderStatus = newStatus;

@@ -28,7 +28,7 @@ public class GetPurchaseOrdersForDropdownHandler : IRequestHandler<GetPurchaseOr
     public async Task<List<PurchaseOrderDto>> Handle(GetPurchaseOrdersForDropdownQuery request, CancellationToken cancellationToken)
     {
         return await _repository.GetQuery()
-            .Where(po => po.OrderStatus == PurchaseOrderStatus.Confirmed || po.OrderStatus == PurchaseOrderStatus.PartiallyReceived) // Only eligible POs
+            .Where(po => po.OrderStatus == PurchaseOrderStatus.Confirmed) // Only eligible POs
             .Select(po => new PurchaseOrderDto { Id = po.Id, Number = po.Number })
             .ToListAsync(cancellationToken);
     }

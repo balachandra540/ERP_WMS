@@ -176,6 +176,7 @@
                 }
             },
             updateSecondaryData: async (id, unitPrice, quantity, summary, productId, purchaseOrderId, updatedById) => {
+                debugger;
                 try {
                     const response = await AxiosManager.post('/PurchaseOrderItem/UpdatePurchaseOrderItem', {
                         id, unitPrice, quantity, summary, productId, purchaseOrderId, updatedById
@@ -222,8 +223,8 @@
                 const response = await services.getMainData();
                 state.mainData = response?.data?.content?.data.map(item => ({
                     ...item,
-                    orderDate: new Date(item.orderDate),
-                    createdAtUtc: new Date(item.createdAtUtc)
+                    orderDate: item.orderDate ? new Date(item.orderDate).toISOString() : null,
+                    createdAtUtc: item.createdAtUtc ? new Date(item.createdAtUtc).toISOString() : null
                 }));
             },
             populateSecondaryData: async (purchaseOrderId) => {
@@ -503,12 +504,34 @@
                             field: 'id', isPrimaryKey: true, headerText: 'Id', visible: false
                         },
                         { field: 'number', headerText: 'Number', width: 150, minWidth: 150 },
-                        { field: 'orderDate', headerText: 'PO Date', width: 150, format: 'yyyy-MM-dd' },
+                        {
+                            field: 'orderDate',
+                            headerText: 'PO Date',
+                            width: 150,
+                            valueAccessor: (field, data) => {
+                                if (!data.orderDate) return '';
+                                const d = new Date(data.orderDate);
+                                return d.toLocaleString('en-GB', { year: 'numeric', month: 'short', day: '2-digit' });
+                            }
+                        },
                         { field: 'vendorName', headerText: 'Vendor', width: 200, minWidth: 200 },
                         { field: 'orderStatusName', headerText: 'Status', width: 150, minWidth: 150 },
                         { field: 'taxName', headerText: 'Tax', width: 150, minWidth: 150 },
                         { field: 'afterTaxAmount', headerText: 'Total Amount', width: 150, minWidth: 150, format: 'N2' },
-                        { field: 'createdAtUtc', headerText: 'Created At UTC', width: 150, format: 'yyyy-MM-dd HH:mm' }
+
+                        {
+                            field: 'createdAtUtc',
+                            headerText: 'Created At UTC',
+                            width: 180,
+                            valueAccessor: (field, data) => {
+                                if (!data.createdAtUtc) return '';
+                                const d = new Date(data.createdAtUtc);
+                                return d.toLocaleString('en-GB', {
+                                    year: 'numeric', month: 'short', day: '2-digit',
+                                    hour: '2-digit', minute: '2-digit', hour12: false
+                                });
+                            }
+                        }
                     ],
                     toolbar: [
                         'ExcelExport', 'Search',

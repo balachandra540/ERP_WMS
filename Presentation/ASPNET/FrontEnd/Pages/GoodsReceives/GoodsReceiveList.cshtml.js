@@ -1206,7 +1206,7 @@ const App = {
             },
             getPurchaseOrderListLookupData: async () => {
                 try {
-                    const response = await AxiosManager.get('/PurchaseOrder/GetPurchaseOrder', {});
+                    const response = await AxiosManager.get('/PurchaseOrder/GetPurchaseOrderListForGoodsrecieved', {});
                     return response;
                 } catch (error) {
                     throw error;
