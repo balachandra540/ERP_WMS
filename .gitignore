@@ -1,2 +1,18 @@
 ﻿.vs/
 obj/
+
+# Build Folders
+bin/
+obj/
+Debug/
+Release/
+
+# Visual Studio specific
+.vs/
+*.user
+*.suo
+
+# Other auto-generated
+*.log
+*.cache
+/Presentation/ASPNET/bin/Debug/net9.0/ASPNET.staticwebassets.endpoints.json
