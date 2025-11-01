@@ -54,33 +54,21 @@ namespace Application.Features.PurchaseOrderManager.Queries
         public GetPurchaseOrderListProfile()
         {
             CreateMap<PurchaseOrder, GetPurchaseOrderListDto>()
-                .ForMember(
-                    dest => dest.VendorName,
-                    opt => opt.MapFrom(src => src.Vendor != null ? src.Vendor.Name : string.Empty)
-                )
-                .ForMember(
-                    dest => dest.TaxName,
-                    opt => opt.MapFrom(src => src.Tax != null ? src.Tax.Name : string.Empty)
-                )
-                .ForMember(
-                    dest => dest.OrderStatusName,
+                .ForMember(dest => dest.VendorName,
+                    opt => opt.MapFrom(src => src.Vendor != null ? src.Vendor.Name : string.Empty))
+                .ForMember(dest => dest.TaxName,
+                    opt => opt.MapFrom(src => src.Tax != null ? src.Tax.Name : string.Empty))
+                .ForMember(dest => dest.OrderStatusName,
                     opt => opt.MapFrom(src =>
                         src.OrderStatus.HasValue
                             ? src.OrderStatus.Value.ToFriendlyName()
-                            : string.Empty
-                    )
-                )
-                // Map items
-                .ForMember(
-                    dest => dest.Items,
-                    opt => opt.MapFrom(src => src.PurchaseOrderItemList)
-                );
+                            : string.Empty))
+                .ForMember(dest => dest.Items,
+                    opt => opt.MapFrom(src => src.PurchaseOrderItemList));
 
             CreateMap<PurchaseOrderItem, PurchaseOrderItemDto>()
-                .ForMember(
-                    dest => dest.ProductName,
-                    opt => opt.MapFrom(src => src.Product != null ? src.Product.Name : string.Empty)
-                );
+                .ForMember(dest => dest.ProductName,
+                    opt => opt.MapFrom(src => src.Product != null ? src.Product.Name : string.Empty));
         }
     }
 
@@ -115,13 +103,12 @@ namespace Application.Features.PurchaseOrderManager.Queries
         {
             var allowedStatuses = new[]
             {
-        PurchaseOrderStatus.Confirmed,
-        PurchaseOrderStatus.Archived,
-        PurchaseOrderStatus.PartiallyReceived
-    };
+                PurchaseOrderStatus.Confirmed,
+                PurchaseOrderStatus.Pending,
+                PurchaseOrderStatus.Cancelled
+            };
 
-            var query = _context
-                .PurchaseOrder
+            var query = _context.PurchaseOrder
                 .AsNoTracking()
                 .ApplyIsDeletedFilter(request.IsDeleted)
                 .Where(x => x.OrderStatus.HasValue && allowedStatuses.Contains(x.OrderStatus.Value));
@@ -143,6 +130,67 @@ namespace Application.Features.PurchaseOrderManager.Queries
             var dtos = _mapper.Map<List<GetPurchaseOrderListDto>>(entities);
 
             return new GetPurchaseOrderListResult { Data = dtos };
+        }
+    }
+
+    #endregion
+
+    #region Goods Received List Query
+
+    public class GetPurchaseOrderListForGoodsrecievedRequest : IRequest<GetPurchaseOrderListForGoodsrecievedResult>
+    {
+        public bool IsDeleted { get; init; } = false;
+    }
+
+    public class GetPurchaseOrderListForGoodsrecievedResult
+    {
+        public List<GetPurchaseOrderListDto>? Data { get; init; }
+    }
+
+    public class GetPurchaseOrderListForGoodsrecievedHandler
+        : IRequestHandler<GetPurchaseOrderListForGoodsrecievedRequest, GetPurchaseOrderListForGoodsrecievedResult>
+    {
+        private readonly IMapper _mapper;
+        private readonly IQueryContext _context;
+
+        public GetPurchaseOrderListForGoodsrecievedHandler(IMapper mapper, IQueryContext context)
+        {
+            _mapper = mapper;
+            _context = context;
+        }
+
+        public async Task<GetPurchaseOrderListForGoodsrecievedResult> Handle(
+            GetPurchaseOrderListForGoodsrecievedRequest request,
+            CancellationToken cancellationToken)
+        {
+            var allowedStatuses = new[]
+            {
+            PurchaseOrderStatus.Confirmed
+        };
+
+            // Step 1: Load purchase orders with items, vendor, tax
+            var query = _context.PurchaseOrder
+                .AsNoTracking()
+                .ApplyIsDeletedFilter(request.IsDeleted)
+                .Where(x => x.OrderStatus.HasValue && allowedStatuses.Contains(x.OrderStatus.Value))
+                .Include(x => x.Vendor)
+                .Include(x => x.Tax)
+                .Include(x => x.PurchaseOrderItemList);
+
+            var entities = await query.ToListAsync(cancellationToken);
+
+            // Step 2: Filter out POs where all items are fully received
+            var filteredOrders = entities
+                .Where(po => po.PurchaseOrderItemList != null &&
+                             po.PurchaseOrderItemList.Any(item =>
+                                 (item.Quantity ?? 0) - item.ReceivedQuantity > 0))
+                .ToList();
+
+            // Step 3: Map to DTOs
+            var dtos = _mapper.Map<List<GetPurchaseOrderListDto>>(filteredOrders);
+
+            // Step 4: Return only orders that have remaining quantities
+            return new GetPurchaseOrderListForGoodsrecievedResult { Data = dtos };
         }
     }
 
@@ -178,14 +226,10 @@ namespace Application.Features.PurchaseOrderManager.Queries
         {
             var allowedStatuses = new[]
             {
-                PurchaseOrderStatus.Confirmed,
-                PurchaseOrderStatus.Archived,
-                PurchaseOrderStatus.PartiallyReceived
-            };
+        PurchaseOrderStatus.Confirmed
+    };
 
-            // Base query
-            var query = _context
-                .PurchaseOrder
+            var query = _context.PurchaseOrder
                 .AsNoTracking()
                 .ApplyIsDeletedFilter(request.IsDeleted)
                 .Where(x => x.OrderStatus.HasValue && allowedStatuses.Contains(x.OrderStatus.Value));
@@ -199,17 +243,35 @@ namespace Application.Features.PurchaseOrderManager.Queries
             // ✅ Apply purchase order ID filter
             if (!string.IsNullOrEmpty(request.PurchaseOrderId))
             {
-                query = query.Where(x => x.Id == request.PurchaseOrderId);
+                query = query
+                    .Where(x => x.Id == request.PurchaseOrderId)
+                    .Include(x => x.PurchaseOrderItemList)
+                        .ThenInclude(i => i.Product)
+                    .Include(x => x.Vendor)
+                    .Include(x => x.Tax);
             }
 
-            // ✅ Add includes (do this after all Where filters)
-            query = query
-                .Include(x => x.PurchaseOrderItemList)
-                    .ThenInclude(i => i.Product)
-                .Include(x => x.Vendor)
-                .Include(x => x.Tax);
-
             var entities = await query.ToListAsync(cancellationToken);
+
+            // ✅ Filter and recalculate remaining quantity
+            foreach (var po in entities)
+            {
+                if (po.PurchaseOrderItemList != null && po.PurchaseOrderItemList.Any())
+                {
+                    // Keep only items with remaining quantity > 0
+                    po.PurchaseOrderItemList = po.PurchaseOrderItemList
+                        .Where(i => (i.Quantity ?? 0) - i.ReceivedQuantity > 0)
+                        .Select(i =>
+                        {
+                            // Replace Ordered Quantity with Remaining Quantity for display
+                            var remaining = (i.Quantity ?? 0) - i.ReceivedQuantity;
+                            i.Quantity = remaining;
+                            return i;
+                        })
+                        .ToList();
+                }
+            }
+
             var dtos = _mapper.Map<List<GetPurchaseOrderListDto>>(entities);
 
             return new GetPurchaseOrderResult { Data = dtos };

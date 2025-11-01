@@ -42,10 +42,21 @@
                                         </div>
                                         <div class="row mb-2">
                                             <div class="col-md-6">
-                                                <label for="CustomerId">Customer</label>
+                                                <div class="d-flex justify-content-between align-items-center mb-1">
+                                                    <label for="CustomerId" class="mb-0">Customer</label>
+                                                    <button type="button"
+                                                            class="btn btn-outline-primary btn-sm p-1"
+                                                            style="line-height: 1; width: 26px; height: 26px;"
+                                                            @@click ="methods.openCustomerModal"
+                                                            title="Add New Customer">
+                                                        +
+                                                    </button>
+                                                </div>
+
                                                 <div ref="customerIdRef"></div>
                                                 <label class="text-danger">{{ state.errors.customerId }}</label>
                                             </div>
+
                                             <div class="col-md-6">
                                                 <label for="TaxId">Tax</label>
                                                 <div ref="taxIdRef"></div>
@@ -134,7 +145,183 @@
                 </div>
             </div>
         </div>
+    </div> 
+ <div class="modal fade" ref="customerModalRef" id="CustomerModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" v-text="customerState.mainTitle"></h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" v-model="customerState.id" id="Id" name="Id" />
+                    <form id="CustomerForm">
+                        <div class="card mb-3">
+                            <div class="card-header">
+                                <h5>Main Info</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="row mb-2">
+                                    <div class="col-md-6">
+                                        <label for="Name">Name</label>
+                                        <input ref="nameRef" v-model="customerState.name" class="form-control" placeholder="" />
+                                        <label class="text-danger" v-text="customerState.errors.name"></label>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label for="Number">Number</label>
+                                        <input ref="CustomernumberRef" v-model="customerState.number" class="form-control" placeholder="" readonly />
+                                    </div>
+                                </div>
+                                <div class="row mb-2">
+                                    <div class="col-md-6">
+                                        <label for="CustomerGroupId">Customer Group</label>
+                                        <div ref="customerGroupIdRef"></div>
+                                        <label class="text-danger" v-text="customerState.errors.customerGroupId"></label>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label for="CustomerCategoryId">Customer Category</label>
+                                        <div ref="customerCategoryIdRef"></div>
+                                        <label class="text-danger" v-text="customerState.errors.customerCategoryId"></label>
+                                    </div>
+                                </div>
+                                <div class="row mb-2">
+                                    <div class="col-12">
+                                        <label for="Description">Description</label>
+                                        <textarea v-model="customerState.description" class="form-control" rows="3" placeholder=""></textarea>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="card mb-3">
+                            <div class="card-header">
+                                <h5>Address</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="row mb-2">
+                                    <div class="col-md-6">
+                                        <label for="Street">Street</label>
+                                        <input ref="streetRef" v-model="customerState.street" class="form-control" placeholder="" />
+                                        <label class="text-danger" v-text="customerState.errors.street"></label>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label for="City">City</label>
+                                        <input ref="cityRef" v-model="customerState.city" class="form-control" placeholder="" />
+                                        <label class="text-danger" v-text="customerState.errors.city"></label>
+                                    </div>
+                                </div>
+                                <div class="row mb-2">
+                                    <div class="col-md-6">
+                                        <label for="State">State</label>
+                                        <input ref="stateRef" v-model="customerState.state" class="form-control" placeholder="" />
+                                        <label class="text-danger" v-text="customerState.errors.state"></label>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label for="ZipCode">Zip Code</label>
+                                        <input ref="zipCodeRef" v-model="customerState.zipCode" class="form-control" placeholder="" />
+                                        <label class="text-danger" v-text="customerState.errors.zipCode"></label>
+                                    </div>
+                                </div>
+                                <div class="row mb-2">
+                                    <div class="col-md-6">
+                                        <label for="Country">Country</label>
+                                        <input ref="countryRef" v-model="customerState.country" class="form-control" placeholder="" />
+                                        <label class="text-danger" v-text="customerState.errors.country"></label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="card mb-3">
+                            <div class="card-header">
+                                <h5>Communication</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="row mb-2">
+                                    <div class="col-md-6">
+                                        <label for="PhoneNumber">Phone Number</label>
+                                        <input ref="phoneNumberRef" v-model="customerState.phoneNumber" class="form-control" placeholder="" />
+                                        <label class="text-danger" v-text="customerState.errors.phoneNumber"></label>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label for="FaxNumber">Fax Number</label>
+                                        <input ref="faxNumberRef" v-model="customerState.faxNumber" class="form-control" placeholder="" />
+                                        <label class="text-danger" v-text="customerState.errors.faxNumber"></label>
+                                    </div>
+                                </div>
+                                <div class="row mb-2">
+                                    <div class="col-md-6">
+                                        <label for="EmailAddress">Email</label>
+                                        <input ref="emailAddressRef" v-model="customerState.emailAddress" class="form-control" placeholder="" />
+                                        <label class="text-danger" v-text="customerState.errors.emailAddress"></label>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label for="Website">Website</label>
+                                        <input ref="websiteRef" v-model="customerState.website" class="form-control" placeholder="" />
+                                        <label class="text-danger" v-text="customerState.errors.website"></label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="card mb-3">
+                            <div class="card-header">
+                                <h5>Social Media</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="row mb-2">
+                                    <div class="col-md-4">
+                                        <label for="WhatsApp">WhatsApp</label>
+                                        <input ref="whatsAppRef" v-model="customerState.whatsApp" class="form-control" placeholder="" />
+                                        <label class="text-danger" v-text="customerState.errors.whatsApp"></label>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label for="LinkedIn">LinkedIn</label>
+                                        <input ref="linkedInRef" v-model="customerState.linkedIn" class="form-control" placeholder="" />
+                                        <label class="text-danger" v-text="customerState.errors.linkedIn"></label>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label for="Facebook">Facebook</label>
+                                        <input ref="facebookRef" v-model="customerState.facebook" class="form-control" placeholder="" />
+                                        <label class="text-danger" v-text="customerState.errors.facebook"></label>
+                                    </div>
+                                </div>
+                                <div class="row mb-2">
+                                    <div class="col-md-4">
+                                        <label for="Instagram">Instagram</label>
+                                        <input ref="instagramRef" v-model="customerState.instagram" class="form-control" placeholder="" />
+                                        <label class="text-danger" v-text="customerState.errors.instagram"></label>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label for="TwitterX">Twitter/X</label>
+                                        <input ref="twitterXRef" v-model="customerState.twitterX" class="form-control" placeholder="" />
+                                        <label class="text-danger" v-text="customerState.errors.twitterX"></label>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label for="TikTok">TikTok</label>
+                                        <input ref="tikTokRef" v-model="customerState.tikTok" class="form-control" placeholder="" />
+                                        <label class="text-danger" v-text="customerState.errors.tikTok"></label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <button type="button"
+                            id="CustomerSaveButton"
+                            class="btn"
+                            v-bind:class="customerState.deleteMode ? 'btn-danger' : 'btn-primary'"
+                            v-on:click="handler.handleCustomerSubmit"
+                            v-bind:disabled="customerState.isSubmitting">
+                        <span class="spinner-border spinner-border-sm me-2" v-if="customerState.isSubmitting" role="status" aria-hidden="true"></span>
+                        <span v-if="!customerState.isSubmitting">{{ customerState.deleteMode ? 'Delete' : 'Save' }}</span>
+                        <span v-else>{{ customerState.deleteMode ? 'Deleting...' : 'Saving...' }}</span>
+                    </button>
+                </div>
+            </div>
+        </div>
     </div>
+
+
 </div>
 
 @section scripts {

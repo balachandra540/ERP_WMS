@@ -14,6 +14,7 @@ namespace Application.Features.TransferInManager.Commands;
 public class CreateTransferInResult
 {
     public TransferIn? Data { get; set; }
+    public List<InventoryTransaction> InventoryTransactionData { get; set; } = new List<InventoryTransaction>();
 }
 
 public class CreateTransferInRequest : IRequest<CreateTransferInResult>
@@ -23,83 +24,111 @@ public class CreateTransferInRequest : IRequest<CreateTransferInResult>
     public string? Description { get; init; }
     public string? TransferOutId { get; init; }
     public string? CreatedById { get; init; }
+    public List<InventoryItem> Items { get; init; } = new List<InventoryItem>();
+}
+
+public class InventoryItem
+{
+    public string? Id { get; init; }
+
+    public string? ProductId { get; init; }
+    public double? Movement { get; init; }
 }
 
 public class CreateTransferInValidator : AbstractValidator<CreateTransferInRequest>
 {
     public CreateTransferInValidator()
     {
-        RuleFor(x => x.TransferReceiveDate).NotEmpty();
-        RuleFor(x => x.Status).NotEmpty();
-        RuleFor(x => x.TransferOutId).NotEmpty();
+        RuleFor(x => x.TransferReceiveDate).NotEmpty().WithMessage("Transfer receive date is required.");
+        RuleFor(x => x.Status).NotEmpty().WithMessage("Status is required.");
+        RuleFor(x => x.TransferOutId).NotEmpty().WithMessage("TransferOut ID is required.");
+        RuleFor(x => x.CreatedById).NotEmpty().WithMessage("Created by ID is required.");
+
+        // Inventory items validation rules
+        RuleFor(x => x.Items)
+            .NotEmpty().WithMessage("At least one inventory item is required.")
+            .Must(items => items.All(item => !string.IsNullOrEmpty(item.ProductId) && item.Movement.HasValue))
+            .WithMessage("All items must have a valid ProductId and Movement.");
+
+        RuleForEach(x => x.Items)
+            .ChildRules(item =>
+            {
+                item.RuleFor(x => x.ProductId).NotEmpty().WithMessage("Product ID is required for each item.");
+                item.RuleFor(x => x.Movement).NotEmpty().WithMessage("Movement is required for each item.");
+            });
     }
 }
 
 public class CreateTransferInHandler : IRequestHandler<CreateTransferInRequest, CreateTransferInResult>
 {
-    private readonly ICommandRepository<TransferIn> _deliveryOrderRepository;
-    private readonly ICommandRepository<InventoryTransaction> _itemRepository;
+    private readonly ICommandRepository<TransferIn> _transferInRepository;
     private readonly IUnitOfWork _unitOfWork;
     private readonly NumberSequenceService _numberSequenceService;
     private readonly InventoryTransactionService _inventoryTransactionService;
     private readonly ISecurityService _securityService;
 
     public CreateTransferInHandler(
-        ICommandRepository<TransferIn> deliveryOrderRepository,
-        ICommandRepository<InventoryTransaction> itemRepository,
+        ICommandRepository<TransferIn> transferInRepository,
         IUnitOfWork unitOfWork,
         NumberSequenceService numberSequenceService,
         InventoryTransactionService inventoryTransactionService,
          ISecurityService securityService
         )
     {
-        _deliveryOrderRepository = deliveryOrderRepository;
-        _itemRepository = itemRepository;
+        _transferInRepository = transferInRepository;
         _unitOfWork = unitOfWork;
         _numberSequenceService = numberSequenceService;
         _inventoryTransactionService = inventoryTransactionService;
         _securityService = securityService;
     }
 
+
     public async Task<CreateTransferInResult> Handle(CreateTransferInRequest request, CancellationToken cancellationToken = default)
     {
-        var entity = new TransferIn();
-        entity.CreatedById = request.CreatedById;
-
-        entity.Number = _numberSequenceService.GenerateNumber(nameof(TransferIn), "", "IN");
-        entity.TransferReceiveDate = _securityService.ConvertToIst(request.TransferReceiveDate);
-        entity.Status = (TransferStatus)int.Parse(request.Status!);
-        entity.Description = request.Description;
-        entity.TransferOutId = request.TransferOutId;
-
-        await _deliveryOrderRepository.CreateAsync(entity, cancellationToken);
-        await _unitOfWork.SaveAsync(cancellationToken);
-
-        var items = await _itemRepository
-            .GetQuery()
-            .ApplyIsDeletedFilter(false)
-            .Where(x => x.ModuleId == entity.TransferOutId && x.ModuleName == nameof(TransferOut))
-            .Include(x => x.Product)
-            .ToListAsync(cancellationToken);
-
-        foreach (var item in items)
+        try
         {
-            if (item?.Product?.Physical ?? false)
+            // Step 1: Create TransferIn
+            var transferIn = new TransferIn
             {
-                await _inventoryTransactionService.TransferInCreateInvenTrans(
-                    entity.Id,
-                    item.ProductId,
-                    item.Movement,
-                    entity.CreatedById,
-                    cancellationToken
-                    );
+                CreatedById = request.CreatedById,
+                Number = _numberSequenceService.GenerateNumber(nameof(TransferIn), "", "IN"),
+                TransferReceiveDate = _securityService.ConvertToIst(request.TransferReceiveDate),
+                Status = (TransferStatus)int.Parse(request.Status!),
+                Description = request.Description,
+                TransferOutId = request.TransferOutId
+            };
 
+            await _transferInRepository.CreateAsync(transferIn, cancellationToken);
+            await _unitOfWork.SaveAsync(cancellationToken);
+
+            // Step 2: Create InventoryTransactions for each item
+            var inventoryTransactions = new List<InventoryTransaction>();
+            foreach (var item in request.Items)
+            {
+                // Check if the product is physical
+                    var inventoryTransaction = await _inventoryTransactionService.TransferInCreateInvenTrans(
+                        item.Id,
+                        item.ProductId,
+                        item.Movement,
+                        request.CreatedById,
+                        cancellationToken);
+
+                    inventoryTransactions.Add(inventoryTransaction);
             }
-        }
 
-        return new CreateTransferInResult
+            // Save all changes
+            await _unitOfWork.SaveAsync(cancellationToken);
+
+            return new CreateTransferInResult
+            {
+                Data = transferIn,
+                InventoryTransactionData = inventoryTransactions
+            };
+        }
+        catch
         {
-            Data = entity
-        };
+            // Let the exception bubble up to be handled by the caller
+            throw;
+        }
     }
 }

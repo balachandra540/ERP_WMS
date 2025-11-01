@@ -1,7 +1,10 @@
 ﻿using Application.Common.Extensions;
+using Application.Features.InventoryTransactionManager.Queries;
 using Domain.Entities;
 using Domain.Enums;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.VisualBasic;
+using System;
 
 namespace Application.Features.InventoryTransactionManager;
 
@@ -96,19 +99,68 @@ public partial class InventoryTransactionService
 
         return child;
     }
-    public async Task<List<InventoryTransaction>> TransferOutGetInvenTransList(
-        string? moduleId,
-        string? moduleName,
-        CancellationToken cancellationToken = default
-        )
+    public async Task<List<ProductStockSummaryDto>> TransferOutGetInvenTransList(
+    string? moduleId,
+    string? moduleName,
+    bool onlyConfirmed = false,
+    CancellationToken cancellationToken = default)
     {
-        var childs = await _queryContext
+        if (string.IsNullOrEmpty(moduleId) || string.IsNullOrEmpty(moduleName))
+            return new List<ProductStockSummaryDto>();
+
+        // Base query
+        var query = _queryContext.InventoryTransaction
+            .AsNoTracking()
+            .ApplyIsDeletedFilter(false)
+            .Where(x => x.ModuleId == moduleId && x.ModuleName == moduleName);
+
+        // Apply filter conditionally based on the flag
+        if (onlyConfirmed)
+            query = query.Where(x => x.Status == InventoryTransactionStatus.Confirmed);
+
+        // Project directly to ProductStockSummaryDto
+        var result = await query
+            .Select(x => new ProductStockSummaryDto
+            {
+                Id = x.Id, // Assuming Id types match
+                ProductId = x.ProductId,
+                TotalMovement = (decimal)(x.Movement ?? 0), // Explicit cast to decimal
+                TotalStock = (decimal)(x.Movement ?? 0),      // Explicit cast to decimal
+                RequestStock = (decimal)(x.Movement ?? 0) // Explicit cast to decimal
+            })
+            .ToListAsync(cancellationToken);
+
+        return result;
+    }
+
+
+
+    public async Task<List<ProductStockSummaryDto>> FromWarehouseId(
+    string? warehouseId,
+    CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrEmpty(warehouseId))
+            return new List<ProductStockSummaryDto>();
+
+        var result = await _queryContext
             .InventoryTransaction
             .AsNoTracking()
             .ApplyIsDeletedFilter(false)
-            .Where(x => x.ModuleId == moduleId && x.ModuleName == moduleName)
+            .Where(x => x.Status == InventoryTransactionStatus.Confirmed &&
+                        x.WarehouseId == warehouseId)
+            .GroupBy(x => x.ProductId)
+            .Select(g => new ProductStockSummaryDto
+            {
+                ProductId = g.Key,
+                TotalStock = (decimal)(g.Sum(x => x.Stock) ?? 0),
+                TotalMovement = (decimal)(g.Sum(x => x.Movement) ?? 0),
+                RequestStock = 0
+            })
+            // ✅ Only include records where stock > 0
+            .Where(dto => dto.TotalStock > 0)
             .ToListAsync(cancellationToken);
 
-        return childs;
+        return result;
     }
+
 }

@@ -85,6 +85,23 @@ public class PurchaseOrderController : BaseApiController
             Content = response
         });
     }
+    [Authorize]
+    [HttpGet("GetPurchaseOrderListForGoodsrecieved")]
+    public async Task<ActionResult<ApiSuccessResult<GetPurchaseOrderListForGoodsrecievedResult>>> GetPurchaseOrderListForGoodsrecievedAsync(
+    CancellationToken cancellationToken,
+    [FromQuery] bool isDeleted = false)
+    {
+        var request = new GetPurchaseOrderListForGoodsrecievedRequest { IsDeleted = isDeleted };
+        var response = await _sender.Send(request, cancellationToken);
+
+        return Ok(new ApiSuccessResult<GetPurchaseOrderListForGoodsrecievedResult>
+        {
+            Code = StatusCodes.Status200OK,
+            Message = $"Success executing {nameof(GetPurchaseOrderListForGoodsrecievedAsync)}",
+            Content = response
+        });
+    }
+
 
     [Authorize]
     [HttpGet("GetPurchaseOrder")]

@@ -6,7 +6,7 @@ namespace Application.Features.InventoryTransactionManager.Queries;
 
 public class TransferInGetInvenTransListResult
 {
-    public List<InventoryTransaction>? Data { get; set; }
+    public List<ProductStockSummaryDto>? Data { get; set; }
 }
 
 public class TransferInGetInvenTransListRequest : IRequest<TransferInGetInvenTransListResult>

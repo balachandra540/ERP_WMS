@@ -1,4 +1,5 @@
 ﻿using Application.Common.Extensions;
+using Application.Features.InventoryTransactionManager.Queries;
 using Domain.Entities;
 using Domain.Enums;
 using Microsoft.EntityFrameworkCore;
@@ -97,19 +98,39 @@ public partial class InventoryTransactionService
 
         return child;
     }
-    public async Task<List<InventoryTransaction>> TransferInGetInvenTransList(
-        string? moduleId,
-        string? moduleName,
-        CancellationToken cancellationToken = default
-        )
+    public async Task<List<ProductStockSummaryDto>> TransferInGetInvenTransList(
+    string? moduleId,
+    string? moduleName,
+    CancellationToken cancellationToken = default)
     {
-        var childs = await _queryContext
-            .InventoryTransaction
+        if (string.IsNullOrEmpty(moduleId) || string.IsNullOrEmpty(moduleName))
+            return new List<ProductStockSummaryDto>();
+
+        // Base query
+        var query = _queryContext.InventoryTransaction
             .AsNoTracking()
             .ApplyIsDeletedFilter(false)
-            .Where(x => x.ModuleId == moduleId && x.ModuleName == moduleName)
+            .Where(x => x.ModuleId == moduleId && x.ModuleName == moduleName);
+
+        // Check if records exist for given module
+        var moduleExists = await query.AnyAsync(cancellationToken);
+
+
+        // Perform grouping and projection
+        var result = await query
+            .Select(x => new ProductStockSummaryDto
+            {
+                Id = x.Id, // Assuming Id types match
+                ProductId = x.ProductId,
+                TotalMovement = (decimal)(x.Movement ?? 0), // Explicit cast to decimal
+                TotalStock = (decimal)(x.Movement ?? 0),      // Explicit cast to decimal
+                RequestStock = (decimal)(x.Movement ?? 0) // Explicit cast to decimal
+            })
             .ToListAsync(cancellationToken);
 
-        return childs;
+        if (!moduleExists && result.Count == 0)
+            return new List<ProductStockSummaryDto>();
+
+        return result;
     }
 }

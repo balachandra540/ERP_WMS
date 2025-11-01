@@ -56,20 +56,32 @@ public class GetGoodsReceiveItemListHandler : IRequestHandler<GetGoodsReceiveIte
     {
         var items = await _context.GoodsReceiveItem
             .AsNoTracking()
-            .Include(x => x.PurchaseOrderItem) // join with PO Item
+            .Include(x => x.PurchaseOrderItem)
+            .ThenInclude(poi => poi.Product)
             .Where(x => x.GoodsReceiveId == request.GoodsReceiveId && !x.IsDeleted)
             .ToListAsync(cancellationToken);
 
-        var dtoList = items.Select(x => new GetGoodsReceiveItemListDto
+        var dtoList = items.Select(x =>
         {
-            Id = x.Id,
-            GoodsReceiveId = x.GoodsReceiveId,
-            PurchaseOrderItemId = x.PurchaseOrderItemId,
-            ProductId = x.PurchaseOrderItem?.ProductId,               // from PO Item
-            ActualQuantity = x.PurchaseOrderItem?.Quantity ?? 0,      // from PO Item
-            ReceivedQuantity = x.ReceivedQuantity,
-            Notes = x.Notes,
-            CreatedAtUtc = x.CreatedAtUtc
+            var poItem = x.PurchaseOrderItem;
+            var orderedQty = poItem?.Quantity ?? 0;
+            var receivedQty = poItem?.ReceivedQuantity ?? 0;
+
+            // ✅ Remaining quantity calculation
+            var remainingQty = orderedQty - receivedQty;
+            if (remainingQty < 0) remainingQty = 0;
+
+            return new GetGoodsReceiveItemListDto
+            {
+                Id = x.Id,
+                GoodsReceiveId = x.GoodsReceiveId,
+                PurchaseOrderItemId = x.PurchaseOrderItemId,
+                ProductId = poItem?.ProductId,
+                ActualQuantity = remainingQty,      // show remaining quantity instead of ordered
+                ReceivedQuantity = x.ReceivedQuantity,
+                Notes = x.Notes,
+                CreatedAtUtc = x.CreatedAtUtc
+            };
         }).ToList();
 
         return new GetGoodsReceiveItemListResult

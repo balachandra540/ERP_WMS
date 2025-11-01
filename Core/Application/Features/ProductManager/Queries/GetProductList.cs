@@ -90,7 +90,53 @@ public class GetProductListHandler : IRequestHandler<GetProductListRequest, GetP
     }
 }
 
+public class GetInventoryProductListRequest : IRequest<GetProductListResult>
+{
+    public string? WarehouseId { get; init; } // optional filter by location/warehouse
+    public bool IsDeleted { get; init; } = false;
+}
 
+public class GetInventoryProductListHandler : IRequestHandler<GetInventoryProductListRequest, GetProductListResult>
+{
+    private readonly IMapper _mapper;
+    private readonly IQueryContext _context;
 
+    public GetInventoryProductListHandler(IMapper mapper, IQueryContext context)
+    {
+        _mapper = mapper;
+        _context = context;
+    }
 
+    public async Task<GetProductListResult> Handle(GetInventoryProductListRequest request, CancellationToken cancellationToken)
+    {
+        var query = _context
+            .Product
+            .AsNoTracking()
+            .ApplyIsDeletedFilter(request.IsDeleted)
+            .Include(x => x.UnitMeasure)
+            .Include(x => x.ProductGroup)
+            .AsQueryable();
 
+        // Filter by WarehouseId if provided, and ensure matching inventory transactions exist
+        if (!string.IsNullOrEmpty(request.WarehouseId))
+        {
+            query = query.Where(x => x.WarehouseId == request.WarehouseId &&
+                                     _context.InventoryTransaction.Any(it => it.ProductId == x.Id &&
+                                                                             it.WarehouseId == request.WarehouseId));
+        }
+        else
+        {
+            // If no WarehouseId, filter products that have any inventory transaction
+            query = query.Where(x => _context.InventoryTransaction.Any(it => it.ProductId == x.Id));
+        }
+
+        var entities = await query.ToListAsync(cancellationToken);
+
+        var dtos = _mapper.Map<List<GetProductListDto>>(entities);
+
+        return new GetProductListResult
+        {
+            Data = dtos
+        };
+    }
+}

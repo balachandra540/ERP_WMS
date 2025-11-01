@@ -278,9 +278,7 @@ public class UpdateGoodsReceiveHandler : IRequestHandler<UpdateGoodsReceiveReque
             }
         }
 
-        // Step 10: Update Purchase Order status
-        await UpdatePurchaseOrderStatus(entity.PurchaseOrderId!, request.UpdatedById!, cancellationToken);
-
+       
         // Step 11: Final save if PO status changed
         await _unitOfWork.SaveAsync(cancellationToken);
 
@@ -301,40 +299,4 @@ public class UpdateGoodsReceiveHandler : IRequestHandler<UpdateGoodsReceiveReque
         };
     }
 
-    private async Task UpdatePurchaseOrderStatus(string purchaseOrderId, string updatedById, CancellationToken cancellationToken)
-    {
-        var po = await _purchaseOrderRepository.GetQuery()
-            .ApplyIsDeletedFilter(false)
-            .FirstOrDefaultAsync(x => x.Id == purchaseOrderId, cancellationToken);
-
-        if (po == null) return;
-
-        var allPoItems = await _purchaseOrderRepository.GetQuery()
-            .Include(x => x.PurchaseOrderItemList)
-            .ApplyIsDeletedFilter(false)
-            .Where(x => x.Id == purchaseOrderId)
-            .SelectMany(x => x.PurchaseOrderItemList)
-            .ToListAsync(cancellationToken);
-
-        bool isFullyReceived = allPoItems.All(item => item.ReceivedQuantity >= (item.Quantity ?? 0));
-        bool isPartiallyReceived = allPoItems.Any(item => item.ReceivedQuantity > 0) && !isFullyReceived;
-
-        var currentStatus = po.OrderStatus.GetValueOrDefault();
-        var newStatus = currentStatus;
-
-        if (isFullyReceived && currentStatus != PurchaseOrderStatus.FullyReceived)
-            newStatus = PurchaseOrderStatus.FullyReceived;
-        else if (isPartiallyReceived &&
-                 (currentStatus == PurchaseOrderStatus.Confirmed ||
-                  currentStatus == PurchaseOrderStatus.Approved))
-            newStatus = PurchaseOrderStatus.PartiallyReceived;
-
-        if (newStatus != currentStatus)
-        {
-            po.OrderStatus = newStatus;
-            po.UpdatedById = updatedById;
-            po.UpdatedAtUtc = DateTime.Now;
-            _purchaseOrderRepository.Update(po);
-        }
     }
-}

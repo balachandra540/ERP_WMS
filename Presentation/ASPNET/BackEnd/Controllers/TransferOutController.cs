@@ -17,11 +17,11 @@ public class TransferOutController : BaseApiController
 
     [Authorize]
     [HttpPost("CreateTransferOut")]
-    public async Task<ActionResult<ApiSuccessResult<CreateTransferOutResult>>> CreateTransferOutAsync(CreateTransferOutRequest request, CancellationToken cancellationToken)
+    public async Task<ActionResult<ApiSuccessResult<CreateTransferOutWithInventoryResult>>> CreateTransferOutAsync(CreateTransferOutWithInventoryRequest request, CancellationToken cancellationToken)
     {
         var response = await _sender.Send(request, cancellationToken);
 
-        return Ok(new ApiSuccessResult<CreateTransferOutResult>
+        return Ok(new ApiSuccessResult<CreateTransferOutWithInventoryResult>
         {
             Code = StatusCodes.Status200OK,
             Message = $"Success executing {nameof(CreateTransferOutAsync)}",
@@ -31,7 +31,7 @@ public class TransferOutController : BaseApiController
 
     [Authorize]
     [HttpPost("UpdateTransferOut")]
-    public async Task<ActionResult<ApiSuccessResult<UpdateTransferOutResult>>> UpdateTransferOutAsync(UpdateTransferOutRequest request, CancellationToken cancellationToken)
+    public async Task<ActionResult<ApiSuccessResult<UpdateTransferOutResult>>> UpdateTransferOutAsync([FromBody] UpdateTransferOutRequest request, CancellationToken cancellationToken)
     {
         var response = await _sender.Send(request, cancellationToken);
 
