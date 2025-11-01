@@ -61,10 +61,11 @@ public class TransferInController : BaseApiController
     [HttpGet("GetTransferInList")]
     public async Task<ActionResult<ApiSuccessResult<GetTransferInListResult>>> GetTransferInListAsync(
         CancellationToken cancellationToken,
-        [FromQuery] bool isDeleted = false
+        [FromQuery] bool isDeleted = false,
+        string? locationId = null
         )
     {
-        var request = new GetTransferInListRequest { IsDeleted = isDeleted };
+        var request = new GetTransferInListRequest { IsDeleted = isDeleted, locationid = locationId };
         var response = await _sender.Send(request, cancellationToken);
 
         return Ok(new ApiSuccessResult<GetTransferInListResult>

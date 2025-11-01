@@ -14,6 +14,7 @@
             deliveryDate: '',
             description: '',
             salesOrderId: null,
+             locationId :'',
             status: null,
             errors: {
                 deliveryDate: '',
@@ -189,7 +190,8 @@
         const services = {
             getMainData: async () => {
                 try {
-                    const response = await AxiosManager.get('/DeliveryOrder/GetDeliveryOrderList', {});
+                    const locationId = StorageManager.getLocation();
+                    const response = await AxiosManager.get('/DeliveryOrder/GetDeliveryOrderList?LocationId=' + locationId, {});
                     return response;
                 } catch (error) {
                     throw error;
@@ -227,7 +229,8 @@
             },
             getSalesOrderListLookupData: async () => {
                 try {
-                    const response = await AxiosManager.get('/SalesOrder/GetSalesOrderList', {});
+                    const locationId = StorageManager.getLocation();
+                    const response = await AxiosManager.get('/SalesOrder/GetSalesOrderList?LocationId=' + locationId, {});
                     return response;
                 } catch (error) {
                     throw error;
@@ -281,7 +284,9 @@
             },
             getProductListLookupData: async () => {
                 try {
-                    const response = await AxiosManager.get('/Product/GetProductList', {});
+                    debugger;
+                    const locationId = StorageManager.getLocation();
+                    const response = await AxiosManager.get('/Product/GetProductList?WarehouseId =' + locationId, {});
                     return response;
                 } catch (error) {
                     throw error;
@@ -289,7 +294,8 @@
             },
             getWarehouseListLookupData: async () => {
                 try {
-                    const response = await AxiosManager.get('/Warehouse/GetWarehouseList', {});
+                    const locationId = StorageManager.getLocation();
+                    const response = await AxiosManager.get('/Warehouse/GetWarehouseList?id=' + locationId, {});
                     return response;
                 } catch (error) {
                     throw error;
@@ -325,7 +331,7 @@
             },
             populateWarehouseListLookupData: async () => {
                 const response = await services.getWarehouseListLookupData();
-                state.warehouseListLookupData = response?.data?.content?.data.filter(warehouse => warehouse.systemWarehouse === false) || [];
+                state.warehouseListLookupData = response?.data?.content?.data.filter(warehouse => warehouse.type === "Store" || warehouse.type === "Store&Sales") || [];
             },
             populateSecondaryData: async (deliveryOrderId) => {
                 try {

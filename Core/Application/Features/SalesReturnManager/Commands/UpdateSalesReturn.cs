@@ -1,4 +1,5 @@
 ﻿using Application.Common.Repositories;
+using Application.Common.Services.SecurityManager;
 using Application.Features.InventoryTransactionManager;
 using Domain.Entities;
 using Domain.Enums;
@@ -38,16 +39,19 @@ public class UpdateSalesReturnHandler : IRequestHandler<UpdateSalesReturnRequest
     private readonly ICommandRepository<SalesReturn> _repository;
     private readonly IUnitOfWork _unitOfWork;
     private readonly InventoryTransactionService _inventoryTransactionService;
+    private readonly ISecurityService _securityService;
 
     public UpdateSalesReturnHandler(
         ICommandRepository<SalesReturn> repository,
         IUnitOfWork unitOfWork,
-        InventoryTransactionService inventoryTransactionService
+        InventoryTransactionService inventoryTransactionService,
+        ISecurityService securityService
         )
     {
         _repository = repository;
         _unitOfWork = unitOfWork;
         _inventoryTransactionService = inventoryTransactionService;
+        _securityService = securityService;
     }
 
     public async Task<UpdateSalesReturnResult> Handle(UpdateSalesReturnRequest request, CancellationToken cancellationToken)
@@ -62,7 +66,7 @@ public class UpdateSalesReturnHandler : IRequestHandler<UpdateSalesReturnRequest
 
         entity.UpdatedById = request.UpdatedById;
 
-        entity.ReturnDate = request.ReturnDate;
+        entity.ReturnDate = _securityService.ConvertToIst(request.ReturnDate);
         entity.Status = (SalesReturnStatus)int.Parse(request.Status!);
         entity.Description = request.Description;
         entity.DeliveryOrderId = request.DeliveryOrderId;

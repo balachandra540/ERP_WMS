@@ -90,6 +90,7 @@ public class UpdateTransferInHandler : IRequestHandler<UpdateTransferInRequest, 
         }
 
         entity.UpdatedById = request.UpdatedById;
+        entity.TransferReceiveDate = _securityService.ConvertToIst(request.TransferReceiveDate);
 
         entity.TransferReceiveDate = _securityService.ConvertToIst(request.TransferReceiveDate);
 

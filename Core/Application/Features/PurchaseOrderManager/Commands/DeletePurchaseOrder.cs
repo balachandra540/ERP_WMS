@@ -14,6 +14,7 @@ public class DeletePurchaseOrderRequest : IRequest<DeletePurchaseOrderResult>
 {
     public string? Id { get; init; }
     public string? DeletedById { get; init; }
+    public string? LocationId { get; init; }
 }
 
 public class DeletePurchaseOrderValidator : AbstractValidator<DeletePurchaseOrderRequest>

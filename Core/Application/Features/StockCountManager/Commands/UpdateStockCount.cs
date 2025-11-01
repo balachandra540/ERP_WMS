@@ -1,5 +1,7 @@
 ﻿using Application.Common.Repositories;
+using Application.Common.Services.SecurityManager;
 using Application.Features.InventoryTransactionManager;
+using Application.Features.NumberSequenceManager;
 using Domain.Entities;
 using Domain.Enums;
 using FluentValidation;
@@ -38,16 +40,20 @@ public class UpdateStockCountHandler : IRequestHandler<UpdateStockCountRequest, 
     private readonly ICommandRepository<StockCount> _repository;
     private readonly IUnitOfWork _unitOfWork;
     private readonly InventoryTransactionService _inventoryTransactionService;
+    private readonly ISecurityService _securityservice;
 
+    
     public UpdateStockCountHandler(
         ICommandRepository<StockCount> repository,
         IUnitOfWork unitOfWork,
-        InventoryTransactionService inventoryTransactionService
+        InventoryTransactionService inventoryTransactionService,
+               ISecurityService securityService
         )
     {
         _repository = repository;
         _unitOfWork = unitOfWork;
         _inventoryTransactionService = inventoryTransactionService;
+        _securityservice = securityService;
     }
 
     public async Task<UpdateStockCountResult> Handle(UpdateStockCountRequest request, CancellationToken cancellationToken)
@@ -62,7 +68,7 @@ public class UpdateStockCountHandler : IRequestHandler<UpdateStockCountRequest, 
 
         entity.UpdatedById = request.UpdatedById;
 
-        entity.CountDate = request.CountDate;
+        entity.CountDate = _securityservice.ConvertToIst(request.CountDate);
         entity.Status = (StockCountStatus)int.Parse(request.Status!);
         entity.Description = request.Description;
         entity.WarehouseId = request.WarehouseId;

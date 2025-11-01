@@ -46,8 +46,8 @@ public class GetPurchaseReturnListResult
 public class GetPurchaseReturnListRequest : IRequest<GetPurchaseReturnListResult>
 {
     public bool IsDeleted { get; init; } = false;
+    public string? LocationId { get; init; } = null; // ✅ added
 }
-
 
 public class GetPurchaseReturnListHandler : IRequestHandler<GetPurchaseReturnListRequest, GetPurchaseReturnListResult>
 {
@@ -67,10 +67,19 @@ public class GetPurchaseReturnListHandler : IRequestHandler<GetPurchaseReturnLis
             .AsNoTracking()
             .ApplyIsDeletedFilter(request.IsDeleted)
             .Include(x => x.GoodsReceive)
+                .ThenInclude(gr => gr.PurchaseOrder) // ✅ include PurchaseOrder for location
             .AsQueryable();
 
-        var entities = await query.ToListAsync(cancellationToken);
+        // ✅ Apply location filter
+        if (!string.IsNullOrEmpty(request.LocationId))
+        {
+            query = query.Where(x =>
+                x.GoodsReceive != null &&
+                x.GoodsReceive.PurchaseOrder != null &&
+                x.GoodsReceive.PurchaseOrder.LocationId == request.LocationId);
+        }
 
+        var entities = await query.ToListAsync(cancellationToken);
         var dtos = _mapper.Map<List<GetPurchaseReturnListDto>>(entities);
 
         return new GetPurchaseReturnListResult
@@ -78,9 +87,6 @@ public class GetPurchaseReturnListHandler : IRequestHandler<GetPurchaseReturnLis
             Data = dtos
         };
     }
-
-
 }
-
 
 

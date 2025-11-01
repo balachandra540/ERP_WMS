@@ -7,6 +7,8 @@
             id: '',
             name: '',
             description: '',
+            hasAttributes: false, //  Add this line
+            attributes: [], //  add this array to hold attribute rows
             errors: {
                 name: ''
             },
@@ -16,6 +18,8 @@
         const mainGridRef = Vue.ref(null);
         const mainModalRef = Vue.ref(null);
         const nameRef = Vue.ref(null);
+        const attributesModalRef = Vue.ref(null);
+
 
         const nameText = {
             obj: null,
@@ -39,6 +43,23 @@
                 nameText.refresh();
             }
         );
+        Vue.watch(
+            () => state.hasAttributes,
+            (newVal) => {
+                if (newVal) {
+                    // Checkbox checked → open modal
+                    if (state.attributes.length === 0) {
+                        state.attributes.push({ name: '' }); // add first empty textbox row
+                    }
+                    attributesModal.obj.show(); // show modal
+                } else {
+                    // Checkbox unchecked → optional behavior (clear attributes or ignore)
+                    // Example: clear attributes if unchecked
+                    state.attributes = [];
+                }
+            }
+        );
+
 
         const validateForm = function () {
             state.errors.name = '';
@@ -72,20 +93,20 @@
                     throw error;
                 }
             },
-            createMainData: async (name, description, createdById) => {
+            createMainData: async (name, description, hasAttributes, createdById) => {
                 try {
                     const response = await AxiosManager.post('/ProductGroup/CreateProductGroup', {
-                        name, description, createdById
+                        name, description, hasAttributes, createdById
                     });
                     return response;
                 } catch (error) {
                     throw error;
                 }
             },
-            updateMainData: async (id, name, description, updatedById) => {
+            updateMainData: async (id, name, description, hasAttributes, updatedById) => {
                 try {
                     const response = await AxiosManager.post('/ProductGroup/UpdateProductGroup', {
-                        id, name, description, updatedById
+                        id, name, description, hasAttributes, updatedById
                     });
                     return response;
                 } catch (error) {
@@ -109,6 +130,7 @@
                 const response = await services.getMainData();
                 state.mainData = response?.data?.content?.data.map(item => ({
                     ...item,
+                    hasAttributes: item.hasAttributes ?? false, // ✅ ensure boolean
                     createdAtUtc: new Date(item.createdAtUtc)
                 }));
             },
@@ -125,10 +147,10 @@
                     }
 
                     const response = state.id === ''
-                        ? await services.createMainData(state.name, state.description, StorageManager.getUserId())
+                        ? await services.createMainData(state.name, state.description, state.hasAttributes, StorageManager.getUserId())
                         : state.deleteMode
                             ? await services.deleteMainData(state.id, StorageManager.getUserId())
-                            : await services.updateMainData(state.id, state.name, state.description, StorageManager.getUserId());
+                            : await services.updateMainData(state.id, state.name, state.description, state.hasAttributes, StorageManager.getUserId());
 
                     if (response.data.code === 200) {
                         await methods.populateMainData();
@@ -185,6 +207,38 @@
                     state.isSubmitting = false;
                 }
             },
+            addAttribute: async () => {
+                debugger;
+                state.attributes.push({ name: '' });
+            },
+
+            removeAttribute: async (index) => {
+                debugger;
+                state.attributes.splice(index, 1);
+            },
+
+            saveAttributes: async  () => {
+                
+                try {
+                    const productGroupId = state.selectedProductGroupId; // assume stored when modal opened
+                    const payload = state.attributes.map(attr => ({
+                        productGroupId,
+                        attributeName: attr.name,
+                        createdBy: StorageManager.getUserId(), // if you track logged user
+                    }));
+
+                    console.log("Saving attributes:", payload);
+
+                    await AxiosManager.post('/ProductGroup/SaveAttributes', payload);
+
+                    alert('✅ Attributes saved successfully!');
+                } catch (error) {
+                    console.error(error);
+                    alert('❌ Failed to save attributes.');
+                }
+            }
+                
+
         };
 
         Vue.onMounted(async () => {
@@ -194,9 +248,9 @@
 
                 await methods.populateMainData();
                 await mainGrid.create(state.mainData);
-
                 nameText.create();
                 mainModal.create();
+                attributesModal.create();
                 mainModalRef.value?.addEventListener('hidden.bs.modal', () => {
                     resetFormState();
                 });
@@ -240,6 +294,9 @@
                         },
                         { field: 'name', headerText: 'Name', width: 200, minWidth: 200 },
                         { field: 'description', headerText: 'Description', width: 400, minWidth: 400 },
+                        
+                        { field: 'hasAttributes', headerText: 'Has Attributes', textAlign: 'Center', width: 120, minWidth: 120, type: 'boolean', displayAsCheckBox: true },
+
                         { field: 'createdAtUtc', headerText: 'Created At UTC', width: 150, format: 'yyyy-MM-dd HH:mm' }
                     ],
                     toolbar: [
@@ -295,6 +352,7 @@
                                 state.id = selectedRecord.id ?? '';
                                 state.name = selectedRecord.name ?? '';
                                 state.description = selectedRecord.description ?? '';
+                                state.hasAttributes = selectedRecord.hasAttributes ?? false; // ✅ added
                                 mainModal.obj.show();
                             }
                         }
@@ -307,6 +365,7 @@
                                 state.id = selectedRecord.id ?? '';
                                 state.name = selectedRecord.name ?? '';
                                 state.description = selectedRecord.description ?? '';
+                                state.hasAttributes = selectedRecord.hasAttributes ?? false; // ✅ added
                                 mainModal.obj.show();
                             }
                         }
@@ -329,6 +388,21 @@
                 });
             }
         };
+        const attributesModal = {
+            obj: null,
+            create: () => {
+                attributesModal.obj = new bootstrap.Modal(attributesModalRef.value, {
+                    backdrop: 'static',
+                    keyboard: false
+                });
+            },
+            show: () => {
+                attributesModal.obj.show();
+            },
+            hide: () => {
+                attributesModal.obj.hide();
+            }
+        };
 
         return {
             mainGridRef,
@@ -336,6 +410,8 @@
             nameRef,
             state,
             handler,
+            attributesModalRef, // ✅ added
+
         };
     }
 };

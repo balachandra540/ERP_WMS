@@ -21,6 +21,8 @@ public class CreatePurchaseOrderRequest : IRequest<CreatePurchaseOrderResult>
     public string? VendorId { get; init; }
     public string? TaxId { get; init; }
     public string? CreatedById { get; init; }
+    public string? LocationId { get; init; }
+
 }
 
 public class CreatePurchaseOrderValidator : AbstractValidator<CreatePurchaseOrderRequest>
@@ -69,7 +71,7 @@ public class CreatePurchaseOrderHandler : IRequestHandler<CreatePurchaseOrderReq
         entity.Description = request.Description;
         entity.VendorId = request.VendorId;
         entity.TaxId = request.TaxId;
-
+        entity.LocationId = request.LocationId;
         await _repository.CreateAsync(entity, cancellationToken);
         await _unitOfWork.SaveAsync(cancellationToken);
 

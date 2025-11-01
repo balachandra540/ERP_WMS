@@ -44,6 +44,7 @@ public class GetWarehouseListResult
 public class GetWarehouseListRequest : IRequest<GetWarehouseListResult>
 {
     public bool IsDeleted { get; init; } = false;
+    public string? wareHouseId { get; init; } = null;
 }
 
 
@@ -66,6 +67,11 @@ public class GetWarehouseListHandler : IRequestHandler<GetWarehouseListRequest, 
             .ApplyIsDeletedFilter(request.IsDeleted)
             .AsQueryable();
 
+        // ✅ Apply location filter (through SalesOrder)
+        if (request.wareHouseId != null && request.wareHouseId.Length > 0)
+        {
+            query = query.Where(x => x.Id != null && request.wareHouseId.Contains(x.Id!));
+        }
         var entities = await query.ToListAsync(cancellationToken);
 
         var dtos = _mapper.Map<List<GetWarehouseListDto>>(entities);

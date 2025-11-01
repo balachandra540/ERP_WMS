@@ -21,6 +21,9 @@ public record GetPurchaseOrderItemListDto
     public double? Quantity { get; init; }
     public double? Total { get; init; }
     public DateTime? CreatedAtUtc { get; init; }
+    public string? LocationId { get; init; }
+
+
 }
 
 public class GetPurchaseOrderItemListProfile : Profile
@@ -43,6 +46,10 @@ public class GetPurchaseOrderItemListProfile : Profile
             .ForMember(
                 dest => dest.ProductNumber,
                 opt => opt.MapFrom(src => src.Product != null ? src.Product.Number : string.Empty)
+            ) // ✅ Add this line
+            .ForMember(
+                dest => dest.LocationId,
+                opt => opt.MapFrom(src => src.PurchaseOrder != null ? src.PurchaseOrder.LocationId : null)
             );
 
     }
@@ -56,6 +63,8 @@ public class GetPurchaseOrderItemListResult
 public class GetPurchaseOrderItemListRequest : IRequest<GetPurchaseOrderItemListResult>
 {
     public bool IsDeleted { get; init; } = false;
+    public string? LocationId { get; init; }
+
 }
 
 
@@ -80,6 +89,12 @@ public class GetPurchaseOrderItemListHandler : IRequestHandler<GetPurchaseOrderI
                 .ThenInclude(x => x!.Vendor)
             .Include(x => x.Product)
             .AsQueryable();
+
+        // ✅ Apply location filter using the parent PurchaseOrder
+        if (!string.IsNullOrEmpty(request.LocationId))
+        {
+            query = query.Where(x => x.PurchaseOrder != null && x.PurchaseOrder.LocationId == request.LocationId);
+        }
 
         var entities = await query.ToListAsync(cancellationToken);
 

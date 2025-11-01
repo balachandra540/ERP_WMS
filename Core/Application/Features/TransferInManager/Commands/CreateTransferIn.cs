@@ -72,14 +72,14 @@ public class CreateTransferInHandler : IRequestHandler<CreateTransferInRequest, 
         IUnitOfWork unitOfWork,
         NumberSequenceService numberSequenceService,
         InventoryTransactionService inventoryTransactionService,
-        ISecurityService securityService)
+         ISecurityService securityService
+        )
     {
         _transferInRepository = transferInRepository;
         _unitOfWork = unitOfWork;
         _numberSequenceService = numberSequenceService;
         _inventoryTransactionService = inventoryTransactionService;
         _securityService = securityService;
-
     }
 
 

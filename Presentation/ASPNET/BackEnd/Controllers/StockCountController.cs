@@ -60,11 +60,16 @@ public class StockCountController : BaseApiController
     [Authorize]
     [HttpGet("GetStockCountList")]
     public async Task<ActionResult<ApiSuccessResult<GetStockCountListResult>>> GetStockCountListAsync(
-        CancellationToken cancellationToken,
-        [FromQuery] bool isDeleted = false
-        )
+     CancellationToken cancellationToken,
+     [FromQuery] bool isDeleted = false,
+     [FromQuery] string? locationId = null)
     {
-        var request = new GetStockCountListRequest { IsDeleted = isDeleted };
+        var request = new GetStockCountListRequest
+        {
+            IsDeleted = isDeleted,
+            WarehouseId = locationId // pass the location id
+        };
+
         var response = await _sender.Send(request, cancellationToken);
 
         return Ok(new ApiSuccessResult<GetStockCountListResult>

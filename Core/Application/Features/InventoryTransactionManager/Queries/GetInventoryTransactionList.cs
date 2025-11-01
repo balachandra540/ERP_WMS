@@ -69,7 +69,9 @@ public class GetInventoryTransactionListResult
 public class GetInventoryTransactionListRequest : IRequest<GetInventoryTransactionListResult>
 {
     public bool IsDeleted { get; init; } = false;
+    public string? WarehouseId { get; init; }  // ✅ add this
 }
+
 
 
 public class GetInventoryTransactionListHandler : IRequestHandler<GetInventoryTransactionListRequest, GetInventoryTransactionListResult>
@@ -85,22 +87,6 @@ public class GetInventoryTransactionListHandler : IRequestHandler<GetInventoryTr
 
     public async Task<GetInventoryTransactionListResult> Handle(GetInventoryTransactionListRequest request, CancellationToken cancellationToken)
     {
-        //var query = _context
-        //    .InventoryTransaction
-        //    .AsNoTracking()
-        //    .ApplyIsDeletedFilter(request.IsDeleted)
-        //    .Include(x => x.Warehouse)
-        //    .Include(x => x.Product)
-        //    .Include(x => x.WarehouseFrom)
-        //    .Include(x => x.WarehouseTo)
-        //    .Where(x =>
-        //        x.Product!.Physical == true &&
-        //        x.Warehouse!.SystemWarehouse == false &&
-        //        x.Status == Domain.Enums.InventoryTransactionStatus.Confirmed
-        //    )
-        //    .OrderByDescending(x => x.CreatedAtUtc)
-        //    .AsQueryable();
-
         var query = _context
             .InventoryTransaction
             .AsNoTracking()
@@ -117,9 +103,15 @@ public class GetInventoryTransactionListHandler : IRequestHandler<GetInventoryTr
             .OrderByDescending(x => x.CreatedAtUtc)
             .AsQueryable();
 
+        // ✅ location filter
+        if (!string.IsNullOrEmpty(request.WarehouseId))
+        {
+            query = query.Where(x => x.WarehouseId == request.WarehouseId
+                                  || x.WarehouseFromId == request.WarehouseId
+                                  || x.WarehouseToId == request.WarehouseId);
+        }
 
         var entities = await query.ToListAsync(cancellationToken);
-
         var dtos = _mapper.Map<List<GetInventoryTransactionListDto>>(entities);
 
         return new GetInventoryTransactionListResult
@@ -127,6 +119,7 @@ public class GetInventoryTransactionListHandler : IRequestHandler<GetInventoryTr
             Data = dtos
         };
     }
+
 
 
 }

@@ -48,7 +48,7 @@ public class PurchaseReturnSeeder
 
         var warehouses = await _warehouseRepository
             .GetQuery()
-            .Where(x => x.SystemWarehouse == false)
+            .Where(x => (x.Type == "Store" || x.Type == "Store&Sales"))
             .Select(x => x.Id)
             .ToListAsync();
 

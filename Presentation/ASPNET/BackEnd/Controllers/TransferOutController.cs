@@ -61,10 +61,11 @@ public class TransferOutController : BaseApiController
     [HttpGet("GetTransferOutList")]
     public async Task<ActionResult<ApiSuccessResult<GetTransferOutListResult>>> GetTransferOutListAsync(
         CancellationToken cancellationToken,
-        [FromQuery] bool isDeleted = false
+        [FromQuery] bool isDeleted = false,
+        [FromQuery] string? wareHouseId = null
         )
     {
-        var request = new GetTransferOutListRequest { IsDeleted = isDeleted };
+        var request = new GetTransferOutListRequest { IsDeleted = isDeleted , wareHouseId = wareHouseId };
         var response = await _sender.Send(request, cancellationToken);
 
         return Ok(new ApiSuccessResult<GetTransferOutListResult>

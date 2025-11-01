@@ -1,4 +1,5 @@
 ﻿using Application.Common.Repositories;
+using Application.Common.Services.SecurityManager;
 using Application.Features.NumberSequenceManager;
 using Domain.Entities;
 using Domain.Enums;
@@ -36,16 +37,19 @@ public class CreateStockCountHandler : IRequestHandler<CreateStockCountRequest, 
     private readonly ICommandRepository<StockCount> _repository;
     private readonly IUnitOfWork _unitOfWork;
     private readonly NumberSequenceService _numberSequenceService;
+    private readonly ISecurityService _securityService;
 
     public CreateStockCountHandler(
         ICommandRepository<StockCount> repository,
         IUnitOfWork unitOfWork,
-        NumberSequenceService numberSequenceService
+        NumberSequenceService numberSequenceService,
+       ISecurityService securityService
         )
     {
         _repository = repository;
         _unitOfWork = unitOfWork;
         _numberSequenceService = numberSequenceService;
+        _securityService = securityService;
     }
 
     public async Task<CreateStockCountResult> Handle(CreateStockCountRequest request, CancellationToken cancellationToken = default)
@@ -54,7 +58,9 @@ public class CreateStockCountHandler : IRequestHandler<CreateStockCountRequest, 
         entity.CreatedById = request.CreatedById;
 
         entity.Number = _numberSequenceService.GenerateNumber(nameof(StockCount), "", "SC");
-        entity.CountDate = request.CountDate;
+        //entity.CountDate = request.CountDate;
+        entity.CountDate = _securityService.ConvertToIst(request.CountDate);
+
         entity.Status = (StockCountStatus)int.Parse(request.Status!);
         entity.Description = request.Description;
         entity.WarehouseId = request.WarehouseId;

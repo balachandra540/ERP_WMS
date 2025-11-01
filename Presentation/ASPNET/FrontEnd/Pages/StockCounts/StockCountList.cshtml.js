@@ -181,12 +181,16 @@
         const services = {
             getMainData: async () => {
                 try {
-                    const response = await AxiosManager.get('/StockCount/GetStockCountList', {});
+                    const location = StorageManager.getLocation();
+                    const response = await AxiosManager.get('/StockCount/GetStockCountList?locationId=' + location, {});
                     return response;
                 } catch (error) {
                     throw error;
                 }
             },
+            //const locationId = StorageManager.getLocation();
+            //const response = await AxiosManager.get(`/StockCount/GetStockCountList?locationId=${locationId}`);
+
             createMainData: async (countDate, description, status, warehouseId, createdById) => {
                 try {
                     const response = await AxiosManager.post('/StockCount/CreateStockCount', {
@@ -219,7 +223,8 @@
             },
             getWarehouseListLookupData: async () => {
                 try {
-                    const response = await AxiosManager.get('/Warehouse/GetWarehouseList', {});
+                    const location = StorageManager.getLocation();
+                    const response = await AxiosManager.get('/Warehouse/GetWarehouseList?id=' + location, {});
                     return response;
                 } catch (error) {
                     throw error;
@@ -273,7 +278,8 @@
             },
             getProductListLookupData: async () => {
                 try {
-                    const response = await AxiosManager.get('/Product/GetProductList', {});
+                    const location = StorageManager.getLocation();
+                    const response = await AxiosManager.get('/Product/GetProductList?warehouseId=' + location, {});
                     return response;
                 } catch (error) {
                     throw error;

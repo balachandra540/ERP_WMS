@@ -1,5 +1,6 @@
 ﻿using Application.Common.Extensions;
 using Application.Common.Repositories;
+using Application.Common.Services.SecurityManager;
 using Application.Features.InventoryTransactionManager;
 using Application.Features.NumberSequenceManager;
 using Domain.Entities;
@@ -41,6 +42,7 @@ public class CreatePurchaseReturnHandler : IRequestHandler<CreatePurchaseReturnR
     private readonly IUnitOfWork _unitOfWork;
     private readonly NumberSequenceService _numberSequenceService;
     private readonly InventoryTransactionService _inventoryTransactionService;
+    private readonly ISecurityService _securityService;
 
     public CreatePurchaseReturnHandler(
         ICommandRepository<PurchaseReturn> deliveryOrderRepository,
@@ -48,7 +50,8 @@ public class CreatePurchaseReturnHandler : IRequestHandler<CreatePurchaseReturnR
         ICommandRepository<Warehouse> warehouseRepository,
         IUnitOfWork unitOfWork,
         NumberSequenceService numberSequenceService,
-        InventoryTransactionService inventoryTransactionService
+        InventoryTransactionService inventoryTransactionService,
+       ISecurityService securityService
         )
     {
         _deliveryOrderRepository = deliveryOrderRepository;
@@ -56,6 +59,7 @@ public class CreatePurchaseReturnHandler : IRequestHandler<CreatePurchaseReturnR
         _unitOfWork = unitOfWork;
         _numberSequenceService = numberSequenceService;
         _inventoryTransactionService = inventoryTransactionService;
+        _securityService = securityService;
     }
 
     public async Task<CreatePurchaseReturnResult> Handle(CreatePurchaseReturnRequest request, CancellationToken cancellationToken = default)
@@ -64,7 +68,8 @@ public class CreatePurchaseReturnHandler : IRequestHandler<CreatePurchaseReturnR
         entity.CreatedById = request.CreatedById;
 
         entity.Number = _numberSequenceService.GenerateNumber(nameof(PurchaseReturn), "", "PRN");
-        entity.ReturnDate = request.ReturnDate;
+
+        entity.ReturnDate = _securityService.ConvertToIst(request.ReturnDate);
         entity.Status = (PurchaseReturnStatus)int.Parse(request.Status!);
         entity.Description = request.Description;
         entity.GoodsReceiveId = request.GoodsReceiveId;

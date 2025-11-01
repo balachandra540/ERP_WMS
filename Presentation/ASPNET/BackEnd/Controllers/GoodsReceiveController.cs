@@ -61,10 +61,15 @@ public class GoodsReceiveController : BaseApiController
     [HttpGet("GetGoodsReceiveList")]
     public async Task<ActionResult<ApiSuccessResult<GetGoodsReceiveListResult>>> GetGoodsReceiveListAsync(
         CancellationToken cancellationToken,
-        [FromQuery] bool isDeleted = false
+        [FromQuery] bool isDeleted = false,
+         [FromQuery] string? locationId = null
         )
     {
-        var request = new GetGoodsReceiveListRequest { IsDeleted = isDeleted };
+        var request = new GetGoodsReceiveListRequest 
+        { 
+            IsDeleted = isDeleted ,
+            LocationId = locationId,
+        };
         var response = await _sender.Send(request, cancellationToken);
 
         return Ok(new ApiSuccessResult<GetGoodsReceiveListResult>

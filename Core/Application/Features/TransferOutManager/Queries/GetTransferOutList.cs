@@ -52,6 +52,7 @@ public class GetTransferOutListResult
 public class GetTransferOutListRequest : IRequest<GetTransferOutListResult>
 {
     public bool IsDeleted { get; init; } = false;
+    public string? wareHouseId { get; init; }
 }
 
 
@@ -75,6 +76,11 @@ public class GetTransferOutListHandler : IRequestHandler<GetTransferOutListReque
             .Include(x => x.WarehouseFrom)
             .Include(x => x.WarehouseTo)
             .AsQueryable();
+        // ✅ Apply location filter (through SalesOrder)
+        if (request.wareHouseId != null && request.wareHouseId.Length > 0)
+        {
+            query = query.Where(x => x.WarehouseFromId != null && request.wareHouseId.Contains(x.WarehouseFromId));
+        }
 
         var entities = await query.ToListAsync(cancellationToken);
 

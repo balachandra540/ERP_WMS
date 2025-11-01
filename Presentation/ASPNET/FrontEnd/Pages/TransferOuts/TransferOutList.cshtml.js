@@ -233,11 +233,24 @@
                         }
                     });
                     warehouseFromListLookup.obj.appendTo(warehouseFromIdRef.value);
+
+                    // Set value after append
+                    state.warehouseFromId = StorageManager.getLocation();
+
+                    warehouseFromListLookup.obj.value = state.warehouseFromId; // ✅ default select
+                    warehouseFromListLookup.refresh();
+
+                    //  Disable it here on load
+                    //warehouseFromListLookup.obj.enabled = false;
+
+                   
                 }
             },
             refresh: () => {
                 if (warehouseFromListLookup.obj) {
-                    warehouseFromListLookup.obj.value = state.warehouseFromId
+                    warehouseFromListLookup.obj.value = state.warehouseFromId;
+                    //if (warehouseFromListLookup.obj.value)
+                    //    warehouseFromListLookup.obj.enabled = false;
                 }
             },
         };
@@ -274,6 +287,8 @@
                         }
                     });
                     warehouseToListLookup.obj.appendTo(warehouseToIdRef.value);
+
+                    
                 }
             },
             refresh: () => {
@@ -325,7 +340,8 @@
         const services = {
             getMainData: async () => {
                 try {
-                    const response = await AxiosManager.get('/TransferOut/GetTransferOutList', {});
+                    const wareHouseId = StorageManager.getLocation();
+                    const response = await AxiosManager.get('/TransferOut/GetTransferOutList?wareHouseId=' + wareHouseId, {});
                     return response;
                 } catch (error) {
                     throw error;
@@ -408,7 +424,8 @@
             },
             getWarehouseFromListLookupData: async () => {
                 try {
-                    const response = await AxiosManager.get('/Warehouse/GetWarehouseList', {});
+                    const wareHouseId = StorageManager.getLocation();
+                    const response = await AxiosManager.get('/Warehouse/GetWarehouseList?id=' + wareHouseId, {});
                     return response;
                 } catch (error) {
                     throw error;
@@ -502,11 +519,15 @@
             },
             populateWarehouseFromListLookupData: async () => {
                 const response = await services.getWarehouseFromListLookupData();
-                state.warehouseFromListLookupData = response?.data?.content?.data.filter(warehouse => warehouse.systemWarehouse === false) || [];
+                //state.warehouseFromListLookupData = response?.data?.content?.data.filter(warehouse => warehouse.systemWarehouse === false) || [];
+                state.warehouseFromListLookupData = response?.data?.content?.data.filter(warehouse => (warehouse.type === "Store" || warehouse.type === "Store&Sales")) || [];
+
             },
             populateWarehouseToListLookupData: async () => {
                 const response = await services.getWarehouseToListLookupData();
-                state.warehouseToListLookupData = response?.data?.content?.data.filter(warehouse => warehouse.systemWarehouse === false) || [];
+                //state.warehouseToListLookupData = response?.data?.content?.data.filter(warehouse => warehouse.systemWarehouse === false) || [];
+                state.warehouseToListLookupData = response?.data?.content?.data.filter(warehouse => (warehouse.type === "Store" || warehouse.type === "Store&Sales")) || [];
+
             },
             populateTransferOutStatusListLookupData: async () => {
                 const response = await services.getTransferOutStatusListLookupData();
@@ -838,6 +859,8 @@
 
         Vue.onMounted(async () => {
             try {
+                state.warehouseFromId = StorageManager.getLocation();
+
                 await SecurityManager.authorizePage(['TransferOuts']);
                 await SecurityManager.validateToken();
 

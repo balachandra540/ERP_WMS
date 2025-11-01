@@ -10,6 +10,8 @@
             getMainData: async () => {
                 try {
                     const response = await AxiosManager.get('/InventoryTransaction/GetInventoryTransactionList', {});
+                    //const locationId = StorageManager.getLocation();
+                    //const response = await AxiosManager.get(`/InventoryTransaction/GetInventoryTransactionList?locationId=${locationId}`);
                     return response;
                 } catch (error) {
                     throw error;

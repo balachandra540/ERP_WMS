@@ -56,6 +56,7 @@ public class GetTransferInListResult
 public class GetTransferInListRequest : IRequest<GetTransferInListResult>
 {
     public bool IsDeleted { get; init; } = false;
+    public string? locationid { get; init; }
 }
 
 
@@ -77,11 +78,19 @@ public class GetTransferInListHandler : IRequestHandler<GetTransferInListRequest
             .AsNoTracking()
             .ApplyIsDeletedFilter(request.IsDeleted)
             .Include(x => x.TransferOut)
-                .ThenInclude(x => x.WarehouseFrom)
+              .ThenInclude(x => x.WarehouseFrom)
             .Include(x => x.TransferOut)
                 .ThenInclude(x => x.WarehouseTo)
             .AsQueryable();
 
+        // ✅ Filter by Location (WarehouseTo)
+        if (!string.IsNullOrEmpty(request.locationid))
+        {
+            query = query.Where(x =>
+                x.TransferOut != null &&
+                x.TransferOut.WarehouseTo != null &&
+                x.TransferOut.WarehouseTo.Id == request.locationid);
+        }
 
         var entities = await query.ToListAsync(cancellationToken);
 
@@ -92,9 +101,8 @@ public class GetTransferInListHandler : IRequestHandler<GetTransferInListRequest
             Data = dtos
         };
     }
-
-
 }
+
 
 
 

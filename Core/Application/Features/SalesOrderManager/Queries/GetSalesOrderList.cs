@@ -24,6 +24,8 @@ public record GetSalesOrderListDto
     public double? TaxAmount { get; init; }
     public double? AfterTaxAmount { get; init; }
     public DateTime? CreatedAtUtc { get; init; }
+    public string? LocationId { get; init; }
+
 }
 
 public class GetSalesOrderListProfile : Profile
@@ -55,6 +57,8 @@ public class GetSalesOrderListResult
 public class GetSalesOrderListRequest : IRequest<GetSalesOrderListResult>
 {
     public bool IsDeleted { get; init; } = false;
+    public string? LocationId { get; init; }
+
 }
 
 
@@ -78,6 +82,13 @@ public class GetSalesOrderListHandler : IRequestHandler<GetSalesOrderListRequest
             .Include(x => x.Customer)
             .Include(x => x.Tax)
             .AsQueryable();
+
+
+        // ✅ Apply location filter
+        if (!string.IsNullOrEmpty(request.LocationId))
+        {
+            query = query.Where(x => x.LocationId == request.LocationId);
+        }
 
         var entities = await query.ToListAsync(cancellationToken);
 

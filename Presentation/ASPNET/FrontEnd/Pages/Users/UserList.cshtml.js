@@ -3,10 +3,12 @@
         const state = Vue.reactive({
             mainData: [],
             secondaryData: [],
+            LocationData: [],
             deleteMode: false,
             mainTitle: null,
             changePasswordTitle: null,
             changeRoleTitle: null,
+            locationTitle: null,
             id: '',
             firstName: '',
             lastName: '',
@@ -20,6 +22,8 @@
             userId: '',
             wareHouse: '',   // Bound to the dropdown
             warehouses: [], 
+            userlocations: [],
+            //AssignLocations:null,
             errors: {
                 firstName: '',
                 lastName: '',
@@ -41,6 +45,8 @@
         const firstNameRef = Vue.ref(null);
         const lastNameRef = Vue.ref(null);
         const emailRef = Vue.ref(null);
+        const LocationRef = Vue.ref(null);
+        const LocationGridRef = Vue.ref(null);
 
         const firstNameText = {
             obj: null,
@@ -215,6 +221,16 @@
                 secondaryGrid.refresh();
             }
         };
+        const resetLocationFormState = () => {
+            state.userId = '';
+            state.userlocations = [];
+            state.locationTitle = 'Location Access';
+
+            if (LocationGrid.obj) {
+                LocationGrid.obj.clearSelection();
+                LocationGrid.refresh();
+            }
+        };
 
         const getLocations = async () => {
             try {
@@ -231,7 +247,22 @@
                 state.warehouses = [];
             }
         };
+        //getUserAccessLocations
+        const getUserAccessLocations = async () => {
+            try {
+                const response = await AxiosManager.get('/Security/GetUserAccessLocations');
 
+                if (response.data.code === 200) {
+                    state.userlocations = response.data.content.data || [];
+                } else {
+                    console.error('Failed to load warehouses:', response.data.message);
+                    state.userlocations = [];
+                }
+            } catch (error) {
+                console.error('Error fetching warehouses:', error);
+                state.userlocations = [];
+            }
+        };
         const services = {
             getMainData: async () => {
                 try {
@@ -359,6 +390,28 @@
                         }));
 
                     state.secondaryData = result;
+                } catch (error) {
+                    console.error("Error populating secondary data:", error);
+                    state.secondaryData = [];
+                }
+            },
+            populateLocationData: async (userId) => {
+                try {
+                    //const locations = await services.getLocations();
+                    const locations = await getLocations();
+
+                    const allLocations = locations?.data?.content?.data ?? [];
+                    //const userAccessLocations = await services.getUserAccessLocations(userId);
+                    const userAccessLocations = await getLocations(userId);
+                    const userlocations = userAccessLocations?.data?.content?.data ?? [];
+                    const result = allLocations.length === 0
+                        ? []
+                        : allLocations.map(loc => ({
+                            locationName: loc.name,
+                            isDefault: userlocations.includes(loc.isDefault)
+                        }));
+
+                    state.LocationData = result;
                 } catch (error) {
                     console.error("Error populating secondary data:", error);
                     state.secondaryData = [];
@@ -516,8 +569,7 @@
                 await getLocations();
                 await methods.populateMainData();
                 await mainGrid.create(state.mainData);
-                await secondaryGrid.create(state.secondaryData); 
-
+                await secondaryGrid.create(state.secondaryData);
                 firstNameText.create();
                 lastNameText.create();
                 emailText.create();
@@ -525,6 +577,12 @@
                 mainModal.create();
                 changePasswordModal.create();
                 changeRoleModal.create();
+                LocationModal.create();
+                try { 
+                    await LocationGrid.create(state.LocationData);
+                } catch (ex) {
+                    console.log(ex);
+                }
 
                 mainModalRef.value?.addEventListener('hidden.bs.modal', () => {
                     resetFormState();
@@ -535,7 +593,9 @@
                 changeRoleModalRef.value?.addEventListener('hidden.bs.modal', () => {
                     resetSecondaryFormState();
                 });
-
+                LocationRef.value?.addEventListener('hidden.bs.modal', () => {
+                    resetLocationFormState();
+                });
             } catch (e) {
                 console.error('page init error:', e);
             } finally {
@@ -547,7 +607,7 @@
             mainModalRef.value?.removeEventListener('hidden.bs.modal', resetFormState);
             changePasswordModalRef.value?.removeEventListener('hidden.bs.modal', resetChangePasswordFormState);
             changeRoleModalRef.value?.removeEventListener('hidden.bs.modal', resetSecondaryFormState);
-
+            LocationRef.value ?. removeEventListener('hidden.bs.modal', resetLocationFormState);
         });
 
         const mainGrid = {
@@ -593,25 +653,26 @@
                         { type: 'Separator' },
                         { text: 'Change Password', tooltipText: 'Change Password', id: 'ChangePasswordCustom' },
                         { text: 'Change Role', tooltipText: 'Change Role', id: 'ChangeRoleCustom' },
+                        { tooltipText: 'Locations', text: 'Locations',id:'ChangeLocations'},
                     ],
                     beforeDataBound: () => { },
                     dataBound: function () {
-                        mainGrid.obj.toolbarModule.enableItems(['EditCustom', 'DeleteCustom', 'ChangePasswordCustom', 'ChangeRoleCustom'], false);
+                        mainGrid.obj.toolbarModule.enableItems(['EditCustom', 'DeleteCustom', 'ChangePasswordCustom', 'ChangeRoleCustom','ChangeLocations'], false);
                         mainGrid.obj.autoFitColumns(['firstName', 'lastName', 'email', 'emailConfirmed', 'isBlocked', 'isDeleted', 'createdAt']);
                     },
                     excelExportComplete: () => { },
                     rowSelected: () => {
                         if (mainGrid.obj.getSelectedRecords().length == 1) {
-                            mainGrid.obj.toolbarModule.enableItems(['EditCustom', 'DeleteCustom', 'ChangePasswordCustom', 'ChangeRoleCustom'], true);
+                            mainGrid.obj.toolbarModule.enableItems(['EditCustom', 'DeleteCustom', 'ChangePasswordCustom', 'ChangeRoleCustom','ChangeLocations'], true);
                         } else {
-                            mainGrid.obj.toolbarModule.enableItems(['EditCustom', 'DeleteCustom', 'ChangePasswordCustom', 'ChangeRoleCustom'], false);
+                            mainGrid.obj.toolbarModule.enableItems(['EditCustom', 'DeleteCustom', 'ChangePasswordCustom', 'ChangeRoleCustom','ChangeLocations'], false);
                         }
                     },
                     rowDeselected: () => {
                         if (mainGrid.obj.getSelectedRecords().length == 1) {
-                            mainGrid.obj.toolbarModule.enableItems(['EditCustom', 'DeleteCustom', 'ChangePasswordCustom', 'ChangeRoleCustom'], true);
+                            mainGrid.obj.toolbarModule.enableItems(['EditCustom', 'DeleteCustom', 'ChangePasswordCustom', 'ChangeRoleCustom','ChangeLocations'], true);
                         } else {
-                            mainGrid.obj.toolbarModule.enableItems(['EditCustom', 'DeleteCustom', 'ChangePasswordCustom', 'ChangeRoleCustom'], false);
+                            mainGrid.obj.toolbarModule.enableItems(['EditCustom', 'DeleteCustom', 'ChangePasswordCustom', 'ChangeRoleCustom','ChangeLocations'], false);
                         }
                     },
                     rowSelecting: () => {
@@ -684,6 +745,16 @@
                                 await methods.populateSecondaryData(state.userId);
                                 secondaryGrid.refresh();
                                 changeRoleModal.obj.show();
+                            }
+                        }
+                        if (args.item.id === 'ChangeLocations') {
+                            if (mainGrid.obj.getSelectedRecords().length) {
+                                const selectedRecord = mainGrid.obj.getSelectedRecords()[0];
+                                state.locationTitle = 'Location Access';
+                                state.userId = selectedRecord.id ?? '';
+                                await methods.populateLocationData(state.userId);
+                                LocationGrid.refresh();
+                                LocationModal.obj.show();
                             }
                         }
                     }
@@ -858,6 +929,134 @@
             }
         };
 
+        const LocationGrid = {
+            obj: null,
+            create: async (dataSource) => {
+                LocationGrid.obj = new ej.grids.Grid({
+                    height: 400,
+                    dataSource: dataSource,
+                    editSettings: { allowEditing: true, allowAdding: false, allowDeleting: false, showDeleteConfirmDialog: true, mode: 'Normal', allowEditOnDblClick: true },
+                    allowFiltering: false,
+                    allowSorting: true,
+                    allowSelection: true,
+                    allowGrouping: false,
+                    allowTextWrap: true,
+                    allowResizing: true,
+                    allowPaging: false,
+                    allowExcelExport: true,
+                    filterSettings: { type: 'CheckBox' },
+                    sortSettings: { columns: [{ field: 'roleName', direction: 'Descending' }] },
+                    pageSettings: { currentPage: 1, pageSize: 50, pageSizes: ["10", "20", "50", "100", "200", "All"] },
+                    selectionSettings: { persistSelection: true, type: 'Single' },
+                    autoFit: true,
+                    showColumnMenu: false,
+                    gridLines: 'Horizontal',
+                    columns: [
+                        { type: 'checkbox', width: 60 },
+                        {
+                            field: 'id', isPrimaryKey: true, headerText: 'Id', visible: false
+                        },
+                        { field: 'roleName', headerText: 'Role', allowEditing: false, width: 200, minWidth: 200 },
+                        { field: 'accessGranted', headerText: 'Access Granted', textAlign: 'Center', width: 150, minWidth: 150, editType: 'booleanedit', displayAsCheckBox: true, type: 'boolean', allowEditing: true },
+                    ],
+                    //toolbar: [
+                    //    'ExcelExport',
+                    //    { type: 'Separator' },
+                    //    'Edit', 'Update', 'Cancel',
+                    //],
+                    toolbar: [
+                        'ExcelExport', 'Search',
+                        { type: 'Separator' },
+                        { text: 'Edit', tooltipText: 'Edit', prefixIcon: 'e-edit', id: 'EditRoleCustom' },
+                        { text: 'Update', tooltipText: 'Update', id: 'UpdateRoleCustom' },
+                        { text: 'Cancel', tooltipText: 'Cancel', id: 'CancelRoleCustom' },
+                    ],
+                    beforeDataBound: () => { },
+                    dataBound: function () {
+                        LocationGrid.obj.autoFitColumns(['roleName', 'accessGranted']);
+                        // Disable Edit button initially
+                        LocationGrid.obj.toolbarModule.enableItems(['EditRoleCustom', 'UpdateRoleCustom', 'CancelRoleCustom'], false);
+                    },
+                    excelExportComplete: () => { },
+                    rowSelected: () => {
+                        if (LocationGrid.obj.getSelectedRecords().length == 1) {
+                            LocationGrid.obj.toolbarModule.enableItems(['EditRoleCustom', 'CancelRoleCustom'], true);
+                        } else {
+                            LocationGrid.obj.toolbarModule.enableItems(['EditRoleCustom', 'CancelRoleCustom'], false);
+                        }
+                    },
+                    rowDeselected: () => {
+                        if (LocationGrid.obj.getSelectedRecords().length == 1) {
+                            LocationGrid.obj.toolbarModule.enableItems(['EditRoleCustom', 'CancelRoleCustom'], true);
+                        } else {
+                            LocationGrid.obj.toolbarModule.enableItems(['EditRoleCustom', 'CancelRoleCustom'], false);
+                        }
+                    },
+                    rowSelecting: () => {
+                        if (LocationGrid.obj.getSelectedRecords().length) {
+                            LocationGrid.obj.clearSelection();
+                        }
+                    },
+                    toolbarClick: async (args) => {
+                        if (args.item.id === 'SecondaryGrid_excelexport') {
+                            LocationGrid.obj.excelExport();
+                        }
+                        else if (args.item.id === 'EditRoleCustom') {
+                            if (LocationGrid.obj.getSelectedRecords().length) {
+                                const selectedRecord = LocationGrid.obj.getSelectedRecords()[0];
+                                LocationGrid.obj.toolbarModule.enableItems(['UpdateRoleCustom', 'CancelRoleCustom'], true);
+                                LocationGrid.obj.toolbarModule.enableItems(['EditRoleCustom'], false);
+                            }
+                        }
+                       
+                        else if (args.item.id === 'CancelRoleCustom') {
+                            resetSecondaryFormState();
+                        }
+
+
+                    },
+                    actionComplete: async (args) => {
+                        if (args.requestType === 'save' && args.action === 'edit') {
+                            try {
+                                const roleName = args?.data?.roleName;
+                                const accessGranted = args?.data?.accessGranted;
+                                const response = await services.updateUserRoleData(state.userId, roleName, accessGranted);
+
+                                if (response.data.code === 200) {
+                                    await methods.populateSecondaryData(state.userId);
+                                    LocationGrid.refresh();
+                                    LocationGrid.obj.clearSelection();
+                                    Swal.fire({
+                                        icon: 'success',
+                                        title: 'Save Successful',
+                                        timer: 1000,
+                                        showConfirmButton: false
+                                    });
+                                } else {
+                                    Swal.fire({
+                                        icon: 'error',
+                                        title: 'Save Failed',
+                                        text: response.data.message ?? 'Please check your data.',
+                                        confirmButtonText: 'Try Again'
+                                    });
+                                }
+                            } catch (error) {
+                                Swal.fire({
+                                    icon: 'error',
+                                    title: 'An Error Occurred',
+                                    text: error.response?.data?.message ?? 'Please try again.',
+                                    confirmButtonText: 'OK'
+                                });
+                            }
+                        }
+                    }
+                });
+                LocationGrid.obj.appendTo(LocationGridRef.value);
+            },
+            refresh: () => {
+                LocationGrid.obj.setProperties({ dataSource: state.LocationData });
+            }
+        };
         const mainModal = {
             obj: null,
             create: () => {
@@ -887,7 +1086,15 @@
                 });
             }
         };
-
+        const LocationModal = {
+            obj: null,
+            create: () => {
+                LocationModal.obj = new bootstrap.Modal(LocationRef.value, {
+                    backdrop: 'static',
+                    keyboard: false
+                });
+            }
+        };
         return {
             mainGridRef,
             mainModalRef,
@@ -899,6 +1106,10 @@
             emailRef,
             state,
             handler,
+            LocationRef,
+            LocationGrid,
+            LocationGridRef
+
         };
     }
 };

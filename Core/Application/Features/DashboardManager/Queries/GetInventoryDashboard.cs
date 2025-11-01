@@ -44,7 +44,7 @@ public class GetInventoryDashboardHandler : IRequestHandler<GetInventoryDashboar
             .Include(x => x.WarehouseTo)
             .Where(x =>
                 x.Product!.Physical == true &&
-                x.Warehouse!.SystemWarehouse == false &&
+                (x.Warehouse!.Type == "Store" || x.Warehouse!.Type == "Store&Sales") &&
                 x.Status == InventoryTransactionStatus.Confirmed
             )
             .OrderByDescending(x => x.CreatedAtUtc)
@@ -58,7 +58,7 @@ public class GetInventoryDashboardHandler : IRequestHandler<GetInventoryDashboar
             .Include(x => x.Product)
             .Where(x =>
                 x.Status == InventoryTransactionStatus.Confirmed &&
-                x.Warehouse!.SystemWarehouse == false &&
+                (x.Warehouse!.Type == "Store" || x.Warehouse!.Type == "Store&Sales") &&
                 x.Product!.Physical == true
             )
             .GroupBy(x => new { x.WarehouseId, x.ProductId })
@@ -77,7 +77,7 @@ public class GetInventoryDashboardHandler : IRequestHandler<GetInventoryDashboar
         var warehouseData = _context.Warehouse
             .AsNoTracking()
             .ApplyIsDeletedFilter(false)
-            .Where(x => x.SystemWarehouse == false)
+            .Where(x => (x.Type == "Store" || x.Type == "Store&Sales"))
             .Select(x => x.Name)
             .ToList();
 

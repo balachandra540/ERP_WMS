@@ -60,11 +60,16 @@ public class SalesOrderItemController : BaseApiController
     [Authorize]
     [HttpGet("GetSalesOrderItemList")]
     public async Task<ActionResult<ApiSuccessResult<GetSalesOrderItemListResult>>> GetSalesOrderItemListAsync(
-        CancellationToken cancellationToken,
-        [FromQuery] bool isDeleted = false
-        )
+    [FromQuery] bool isDeleted = false,
+    [FromQuery] string? locationId = null, // string[]? locationId = null,  // ✅ handle one or many location IDs
+    CancellationToken cancellationToken = default)
     {
-        var request = new GetSalesOrderItemListRequest { IsDeleted = isDeleted };
+        var request = new GetSalesOrderItemListRequest
+        {
+            IsDeleted = isDeleted,
+            LocationIds = locationId   // ✅ pass to request
+        };
+
         var response = await _sender.Send(request, cancellationToken);
 
         return Ok(new ApiSuccessResult<GetSalesOrderItemListResult>
@@ -74,6 +79,7 @@ public class SalesOrderItemController : BaseApiController
             Content = response
         });
     }
+
 
     [Authorize]
     [HttpGet("GetSalesOrderItemBySalesOrderIdList")]

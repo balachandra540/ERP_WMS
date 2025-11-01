@@ -20,10 +20,16 @@ public class InventoryTransactionController : BaseApiController
     [Authorize]
     [HttpGet("GetInventoryTransactionList")]
     public async Task<ActionResult<ApiSuccessResult<GetInventoryTransactionListResult>>> GetInventoryTransactionListAsync(
-        CancellationToken cancellationToken
-        )
+    CancellationToken cancellationToken,
+    [FromQuery] bool isDeleted = false,
+    [FromQuery] string? locationId = null)
     {
-        var request = new GetInventoryTransactionListRequest { };
+        var request = new GetInventoryTransactionListRequest
+        {
+            IsDeleted = isDeleted,
+            WarehouseId = locationId  // ✅ pass warehouse/location id
+        };
+
         var response = await _sender.Send(request, cancellationToken);
 
         return Ok(new ApiSuccessResult<GetInventoryTransactionListResult>
@@ -35,13 +41,20 @@ public class InventoryTransactionController : BaseApiController
     }
 
 
+
     [Authorize]
     [HttpGet("GetInventoryStockList")]
     public async Task<ActionResult<ApiSuccessResult<GetInventoryStockListResult>>> GetInventoryStockListAsync(
-        CancellationToken cancellationToken
-        )
+     CancellationToken cancellationToken,
+     [FromQuery] bool isDeleted = false,
+     [FromQuery] string? locationId = null)
     {
-        var request = new GetInventoryStockListRequest { };
+        var request = new GetInventoryStockListRequest
+        {
+            IsDeleted = isDeleted,
+            WarehouseId = locationId
+        };
+
         var response = await _sender.Send(request, cancellationToken);
 
         return Ok(new ApiSuccessResult<GetInventoryStockListResult>
@@ -51,6 +64,7 @@ public class InventoryTransactionController : BaseApiController
             Content = response
         });
     }
+
 
     [Authorize]
     [HttpPost("DeliveryOrderCreateInvenTrans")]
