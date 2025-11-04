@@ -50,7 +50,6 @@ public class GetPurchaseOrderSingleHandler : IRequestHandler<GetPurchaseOrderSin
             .PurchaseOrder
             .AsNoTracking()
             .Include(x => x.Vendor)
-            .Include(x => x.Tax)
             .Include(x => x.PurchaseOrderItemList.Where(item => !item.IsDeleted))
                 .ThenInclude(x => x.Product)
             .Where(x => x.Id == request.Id)

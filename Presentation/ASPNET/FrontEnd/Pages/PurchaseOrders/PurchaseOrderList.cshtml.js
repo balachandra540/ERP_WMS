@@ -45,9 +45,11 @@
             state.errors.vendorId = '';
             state.errors.taxId = '';
             state.errors.orderStatus = '';
+            state.errors.gridItems = [];
 
             let isValid = true;
 
+            // Validate form fields
             if (!state.orderDate) {
                 state.errors.orderDate = 'Order date is required.';
                 isValid = false;
@@ -55,14 +57,90 @@
             if (!state.vendorId) {
                 state.errors.vendorId = 'Vendor is required.';
                 isValid = false;
-            }
-            if (!state.taxId) {
-                state.errors.taxId = 'Tax is required.';
-                isValid = false;
-            }
+            }            
             if (!state.orderStatus) {
                 state.errors.orderStatus = 'Order status is required.';
                 isValid = false;
+            }
+
+            // GET BATCH CHANGES HERE
+            const batchChanges = secondaryGrid.getBatchChanges();
+
+            console.log('Validation Time - Reading Batch Changes:');
+            console.log('Added Records:', batchChanges.addedRecords);
+            console.log('Changed Records:', batchChanges.changedRecords);
+            console.log('Deleted Records:', batchChanges.deletedRecords);
+
+            // Initialize data
+            let currentSecondaryData = state.id !== ""
+                ? [...state.secondaryData]
+                : [...(batchChanges.changedRecords || [])];
+
+            // Helper function to match records
+            const matchRecord = (a, b) => {
+                if (a.purchaseOrderItemId && b.purchaseOrderItemId) {
+                    return a.purchaseOrderItemId === b.purchaseOrderItemId;
+                }
+                if (a.id && b.id) {
+                    return a.id === b.id;
+                }
+                return false;
+            };
+
+            // Apply batch changes
+            const changedRecords = batchChanges.changedRecords || [];
+            for (let changed of changedRecords) {
+                const index = currentSecondaryData.findIndex(item => matchRecord(item, changed));
+                if (index !== -1) {
+                    currentSecondaryData[index] = { ...currentSecondaryData[index], ...changed };
+                }
+            }
+
+            // Filter deleted records
+            const deletedRecords = batchChanges.deletedRecords || [];
+            if (deletedRecords.length > 0) {
+                currentSecondaryData = currentSecondaryData.filter(item =>
+                    !deletedRecords.some(deleted => matchRecord(item, deleted))
+                );
+            }
+
+            // Add new records
+            const addedRecords = batchChanges.addedRecords || [];
+            if (addedRecords.length > 0) {
+                currentSecondaryData = [...currentSecondaryData, ...addedRecords];
+            }
+
+            console.log('Final data for validation:', currentSecondaryData);
+
+            // Check if there are items
+            if (currentSecondaryData.length === 0) {
+                state.errors.gridItems.push('At least one item must be added to the order.');
+                isValid = false;
+            }
+
+            // Validate each item
+            for (let i = 0; i < currentSecondaryData.length; i++) {
+                const record = currentSecondaryData[i];
+
+                if (!record.productId) {
+                    state.errors.gridItems.push(`Row ${i + 1}: Product is required.`);
+                    isValid = false;
+                }
+
+                if (!record.taxId) {
+                    state.errors.gridItems.push(`Row ${i + 1}: Tax is required.`);
+                    isValid = false;
+                }
+
+                if (!record.quantity || record.quantity <= 0) {
+                    state.errors.gridItems.push(`Row ${i + 1}: Quantity must be greater than 0.`);
+                    isValid = false;
+                }
+
+                if (!record.unitPrice || record.unitPrice <= 0) {
+                    state.errors.gridItems.push(`Row ${i + 1}: Unit price must be greater than 0.`);
+                    isValid = false;
+                }
             }
 
             return isValid;
@@ -100,28 +178,80 @@
                     throw error;
                 }
             },
-            createMainData: async (orderDate, description, orderStatus, taxId, vendorId, createdById) => {
+            createMainData: async (orderDate, description, orderStatus, vendorId, beforeTaxAmount, taxAmount, afterTaxAmount, createdById, items = []) => {
                 try {
                     const locationId = StorageManager.getLocation();
-                    const response = await AxiosManager.post('/PurchaseOrder/CreatePurchaseOrder', {
-                        orderDate, description, orderStatus, taxId, vendorId, createdById, locationId
-                    });
+
+                    // Sanitize numbers: Remove commas and ensure numeric type
+                    const formatNumber = (numStr) => {
+                        if (typeof numStr === 'string') {
+                            return parseFloat(numStr.replace(/,/g, '')); // e.g., "420,000.00" -> 420000
+                        }
+                        return numStr;
+                    };
+
+                    const payload = {
+                        orderDate,  // Keep as ISO string
+                        description,
+                        orderStatus,  // Ensure this is passed (e.g., "Draft")
+                        vendorId,
+                        createdById,
+                        locationId,
+                        beforeTaxAmount: formatNumber(beforeTaxAmount),  // Add and format
+                        taxAmount: formatNumber(taxAmount),
+                        afterTaxAmount: formatNumber(afterTaxAmount),
+                        items  // Already good; ensure unitPrice etc. are numbers
+                    };
+
+                    console.log('Sanitized payload:', JSON.stringify(payload, null, 2));
+                    const response = await AxiosManager.post('/PurchaseOrder/CreatePurchaseOrder', payload);
                     return response;
                 } catch (error) {
+                    console.error('Frontend error:', error);
                     throw error;
                 }
             },
-            updateMainData: async (id, orderDate, description, orderStatus, taxId, vendorId, updatedById) => {
+            updateMainData: async (id, orderDate, description, orderStatus, vendorId, beforeTaxAmount, taxAmount, afterTaxAmount, updatedById, items = [], deletedItemIds = []) => {
                 try {
                     const locationId = StorageManager.getLocation();
-                    const response = await AxiosManager.post('/PurchaseOrder/UpdatePurchaseOrder', {
-                        id, orderDate, description, orderStatus, taxId, vendorId, updatedById, locationId
-                    });
+
+                    // Sanitize numbers: Remove commas and ensure numeric type
+                    const formatNumber = (numStr) => {
+                        if (typeof numStr === 'string') {
+                            return parseFloat(numStr.replace(/,/g, '')); // e.g., "420,000.00" -> 420000
+                        }
+                        return numStr;
+                    };
+                    // CRITICAL FIX: Extract just the IDs, not the whole object
+                    const flattenedDeletedIds = (deletedItemIds || [])
+                        .flat(Infinity)
+                        .map(item => typeof item === 'string' ? item : item?.Id)
+                        .filter(id => id && id !== null);
+
+                    const payload = {
+                        id,
+                        orderDate,  // Keep as ISO string
+                        description,
+                        orderStatus,  // Ensure this is passed (e.g., "Draft")
+                        vendorId,
+                        updatedById,
+                        locationId,
+                        beforeTaxAmount: formatNumber(beforeTaxAmount),  // Add and format
+                        taxAmount: formatNumber(taxAmount),
+                        afterTaxAmount: formatNumber(afterTaxAmount),
+                        items,  // Already good; ensure unitPrice etc. are numbers
+                        deletedItemIds: flattenedDeletedIds  // Just array of ID strings
+                    };
+                    console.log('Sanitized payload:', JSON.stringify(payload, null, 2));
+
+                    const response = await AxiosManager.post('/PurchaseOrder/UpdatePurchaseOrder', payload);
                     return response;
                 } catch (error) {
+                    console.error('Frontend error:', error);
                     throw error;
                 }
             },
+
             deleteMainData: async (id, deletedById) => {
                 try {
                     const locationId = StorageManager.getLocation();
@@ -222,6 +352,7 @@
             },
             populateMainData: async () => {
                 const response = await services.getMainData();
+                debugger;
                 state.mainData = response?.data?.content?.data.map(item => ({
                     ...item,
                     orderDate: item.orderDate ? new Date(item.orderDate).toISOString().split('T')[0] : '',
@@ -252,44 +383,209 @@
                     state.totalAmount = NumberFormatManager.formatToLocale(record.afterTaxAmount ?? 0);
                 }
             },
-            handleFormSubmit: async () => {
-                state.isSubmitting = true;
-                await new Promise(resolve => setTimeout(resolve, 200));
+            calculateTotals: async () => {
+                let subTotal = 0;
+                let taxTotal = 0;
+                let grandTotal = 0;
+                state.secondaryData.forEach(row => {
+                    const preTaxLine = (row.unitPrice || 0) * (row.quantity || 0);
+                    const taxLine = (row.taxAmount || 0) * (row.quantity || 0);
+                    subTotal += preTaxLine;
+                    taxTotal += taxLine;
+                    grandTotal += row.total || 0;  // Or compute as preTaxLine + taxLine for verification
+                });
 
-                if (!validateForm()) {
-                    state.isSubmitting = false;
-                    return;
+                state.subTotalAmount = NumberFormatManager.formatToLocale(subTotal ?? 0);
+                state.taxAmount = NumberFormatManager.formatToLocale(taxTotal ?? 0);
+                state.totalAmount = NumberFormatManager.formatToLocale(grandTotal ?? 0);
+            },
+            prepareSecondaryDataForSubmission: function () {
+                // Get batch changes from grid
+                const batchChanges = secondaryGrid.getBatchChanges();
+
+                console.log('Batch Changes:', batchChanges);
+
+                // Initialize with existing data if record exists, otherwise use changed records
+                let currentSecondaryData = state.id !== ""
+                    ? [...state.secondaryData]
+                    : [...(batchChanges.changedRecords || [])];
+
+                // Helper function to match records by ID or purchaseOrderItemId
+                const matchRecord = (a, b) => {
+                    if (a.purchaseOrderItemId && b.purchaseOrderItemId) {
+                        return a.purchaseOrderItemId === b.purchaseOrderItemId;
+                    }
+                    if (a.id && b.id) {
+                        return a.id === b.id;
+                    }
+                    return false;
+                };
+
+                // Apply changed records - merge updates with existing data
+                const changedRecords = batchChanges.changedRecords || [];
+                for (let changed of changedRecords) {
+                    const index = currentSecondaryData.findIndex(item =>
+                        matchRecord(item, changed)
+                    );
+
+                    if (index !== -1) {
+                        // Merge changed data with existing record, preserving important fields
+                        currentSecondaryData[index] = {
+                            ...currentSecondaryData[index],
+                            ...changed,
+                            // Ensure these critical fields are properly set
+                            unitPrice: changed.unitPrice ?? currentSecondaryData[index].unitPrice,
+                            quantity: changed.quantity ?? currentSecondaryData[index].quantity,
+                            taxId: changed.taxId ?? currentSecondaryData[index].taxId,
+                            taxAmount: changed.taxAmount ?? currentSecondaryData[index].taxAmount,
+                            totalAfterTax: changed.totalAfterTax ?? currentSecondaryData[index].totalAfterTax,
+                            total: changed.total ?? currentSecondaryData[index].total
+                        };
+                    }
                 }
 
-                try {
-                    const response = state.id === ''
-                        ? await services.createMainData(state.orderDate, state.description, state.orderStatus, state.taxId, state.vendorId, StorageManager.getUserId())
-                        : state.deleteMode
-                            ? await services.deleteMainData(state.id, StorageManager.getUserId())
-                            : await services.updateMainData(state.id, state.orderDate, state.description, state.orderStatus, state.taxId, state.vendorId, StorageManager.getUserId());
+                // Remove deleted items from the data array - FLATTEN IF NESTED
+                let deletedRecords = batchChanges.deletedRecords || [];
+                deletedRecords = deletedRecords.flat(Infinity);  // ADD THIS LINE
 
+                // Add newly created records
+                const addedRecords = batchChanges.addedRecords || [];
+                if (addedRecords.length > 0) {
+                    currentSecondaryData = [...currentSecondaryData, ...addedRecords];
+                }
+
+                // Validate and filter final items
+                const validItems = currentSecondaryData.filter(item => {
+                    // Check required fields
+                    if (!item.productId || item.productId === undefined) return false;
+                    if (item.quantity === undefined || item.quantity === null || item.quantity <= 0) return false;
+                    if (item.unitPrice === undefined || item.unitPrice === null) return false;
+
+                    
+                    return true;
+                });
+
+                console.log('Valid Items for submission:', validItems);
+                console.log('Deleted Items:', deletedRecords);
+
+                return {
+                    validItems,
+                    deletedRecords,
+                    summary: {
+                        total: validItems.length,
+                        added: addedRecords.length,
+                        changed: changedRecords.length,
+                        deleted: deletedRecords.length
+                    }
+                };
+            },
+
+            handleFormSubmit: async () => {
+                try {
+                    state.isSubmitting = true;
+                    await new Promise(resolve => setTimeout(resolve, 300));
+
+                    if (!validateForm()) {
+                        return;
+                    }
+
+                    let response;
+                    const userId = StorageManager.getUserId();
+                    const { validItems, deletedRecords } = methods.prepareSecondaryDataForSubmission();
+
+                    debugger
+                    if (state.id === '') {
+                        // Create DTO for items
+                        const itemsDto = validItems.map(item => ({
+                            productId: item.productId,
+                            unitPrice: item.unitPrice,
+                            quantity: item.quantity,
+                            taxId: item.taxId,
+                            taxAmount: item.taxAmount,
+                            totalAfterTax: item.totalAfterTax,
+                            total: item.total,
+                            summary:item.summary
+                        }));
+
+                        // Call API with all fields
+                        const response = await services.createMainData(
+                            state.orderDate,
+                            state.description,
+                            state.orderStatus,
+                            state.vendorId,
+                            state.subTotalAmount,     // BeforeTaxAmount
+                            state.taxAmount,    // TaxAmount
+                            state.totalAmount,  // AfterTaxAmount
+                            userId,             // CreatedById
+                            itemsDto            // Items
+                        );
+
+                        if (response.data.code === 200) {
+                            state.id = response?.data?.content?.data.id ?? '';
+                            state.number = response?.data?.content?.data.number ?? '';
+                        }
+                    }
+                     else if (state.deleteMode) {
+                        // **DELETE GOODS RECEIPT**
+                        response = await services.deleteMainData(state.id, userId);
+                    } else {
+                        const DeleteditemsDto = (deletedRecords || [])
+                            .flat(Infinity)  // First: flatten to [{id: "123"}]
+                            .map(item => ({   // Then: map over flattened array
+                                Id: item?.id ?? null
+                            }));
+
+                        // **UPDATE EXISTING GOODS RECEIPT WITH ITEMS IN ONE REQUEST**
+                        const itemsDto = validItems.map(item => ({
+                            Id: item.id || null,  // Include ID for updates/deletes
+                            productId: item.productId,
+                            unitPrice: item.unitPrice,
+                            quantity: item.quantity,
+                            taxId: item.taxId,
+                            taxAmount: item.taxAmount,
+                            totalAfterTax: item.totalAfterTax,
+                            total: item.total,
+                            summary:item.summary
+                        }));
+
+                        // Filter out deleted items (zero quantity or explicitly marked; assume prepareSecondaryDataForSubmission handles this)
+                        const filteredItemsDto = itemsDto.filter(item => item.quantity > 0);
+
+                        response = await services.updateMainData(
+                            state.id,
+                            state.orderDate,
+                            state.description,
+                            state.orderStatus,
+                            state.vendorId,
+                            state.subTotalAmount,     // BeforeTaxAmount
+                            state.taxAmount,    // TaxAmount
+                            state.totalAmount,  // AfterTaxAmount
+                            userId,             // CreatedById
+                            filteredItemsDto,            // Items
+                            DeleteditemsDto
+                        );
+
+                        if (response.data.code === 200) {
+                            // No need for separate secondary calls; all handled in single request
+                        }
+                    }
+
+                    // **HANDLE RESPONSE**
                     if (response.data.code === 200) {
                         await methods.populateMainData();
                         mainGrid.refresh();
 
                         if (!state.deleteMode) {
-                            state.mainTitle = 'Edit Purchase Order';
-                            state.id = response?.data?.content?.data.id ?? '';
-                            state.number = response?.data?.content?.data.number ?? '';
-                            state.orderDate = response?.data?.content?.data.orderDate ? new Date(response.data.content.data.orderDate) : null;
-                            state.description = response?.data?.content?.data.description ?? '';
-                            state.vendorId = response?.data?.content?.data.vendorId ?? '';
-                            state.taxId = response?.data?.content?.data.taxId ?? '';
-                            taxListLookup.trackingChange = true;
-                            state.orderStatus = String(response?.data?.content?.data.orderStatusName ?? '');
+                            // Refresh secondary data after successful save
+                            await methods.populateSecondaryData();
+                            secondaryGrid.refresh();
+
+                            state.mainTitle = 'Edit Goods Receive';
                             state.showComplexDiv = true;
-
-                            await methods.refreshPaymentSummary(state.id);
-
                             Swal.fire({
                                 icon: 'success',
                                 title: 'Save Successful',
-                                timer: 1000,
+                                timer: 2000,
                                 showConfirmButton: false
                             });
                         } else {
@@ -305,7 +601,6 @@
                                 resetFormState();
                             }, 2000);
                         }
-
                     } else {
                         Swal.fire({
                             icon: 'error',
@@ -315,6 +610,7 @@
                         });
                     }
                 } catch (error) {
+                    console.error('Submit error:', error);
                     Swal.fire({
                         icon: 'error',
                         title: 'An Error Occurred',
@@ -323,7 +619,7 @@
                     });
                 } finally {
                     state.isSubmitting = false;
-                }
+                }                
             },
             onMainModalHidden: () => {
                 state.errors.orderDate = '';
@@ -517,7 +813,9 @@
                         },
                         { field: 'vendorName', headerText: 'Vendor', width: 200, minWidth: 200 },
                         { field: 'orderStatusName', headerText: 'Status', width: 150, minWidth: 150 },
-                        { field: 'taxName', headerText: 'Tax', width: 150, minWidth: 150 },
+                        { field: 'beforeTaxAmount', headerText: 'Before Tax Total Amount', width: 150, minWidth: 150, format: 'N2' },
+                        { field: 'taxAmount', headerText: 'Tax Amount', width: 150, minWidth: 150, format: 'N2' },
+
                         { field: 'afterTaxAmount', headerText: 'Total Amount', width: 150, minWidth: 150, format: 'N2' },
 
                         {
@@ -579,7 +877,7 @@
                             resetFormState();
                             state.secondaryData = [];
                             secondaryGrid.refresh();
-                            state.showComplexDiv = false;
+                            state.showComplexDiv = true;
                             mainModal.obj.show();
                         }
 
@@ -644,6 +942,12 @@
 
         const secondaryGrid = {
             obj: null,
+            manualBatchChanges: {
+                addedRecords: [],
+                changedRecords: [],
+                deletedRecords: []
+            },
+
             create: async (dataSource) => {
                 secondaryGrid.obj = new ej.grids.Grid({
                     height: 400,
@@ -748,12 +1052,130 @@
                                                 const total = e.value * quantityObj.value;
                                                 totalObj.value = total;
                                             }
+                                            const taxPercent = taxObj?.value
+                                                ? (state.taxListLookupData.find(t => t.id === taxObj.value)?.percentage || 0)
+                                                : 0;
+                                            const unitPrice = e.value ?? 0;  // Keep your existing reference
+                                            const quantity = quantityObj?.value ?? 1;  // Fallback to 1 if unset, as in product change
+
+                                            let taxAmount;
+                                            let totalAfterTax;
+                                            if (taxPercent === 0) {
+                                                // Explicit zero-tax calculation: No tax applied
+                                                taxAmount = 0;
+                                                totalAfterTax = unitPrice;
+                                            } else {
+                                                // Original non-zero tax calculation
+                                                taxAmount = (unitPrice * taxPercent) / 100;
+                                                totalAfterTax = unitPrice + taxAmount;
+                                            }
+                                            const total = totalAfterTax * quantity;
+
+                                            args.rowData.taxId = e.value;
+                                            args.rowData.taxAmount = taxAmount;
+                                            args.rowData.totalAfterTax = totalAfterTax;
+                                            args.rowData.total = total;
+
+                                            if (taxAmountObj) taxAmountObj.value = taxAmount;
+                                            if (totalAfterTaxObj) totalAfterTaxObj.value = totalAfterTax;
+                                            if (totalObj) totalObj.value = total;
                                         }
                                     });
                                     priceObj.appendTo(args.element);
                                 }
                             }
                         },
+                        {
+                            field: 'taxId',
+                            headerText: 'Tax',
+                            width: 160,
+                            editType: 'dropdownedit',
+                            valueAccessor: (field, data) => {
+                                const tax = state.taxListLookupData.find(item => item.id === data[field]);
+                                return tax ? `${tax.name} (${tax.percentage}%)` : '';
+                            },
+                            edit: {
+                                create: () => document.createElement('input'),
+                                read: () => taxObj.value,
+                                destroy: () => taxObj.destroy(),
+                                write: (args) => {
+                                    taxObj = new ej.dropdowns.DropDownList({
+                                        dataSource: state.taxListLookupData,
+                                        fields: { value: 'id', text: 'name' },
+                                        value: args.rowData.taxId,
+                                        placeholder: 'Select Tax',
+                                        change: (e) => {
+                                            const selectedTax = state.taxListLookupData.find(t => t.id === e.value);
+                                            const unitPrice = priceObj?.value ?? 0;  // Keep your existing reference
+                                            const taxPercent = selectedTax?.percentage ?? 0;
+                                            const quantity = quantityObj?.value ?? 1;  // Fallback to 1 if unset, as in product change
+
+                                            let taxAmount;
+                                            let totalAfterTax;
+                                            if (taxPercent === 0) {
+                                                // Explicit zero-tax calculation: No tax applied
+                                                taxAmount = 0;
+                                                totalAfterTax = unitPrice;
+                                            } else {
+                                                // Original non-zero tax calculation
+                                                taxAmount = (unitPrice * taxPercent) / 100;
+                                                totalAfterTax = unitPrice + taxAmount;
+                                            }
+                                            const total = totalAfterTax * quantity;
+
+                                            args.rowData.taxId = e.value;
+                                            args.rowData.taxAmount = taxAmount;
+                                            args.rowData.totalAfterTax = totalAfterTax;
+                                            args.rowData.total = total;
+
+                                            if (taxAmountObj) taxAmountObj.value = taxAmount;
+                                            if (totalAfterTaxObj) totalAfterTaxObj.value = totalAfterTax;
+                                            if (totalObj) totalObj.value = total;
+                                        }
+                                    });
+                                    taxObj.appendTo(args.element);
+                                }
+                            }
+                        },
+                        {
+                            field: 'taxAmount',
+                            headerText: 'Tax Amount',
+                            width: 150,
+                            type: 'number', format: 'N2', textAlign: 'Right',
+                            allowEditing: false,
+                            edit: {
+                                create: () => document.createElement('input'),
+                                read: () => taxAmountObj.value,
+                                destroy: () => taxAmountObj.destroy(),
+                                write: (args) => {
+                                    taxAmountObj = new ej.inputs.NumericTextBox({
+                                        value: args.rowData.taxAmount ?? 0,
+                                        readonly: true
+                                    });
+                                    taxAmountObj.appendTo(args.element);
+                                }
+                            }
+                        },
+                        {
+                            field: 'totalAfterTax',
+                            headerText: 'Unit Price After Tax',
+                            width: 180,
+                            type: 'number', format: 'N2', textAlign: 'Right',
+                            allowEditing: false,
+                            edit: {
+                                create: () => document.createElement('input'),
+                                read: () => totalAfterTaxObj.value,
+                                destroy: () => totalAfterTaxObj.destroy(),
+                                write: (args) => {
+                                    totalAfterTaxObj = new ej.inputs.NumericTextBox({
+                                        value: args.rowData.totalAfterTax ?? 0,
+                                        readonly: true
+                                    });
+                                    totalAfterTaxObj.appendTo(args.element);
+                                }
+                            }
+                        },
+
                         {
                             field: 'quantity',
                             headerText: 'Quantity',
@@ -781,7 +1203,24 @@
                                         value: args.rowData.quantity ?? 0,
                                         change: (e) => {
                                             if (priceObj && totalObj) {
-                                                const total = e.value * priceObj.value;
+                                                const unitPrice = priceObj.value || 0;
+                                                const quantity = e.value || 0;
+
+                                                const taxPercent = taxObj?.value
+                                                    ? (state.taxListLookupData.find(t => t.id === taxObj.value)?.percentage || 0)
+                                                    : 0;
+                                                let taxAmount;
+                                                let totalAfterTax;
+                                                if (taxPercent === 0) {
+                                                    // Explicit zero-tax calculation: No tax applied
+                                                    taxAmount = 0;
+                                                    totalAfterTax = unitPrice;
+                                                } else {
+                                                    // Original non-zero tax calculation
+                                                    taxAmount = (unitPrice * taxPercent) / 100;
+                                                    totalAfterTax = unitPrice + taxAmount;
+                                                }
+                                                const total = totalAfterTax * quantity;
                                                 totalObj.value = total;
                                             }
                                         }
@@ -894,62 +1333,55 @@
                         }
                     },
                     actionComplete: async (args) => {
+                        const purchaseOrderId = state.id;
+                        const userId = StorageManager.getUserId();
+
+                        // Track changes manually
                         if (args.requestType === 'save' && args.action === 'add') {
-                            const purchaseOrderId = state.id;
-                            const userId = StorageManager.getUserId();
-                            const data = args.data;
-
-                            await services.createSecondaryData(data?.unitPrice, data?.quantity, data?.summary, data?.productId, purchaseOrderId, userId);
-                            await methods.populateSecondaryData(purchaseOrderId);
-                            secondaryGrid.refresh();
-
-                            Swal.fire({
-                                icon: 'success',
-                                title: 'Save Successful',
-                                timer: 2000,
-                                showConfirmButton: false
-                            });
+                            // Track added record
+                            secondaryGrid.manualBatchChanges.addedRecords.push(args.data);
+                            console.log('Added Record:', args.data);
                         }
+
                         if (args.requestType === 'save' && args.action === 'edit') {
-                            const purchaseOrderId = state.id;
-                            const userId = StorageManager.getUserId();
-                            const data = args.data;
-
-                            await services.updateSecondaryData(data?.id, data?.unitPrice, data?.quantity, data?.summary, data?.productId, purchaseOrderId, userId);
-                            await methods.populateSecondaryData(purchaseOrderId);
-                            secondaryGrid.refresh();
-
-                            Swal.fire({
-                                icon: 'success',
-                                title: 'Save Successful',
-                                timer: 2000,
-                                showConfirmButton: false
-                            });
+                            // Track changed record
+                            const index = secondaryGrid.manualBatchChanges.changedRecords.findIndex(
+                                r => r.id === args.data?.id
+                            );
+                            if (index > -1) {
+                                secondaryGrid.manualBatchChanges.changedRecords[index] = args.data;
+                            } else {
+                                secondaryGrid.manualBatchChanges.changedRecords.push(args.data);
+                            }
+                            console.log('Changed Record:', args.data);
                         }
+
                         if (args.requestType === 'delete') {
-                            const purchaseOrderId = state.id;
-                            const userId = StorageManager.getUserId();
-                            const data = args.data[0];
-
-                            await services.deleteSecondaryData(data?.id, userId);
-                            await methods.populateSecondaryData(purchaseOrderId);
-                            secondaryGrid.refresh();
-
-                            Swal.fire({
-                                icon: 'success',
-                                title: 'Delete Successful',
-                                timer: 2000,
-                                showConfirmButton: false
-                            });
+                            // Track deleted record
+                            secondaryGrid.manualBatchChanges.deletedRecords.push(args.data);
+                            console.log('Deleted Record:', args.data);
                         }
 
-                        await methods.populateMainData();
-                        mainGrid.refresh();
-                        await methods.refreshPaymentSummary(state.id);
-                    }
+
+                        methods.calculateTotals()  // Add this line
+
+                           }
+
                 });
                 secondaryGrid.obj.appendTo(secondaryGridRef.value);
             },
+            getBatchChanges: () => {
+                return secondaryGrid.manualBatchChanges;
+            },
+            // Add method to clear batch changes after submission
+            clearBatchChanges: () => {
+                secondaryGrid.manualBatchChanges = {
+                    addedRecords: [],
+                    changedRecords: [],
+                    deletedRecords: []
+                };
+            },
+
             refresh: () => {
                 secondaryGrid.obj.setProperties({ dataSource: state.secondaryData });
             }

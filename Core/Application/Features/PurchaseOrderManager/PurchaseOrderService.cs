@@ -22,32 +22,31 @@ public class PurchaseOrderService
         _unitOfWork = unitOfWork;
     }
 
-    public void Recalculate(string purchaseOrderId)
-    {
-        var purchaseOrder = _purchaseOrderRepository
-            .GetQuery()
-            .ApplyIsDeletedFilter()
-            .Where(x => x.Id == purchaseOrderId)
-            .Include(x => x.Tax)
-            .SingleOrDefault();
+    //public void Recalculate(string purchaseOrderId)
+    //{
+    //    var purchaseOrder = _purchaseOrderRepository
+    //        .GetQuery()
+    //        .ApplyIsDeletedFilter()
+    //        .Where(x => x.Id == purchaseOrderId)
+    //        .SingleOrDefault();
 
-        if (purchaseOrder == null)
-            return;
+    //    if (purchaseOrder == null)
+    //        return;
 
-        var purchaseOrderItems = _purchaseOrderItemRepository
-            .GetQuery()
-            .ApplyIsDeletedFilter()
-            .Where(x => x.PurchaseOrderId == purchaseOrderId)
-            .ToList();
+    //    var purchaseOrderItems = _purchaseOrderItemRepository
+    //        .GetQuery()
+    //        .ApplyIsDeletedFilter()
+    //        .Where(x => x.PurchaseOrderId == purchaseOrderId)
+    //        .ToList();
 
-        purchaseOrder.BeforeTaxAmount = purchaseOrderItems.Sum(x => x.Total ?? 0);
+    //    purchaseOrder.BeforeTaxAmount = purchaseOrderItems.Sum(x => x.Total ?? 0);
 
-        var taxPercentage = purchaseOrder.Tax?.Percentage ?? 0;
-        purchaseOrder.TaxAmount = (purchaseOrder.BeforeTaxAmount ?? 0) * taxPercentage / 100;
+    //    var taxPercentage = purchaseOrder.Tax?.Percentage ?? 0;
+    //    purchaseOrder.TaxAmount = (purchaseOrder.BeforeTaxAmount ?? 0) * taxPercentage / 100;
 
-        purchaseOrder.AfterTaxAmount = (purchaseOrder.BeforeTaxAmount ?? 0) + (purchaseOrder.TaxAmount ?? 0);
+    //    purchaseOrder.AfterTaxAmount = (purchaseOrder.BeforeTaxAmount ?? 0) + (purchaseOrder.TaxAmount ?? 0);
 
-        _purchaseOrderRepository.Update(purchaseOrder);
-        _unitOfWork.Save();
-    }
+    //    _purchaseOrderRepository.Update(purchaseOrder);
+    //    _unitOfWork.Save();
+    //}
 }

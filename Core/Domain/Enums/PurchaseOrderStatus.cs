@@ -11,7 +11,7 @@ using System.ComponentModel;
         [Description("Cancelled")]
         Cancelled = 1,
         [Description("Approved")]
-        Confirmed = 2,
+        Approved = 2,
         
     }
 

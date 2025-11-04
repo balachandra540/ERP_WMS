@@ -56,8 +56,6 @@ namespace Application.Features.PurchaseOrderManager.Queries
             CreateMap<PurchaseOrder, GetPurchaseOrderListDto>()
                 .ForMember(dest => dest.VendorName,
                     opt => opt.MapFrom(src => src.Vendor != null ? src.Vendor.Name : string.Empty))
-                .ForMember(dest => dest.TaxName,
-                    opt => opt.MapFrom(src => src.Tax != null ? src.Tax.Name : string.Empty))
                 .ForMember(dest => dest.OrderStatusName,
                     opt => opt.MapFrom(src =>
                         src.OrderStatus.HasValue
@@ -103,7 +101,7 @@ namespace Application.Features.PurchaseOrderManager.Queries
         {
             var allowedStatuses = new[]
             {
-                PurchaseOrderStatus.Confirmed,
+                PurchaseOrderStatus.Approved,
                 PurchaseOrderStatus.Pending,
                 PurchaseOrderStatus.Cancelled
             };
@@ -123,8 +121,7 @@ namespace Application.Features.PurchaseOrderManager.Queries
             query = query
                 .Include(x => x.PurchaseOrderItemList)
                     .ThenInclude(i => i.Product)
-                .Include(x => x.Vendor)
-                .Include(x => x.Tax);
+                .Include(x => x.Vendor);
 
             var entities = await query.ToListAsync(cancellationToken);
             var dtos = _mapper.Map<List<GetPurchaseOrderListDto>>(entities);
@@ -165,7 +162,7 @@ namespace Application.Features.PurchaseOrderManager.Queries
         {
             var allowedStatuses = new[]
             {
-            PurchaseOrderStatus.Confirmed
+            PurchaseOrderStatus.Approved
         };
 
             // Step 1: Load purchase orders with items, vendor, tax
@@ -174,7 +171,6 @@ namespace Application.Features.PurchaseOrderManager.Queries
                 .ApplyIsDeletedFilter(request.IsDeleted)
                 .Where(x => x.OrderStatus.HasValue && allowedStatuses.Contains(x.OrderStatus.Value))
                 .Include(x => x.Vendor)
-                .Include(x => x.Tax)
                 .Include(x => x.PurchaseOrderItemList);
 
             var entities = await query.ToListAsync(cancellationToken);
@@ -226,7 +222,7 @@ namespace Application.Features.PurchaseOrderManager.Queries
         {
             var allowedStatuses = new[]
             {
-        PurchaseOrderStatus.Confirmed
+        PurchaseOrderStatus.Approved
     };
 
             var query = _context.PurchaseOrder
@@ -247,8 +243,7 @@ namespace Application.Features.PurchaseOrderManager.Queries
                     .Where(x => x.Id == request.PurchaseOrderId)
                     .Include(x => x.PurchaseOrderItemList)
                         .ThenInclude(i => i.Product)
-                    .Include(x => x.Vendor)
-                    .Include(x => x.Tax);
+                    .Include(x => x.Vendor);
             }
 
             var entities = await query.ToListAsync(cancellationToken);

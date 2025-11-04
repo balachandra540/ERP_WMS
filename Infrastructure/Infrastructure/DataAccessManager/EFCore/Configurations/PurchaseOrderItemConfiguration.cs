@@ -22,6 +22,25 @@ public class PurchaseOrderItemConfiguration : BaseEntityConfiguration<PurchaseOr
                    .HasColumnType("double precision")
                    .IsRequired()
                    .HasDefaultValue(0.0);
+        // ✅ Add new tax-related properties
+        builder.Property(x => x.TaxId)
+            .HasMaxLength(IdConsts.MaxLength)
+            .IsRequired(false);
+
+        builder.Property(x => x.TaxAmount)
+            .HasColumnType("double precision")
+            .IsRequired(false);
+
+        builder.Property(x => x.TotalAfterTax)
+            .HasColumnType("double precision")
+            .IsRequired(false);
+
+        // ✅ Define foreign key relationship for Tax
+        builder.HasOne(x => x.Tax)
+            .WithMany()
+            .HasForeignKey(x => x.TaxId)
+            .OnDelete(DeleteBehavior.NoAction);
+
     }
 }
 

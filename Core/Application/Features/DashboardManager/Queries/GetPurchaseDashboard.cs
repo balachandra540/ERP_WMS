@@ -41,7 +41,7 @@ public class GetPurchaseDashboardHandler : IRequestHandler<GetPurchaseDashboardR
             .ApplyIsDeletedFilter(false)
             .Include(x => x.PurchaseOrder)
             .Include(x => x.Product)
-            .Where(x => x.PurchaseOrder!.OrderStatus == PurchaseOrderStatus.Confirmed)
+            .Where(x => x.PurchaseOrder!.OrderStatus == PurchaseOrderStatus.Approved)
             .OrderByDescending(x => x.PurchaseOrder!.OrderDate)
             .Take(30)
             .ToListAsync(cancellationToken);

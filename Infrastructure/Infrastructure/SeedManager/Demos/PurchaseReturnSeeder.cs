@@ -43,7 +43,7 @@ public class PurchaseReturnSeeder
 
         var goodsReceives = await _goodsReceiveRepository
             .GetQuery()
-            .Where(x => x.Status >= GoodsReceiveStatus.Confirmed)
+            .Where(x => x.Status >= GoodsReceiveStatus.Approved)
             .ToListAsync();
 
         var warehouses = await _warehouseRepository

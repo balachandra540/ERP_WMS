@@ -47,13 +47,6 @@
                                                 <label class="text-danger">{{ state.errors.vendorId }}</label>
                                             </div>
                                             <div class="col-md-6">
-                                                <label for="TaxId">Tax</label>
-                                                <div ref="taxIdRef"></div>
-                                                <label class="text-danger">{{ state.errors.taxId }}</label>
-                                            </div>
-                                        </div>
-                                        <div class="row mb-2">
-                                            <div class="col-md-6">
                                                 <label for="OrderStatus">Order Status</label>
                                                 <div ref="orderStatusRef"></div>
                                                 <label class="text-danger">{{ state.errors.orderStatus }}</label>
@@ -100,7 +93,7 @@
                                         <div class="row justify-content-end">
                                             <div class="col-md-6">
                                                 <div class="d-flex justify-content-between py-2 border-bottom">
-                                                    <span class="fw-bold">Subtotal</span>
+                                                    <span class="fw-bold">Before Tax Amount</span>
                                                     <span id="SubTotalAmount">{{ state.subTotalAmount }}</span>
                                                 </div>
                                                 <div class="d-flex justify-content-between py-2 border-bottom">
