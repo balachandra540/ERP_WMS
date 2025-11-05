@@ -5,6 +5,7 @@
             deleteMode: false,
             productGroupListLookupData: [],
             unitMeasureListLookupData: [],
+            taxListLookupData: [],
             mainTitle: null,
             id: '',
             name: '',
@@ -14,6 +15,7 @@
             productGroupId: null,
             unitMeasureId: null,
             physical: false,
+            taxId: null,
             location: '', // 👈 add this
             errors: {
                 name: '',
@@ -31,6 +33,7 @@
         const nameRef = Vue.ref(null);
         const numberRef = Vue.ref(null);
         const unitPriceRef = Vue.ref(null);
+        const taxIdRef = Vue.ref(null);
 
         const validateForm = function () {
             state.errors.name = '';
@@ -59,7 +62,10 @@
                 state.errors.unitMeasureId = 'UnitMeasure is required.';
                 isValid = false;
             }
-
+            if (!state.taxId) {
+                state.errors.taxId = 'Tax is required.';
+                isValid = false;
+            }
             return isValid;
         };
 
@@ -72,9 +78,11 @@
             state.productGroupId = null;
             state.unitMeasureId = null;
             state.physical = false;
+            state.taxId = null;
             state.errors = {
                 name: '',
                 unitPrice: '',
+                taxId: '',
                 productGroupId: '',
                 unitMeasureId: ''
             };
@@ -91,20 +99,20 @@
                     throw error;
                 }
             },
-            createMainData: async (name, unitPrice, physical, description, productGroupId, unitMeasureId, createdById, warehouseId) => {
+            createMainData: async (name, unitPrice, physical, description, productGroupId, unitMeasureId, createdById, warehouseId, taxId) => {
                 try {
                     const response = await AxiosManager.post('/Product/CreateProduct', {
-                        name, unitPrice, physical, description, productGroupId, unitMeasureId, createdById, warehouseId
+                        name, unitPrice, physical, description, productGroupId, unitMeasureId, createdById, warehouseId, taxId
                     });
                     return response;
                 } catch (error) {
                     throw error;
                 }
             },
-            updateMainData: async (id, name, unitPrice, physical, description, productGroupId, unitMeasureId, updatedById, warehouseId) => {
+            updateMainData: async (id, name, unitPrice, physical, description, productGroupId, unitMeasureId, updatedById, warehouseId, taxId) => {  // 👈 Add taxId param
                 try {
                     const response = await AxiosManager.post('/Product/UpdateProduct', {
-                        id, name, unitPrice, physical, description, productGroupId, unitMeasureId, updatedById, warehouseId
+                        id, name, unitPrice, physical, description, productGroupId, unitMeasureId, updatedById, warehouseId, taxId  // 👈 Include in payload
                     });
                     return response;
                 } catch (error) {
@@ -137,6 +145,14 @@
                     throw error;
                 }
             },
+            getTaxListLookupData: async () => {
+                try {
+                    const response = await AxiosManager.get('/Tax/GetTaxList', {});
+                    return response;
+                } catch (error) {
+                    throw error;
+                }
+            },
         };
 
         const methods = {
@@ -147,6 +163,10 @@
             populateUnitMeasureListLookupData: async () => {
                 const response = await services.getUnitMeasureListLookupData();
                 state.unitMeasureListLookupData = response?.data?.content?.data;
+            },
+            populateTaxListLookupData: async () => {
+                const response = await services.getTaxListLookupData();
+                state.taxListLookupData = response?.data?.content?.data;
             },
             populateMainData: async () => {
                 const response = await services.getMainData();
@@ -205,6 +225,31 @@
                     unitMeasureListLookup.obj.value = state.unitMeasureId;
                 }
             },
+        };
+        const taxListLookup = {
+            obj: null,
+            trackingChange: false,
+            create: () => {
+                if (state.taxListLookupData && Array.isArray(state.taxListLookupData)) {
+                    taxListLookup.obj = new ej.dropdowns.DropDownList({
+                        dataSource: state.taxListLookupData,
+                        fields: { value: 'id', text: 'name' },
+                        placeholder: 'Select a Tax',
+                        change: async (e) => {
+                            state.taxId = e.value;
+                            if (e.isInteracted && taxListLookup.trackingChange) {
+                                await methods.handleFormSubmit();
+                            }
+                        }
+                    });
+                    taxListLookup.obj.appendTo(taxIdRef.value);
+                }
+            },
+            refresh: () => {
+                if (taxListLookup.obj) {
+                    taxListLookup.obj.value = state.taxId;
+                }
+            }
         };
 
         const nameText = {
@@ -307,9 +352,9 @@
                     }
 
                     const response = state.id === ''
-                        ? await services.createMainData(state.name, state.unitPrice, state.physical, state.description, state.productGroupId, state.unitMeasureId, StorageManager.getUserId(), state.location) : state.deleteMode
+                        ? await services.createMainData(state.name, state.unitPrice, state.physical, state.description, state.productGroupId, state.unitMeasureId, StorageManager.getUserId(), state.location,state.taxId) : state.deleteMode
                             ? await services.deleteMainData(state.id, StorageManager.getUserId())
-                            : await services.updateMainData(state.id, state.name, state.unitPrice, state.physical, state.description, state.productGroupId, state.unitMeasureId, StorageManager.getUserId(), state.location);
+                            : await services.updateMainData(state.id, state.name, state.unitPrice, state.physical, state.description, state.productGroupId, state.unitMeasureId, StorageManager.getUserId(), state.location,state.taxId);
 
                     if (response.data.code === 200) {
                         await methods.populateMainData();
@@ -325,6 +370,7 @@
                             state.productGroupId = response?.data?.content?.data.productGroupId ?? '';
                             state.unitMeasureId = response?.data?.content?.data.unitMeasureId ?? '';
                             state.physical = response?.data?.content?.data.physical ?? false;
+                            state.taxId = response?.data?.content?.data.taxId ?? '';
 
                             Swal.fire({
                                 icon: 'success',
@@ -389,11 +435,13 @@
                 productGroupListLookup.create();
                 await methods.populateUnitMeasureListLookupData();
                 unitMeasureListLookup.create();
+                await methods.populateTaxListLookupData();
+                taxListLookup.create();
 
                 nameText.create();
                 numberText.create();
                 unitPriceNumber.create();
-
+               
                 mainModal.create();
                 mainModalRef.value?.addEventListener('hidden.bs.modal', () => {
                     resetFormState();
@@ -441,9 +489,10 @@
                         },
                         { field: 'number', headerText: 'Number', width: 200, minWidth: 200 },
                         { field: 'name', headerText: 'Name', width: 200, minWidth: 200 },
-                        { field: 'productGroupName', headerText: 'Product Group', width: 150, minWidth: 150 },
-                        { field: 'unitPrice', headerText: 'Unit Price', width: 150, minWidth: 150, format: 'N2' },
-                        { field: 'unitMeasureName', headerText: 'Unit Measure', width: 150, minWidth: 150 },
+                        { field: 'productGroupName', headerText: 'Product Group', width: 100, minWidth: 150 },
+                        { field: 'unitPrice', headerText: 'Unit Price', width: 100, minWidth: 150, format: 'N2' },
+                        { field: 'unitMeasureName', headerText: 'Unit Measure', width: 100, minWidth: 150 },
+                        { field: 'taxName', headerText: 'Tax', width: 150, minWidth: 100 },
                         { field: 'physical', headerText: 'Physical Product', width: 200, minWidth: 200, textAlign: 'Center', type: 'boolean', displayAsCheckBox: true },
                         { field: 'createdAtUtc', headerText: 'Created At UTC', width: 150, format: 'yyyy-MM-dd HH:mm' }
                     ],
@@ -555,6 +604,7 @@
             unitPriceRef,
             state,
             handler,
+            taxIdRef  // 👈 Add this line
         };
     }
 };

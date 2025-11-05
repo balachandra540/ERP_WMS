@@ -21,6 +21,8 @@ public class UpdateProductRequest : IRequest<UpdateProductResult>
     public string? ProductGroupId { get; init; }
     public string? WarehouseId { get; init; }  // added
     public string? UpdatedById { get; init; }
+    public string? TaxId { get; set; }
+
 }
 
 public class UpdateProductValidator : AbstractValidator<UpdateProductRequest>
@@ -33,6 +35,8 @@ public class UpdateProductValidator : AbstractValidator<UpdateProductRequest>
         RuleFor(x => x.Physical).NotEmpty();
         RuleFor(x => x.UnitMeasureId).NotEmpty();
         RuleFor(x => x.ProductGroupId).NotEmpty();
+        RuleFor(x => x.TaxId).NotEmpty();
+
     }
 }
 
@@ -69,7 +73,7 @@ public class UpdateProductHandler : IRequestHandler<UpdateProductRequest, Update
         entity.UnitMeasureId = request.UnitMeasureId;
         entity.ProductGroupId = request.ProductGroupId;
         entity.WarehouseId = request.WarehouseId; // updated
-
+        entity.TaxId = request.TaxId;
         _repository.Update(entity);
         await _unitOfWork.SaveAsync(cancellationToken);
 

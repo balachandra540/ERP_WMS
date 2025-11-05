@@ -579,7 +579,6 @@
                             // Refresh secondary data after successful save
                             await methods.populateSecondaryData();
                             secondaryGrid.refresh();
-
                             state.mainTitle = 'Edit Goods Receive';
                             state.showComplexDiv = true;
                             Swal.fire({
@@ -618,6 +617,7 @@
                         confirmButtonText: 'OK'
                     });
                 } finally {
+                    secondaryGrid.clearBatchChanges();
                     state.isSubmitting = false;
                 }                
             },
@@ -1012,6 +1012,9 @@
                                                 }
                                                 if (summaryObj) {
                                                     summaryObj.value = selectedProduct.description;
+                                                }
+                                                if (taxObj) {
+                                                    taxObj.value = selectedProduct.taxId;
                                                 }
                                                 if (quantityObj) {
                                                     quantityObj.value = 1;
