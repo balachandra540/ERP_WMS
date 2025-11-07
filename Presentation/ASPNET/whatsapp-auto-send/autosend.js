@@ -14,6 +14,14 @@ function autoClickSend() {
     if (sendButton) {
         console.log("✅ Send button found, clicking now...");
         sendButton.click();
+
+
+        // Wait a little for WhatsApp to process the message before closing
+        setTimeout(() => {
+            console.log("🕒 Message sent, requesting tab close...");
+            chrome.runtime.sendMessage({ action: "closeThisTab" });
+        }, 3000);
+
     } else {
         console.log("⏳ Send button not yet visible, retrying...");
         setTimeout(autoClickSend, 1000);
