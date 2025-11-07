@@ -1,0 +1,14 @@
+{
+  "manifest_version": 3,
+  "name": "WhatsApp Auto Send",
+  "version": "1.0",
+  "description": "Automatically clicks the Send button when a WhatsApp message is prefilled.",
+  "permissions": [ "scripting", "activeTab" ],
+  "content_scripts": [
+    {
+      "matches": [ "https://web.whatsapp.com/*" ],
+      "js": [ "autosend.js" ]
+    }
+  ]
+
+}
