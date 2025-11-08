@@ -21,6 +21,9 @@ public record GetProductListDto
     public string? ProductGroupName { get; init; }
     public DateTime? CreatedAtUtc { get; init; }
     public string? WarehouseId { get; init; }
+    public string? TaxId { get; init; }
+    public string? TaxName { get; init; }
+
 }
 
 public class GetProductListProfile : Profile
@@ -31,6 +34,10 @@ public class GetProductListProfile : Profile
             .ForMember(
                 dest => dest.UnitMeasureName,
                 opt => opt.MapFrom(src => src.UnitMeasure != null ? src.UnitMeasure.Name : string.Empty)
+            )
+            .ForMember(
+                dest => dest.TaxName,
+                opt => opt.MapFrom(src => src.Tax != null ? src.Tax.Name : string.Empty)
             )
             .ForMember(
                 dest => dest.ProductGroupName,
@@ -71,6 +78,8 @@ public class GetProductListHandler : IRequestHandler<GetProductListRequest, GetP
             .ApplyIsDeletedFilter(request.IsDeleted)
             .Include(x => x.UnitMeasure)
             .Include(x => x.ProductGroup)
+            .Include(x => x.Tax)
+
             .AsQueryable();
 
         // Filter by WarehouseId if provided

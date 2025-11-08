@@ -9,7 +9,7 @@ namespace Application.Features.PurchaseOrderItemManager.Queries;
 
 public record GetPurchaseOrderItemByPurchaseOrderIdListDto
 {
-    //public string? Id { get; init; }
+    public string? Id { get; init; }
     public string? PurchaseOrderId { get; init; }
     public string? PurchaseOrderNumber { get; init; }
     public string? ProductId { get; init; }
@@ -19,6 +19,9 @@ public record GetPurchaseOrderItemByPurchaseOrderIdListDto
     public double? UnitPrice { get; init; }
     public double? Quantity { get; init; }
     public double? Total { get; init; }
+    public string? TaxId { get; init; }
+    public double? TaxAmount { get; init; }
+    public double? TotalAfterTax { get; init; }
     public DateTime? CreatedAtUtc { get; init; }
 }
 

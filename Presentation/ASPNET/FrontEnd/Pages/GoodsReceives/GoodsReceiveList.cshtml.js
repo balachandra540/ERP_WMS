@@ -1139,12 +1139,20 @@ const App = {
                             state.status = e.value;
                         }
                     });
+
                     goodsReceiveStatusListLookup.obj.appendTo(statusRef.value);
+
+                    // ✅ Set first item as default selection
+                    if (state.goodsReceiveStatusListLookupData.length > 0) {
+                        const firstItem = state.goodsReceiveStatusListLookupData[0];
+                        goodsReceiveStatusListLookup.obj.value = firstItem.id;
+                        state.status = firstItem.id; // keep Vue state in sync
+                    }
                 }
             },
             refresh: () => {
                 if (goodsReceiveStatusListLookup.obj) {
-                    goodsReceiveStatusListLookup.obj.value = state.status
+                    goodsReceiveStatusListLookup.obj.value = state.status;
                 }
             },
         };
@@ -1443,17 +1451,18 @@ const App = {
                         // Get Purchase Order items
                         const poResponse = await services.getPurchaseOrderById(state.purchaseOrderId);
                         const poItems = poResponse?.data?.content?.data[0]?.items || [];
-
+                        const locationId = StorageManager.getLocation();
                         // Create fresh secondary data from PO
                         secondary = poItems.map(item => ({
                             id: '',
-                            warehouseId: state.warehouseListLookupData[0]?.id || '',
+                            warehouseId: locationId || '',
                             goodsReceiveId: state.id,
                             purchaseOrderItemId: item.id,
                             productId: item.productId,
                             receivedQuantity: 0,
                             actualQuantity: item.quantity || 0,
                             notes: '',
+                            unitPrice: item.unitPrice,
                             createdAtUtc: new Date()
                         }));
                     }
@@ -2008,6 +2017,7 @@ const App = {
                             field: 'warehouseId',
                             headerText: 'Warehouse',
                             width: 250,
+                            visible: false ,
                             validationRules: { required: true },
                             disableHtmlEncode: false,
                             valueAccessor: (field, data, column) => {
@@ -2019,7 +2029,7 @@ const App = {
                         {
                             field: 'productId',
                             headerText: 'Product',
-                            width: 300,
+                            width: 200,
                             disableHtmlEncode: false,
                             valueAccessor: (field, data, column) => {
                                 const product = state.productListLookupData.find(item => item.id === data[field]);
@@ -2030,7 +2040,7 @@ const App = {
                         {
                             field: 'actualQuantity',
                             headerText: 'Order Quantity',
-                            width: 150,
+                            width: 100,
                             type: 'number',
                             format: 'N2',
                             textAlign: 'Right',
@@ -2039,7 +2049,7 @@ const App = {
                         {
                             field: 'receivedQuantity',
                             headerText: 'Received Quantity',
-                            width: 180,
+                            width: 100,
                             type: 'number',
                             format: 'N2',
                             textAlign: 'Right',
@@ -2053,9 +2063,65 @@ const App = {
                             }
                         },
                         {
+                            field: 'unitPrice',
+                            headerText: 'Unit Price',
+                            width: 100,
+                            type: 'number',
+                            format: 'N2',
+                            textAlign: 'Right',
+                            allowEditing: false
+                        },
+                        {
+                            field: 'tax_amount',
+                            headerText: 'Tax Amount',
+                            width: 100,
+                            type: 'number',
+                            format: 'N2',
+                            textAlign: 'Right',
+                            allowEditing: false
+                        },
+
+                        {
+                            field: 'freight_charges',
+                            headerText: 'Transport Charges',
+                            width: 100,
+                            type: 'number',
+                            format: 'N2',
+                            textAlign: 'Right',
+                            allowEditing: true
+                        },
+                        {
+                            field: 'ohter_charges',
+                            headerText: 'Other Charges',
+                            width: 100,
+                            type: 'number',
+                            format: 'N2',
+                            textAlign: 'Right',
+                            allowEditing: true
+                        },
+                        {
+                            field: 'FinalPrice',
+                            headerText: 'Final Price',
+                            width: 100,
+                            type: 'number',
+                            format: 'N2',
+                            textAlign: 'Right',
+                            allowEditing: true
+                        },
+                        {
+                            field: 'MRP',
+                            headerText: 'MRP',
+                            width: 100,
+                            type: 'number',
+                            format: 'N2',
+                            textAlign: 'Right',
+                            allowEditing: true
+                        },
+                        {
+                            
                             field: 'notes',
                             headerText: 'Notes',
-                            width: 200,
+                            width: 100,
                             editType: 'stringedit',
                             allowEditing: true
                         }

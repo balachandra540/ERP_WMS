@@ -21,9 +21,11 @@ public class CreateProductRequest : IRequest<CreateProductResult>
     public bool? Physical { get; init; } = true;
     public string? UnitMeasureId { get; init; }
     public string? ProductGroupId { get; init; }
-    public string? WarehouseId { get; init; }  
+    public string? WarehouseId { get; init; }
     public string? CreatedById { get; init; }
-   
+    public string? TaxId { get; set; }
+
+
 }
 
 
@@ -36,6 +38,8 @@ public class CreateProductValidator : AbstractValidator<CreateProductRequest>
         RuleFor(x => x.Physical).NotEmpty();
         RuleFor(x => x.UnitMeasureId).NotEmpty();
         RuleFor(x => x.ProductGroupId).NotEmpty();
+        RuleFor(x => x.TaxId).NotEmpty();
+
     }
 }
 
@@ -71,7 +75,8 @@ public class CreateProductHandler : IRequestHandler<CreateProductRequest, Create
             Description = request.Description,
             UnitMeasureId = request.UnitMeasureId,
             ProductGroupId = request.ProductGroupId,
-            WarehouseId = request.WarehouseId  // new field added
+            WarehouseId = request.WarehouseId,  // new field added
+            TaxId=request.TaxId
         };
 
         await _repository.CreateAsync(entity, cancellationToken);

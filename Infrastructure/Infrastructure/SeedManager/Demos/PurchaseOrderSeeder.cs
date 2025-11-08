@@ -61,7 +61,7 @@ public class PurchaseOrderSeeder
                     OrderDate = transDate,
                     OrderStatus = (PurchaseOrderStatus)random.Next(0, Enum.GetNames(typeof(PurchaseOrderStatus)).Length),
                     VendorId = GetRandomValue(vendors, random),
-                    TaxId = GetRandomValue(taxes, random),
+                    //TaxId = GetRandomValue(taxes, random),
                 };
                 await _purchaseOrderRepository.CreateAsync(purchaseOrder);
 
@@ -84,7 +84,7 @@ public class PurchaseOrderSeeder
 
                 await _unitOfWork.SaveAsync();
 
-                _purchaseOrderService.Recalculate(purchaseOrder.Id);
+                //_purchaseOrderService.Recalculate(purchaseOrder.Id);
             }
         }
     }

@@ -142,7 +142,7 @@ public class UpdateGoodsReceiveHandler : IRequestHandler<UpdateGoodsReceiveReque
         var oldItemsById = entity.GoodsReceiveItems.ToDictionary(i => i.Id);
 
         // Step 5: Delete old inventory transactions if old status was Confirmed (separate query since no navigation)
-        if (oldStatus == GoodsReceiveStatus.Confirmed)
+        if (oldStatus == GoodsReceiveStatus.Approved)
         {
             var txToDelete = await _inventoryTransactionRepository.GetQuery()
                 .Where(tx => tx.ModuleId == entity.Id) // Assuming FK is GoodsReceiveId; adjust if different
@@ -253,7 +253,7 @@ public class UpdateGoodsReceiveHandler : IRequestHandler<UpdateGoodsReceiveReque
         await _unitOfWork.SaveAsync(cancellationToken);
 
         // Step 9: Create new inventory transactions if new status is Confirmed
-        if (newStatus == GoodsReceiveStatus.Confirmed)
+        if (newStatus == GoodsReceiveStatus.Approved)
         {
             if (string.IsNullOrEmpty(warehouseId))
             {
