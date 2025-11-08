@@ -29,27 +29,56 @@
                                         <h5>Main Info</h5>
                                     </div>
                                     <div class="card-body">
-                                        <div class="row mb-2">
-                                            <div class="col-md-6">
-                                                <label for="Name">Name</label>
-                                                <input ref="nameRef" v-model="state.name">
-                                                <label class="text-danger">{{ state.errors.name }}</label>
-                                            </div>
-                                            <div class="col-md-5" style="display:none">
-                                                <div class="form-check">
-                                                    <input v-model="state.hasAttributes" id="HasAttributes" name="HasAttributes"
-                                                           type="checkbox" class="form-check-input">
-                                                    <label for="HasAttributes" class="form-check-label">Has Attributes</label>
+                                            <div class="row mb-2">
+                                                <div class="col-md-6">
+                                                    <label for="Name">Name</label>
+                                                    <input ref="nameRef" v-model="state.name" class="form-control" />
+                                                    <label class="text-danger">{{ state.errors.name }}</label>
+                                                </div>
+                                                <div class="col-md-5 d-flex align-items-center">
+                                                    <div class="form-check">
+                                                        <input v-model="state.hasAttributes" id="HasAttributes" name="HasAttributes"
+                                                               type="checkbox" class="form-check-input" />
+                                                        <label for="HasAttributes" class="form-check-label ms-1">Has Attributes</label>
+                                                    </div>
                                                 </div>
                                             </div>
-                                        </div>
-                                        <div class="row mb-2">
-                                            <div class="col-12">
-                                                <label for="Description">Description</label>
-                                                <textarea v-model="state.description" id="Description" name="Description" class="form-control" rows="3"></textarea>
-                                            </div>
+
+                                    <!-- Description -->
+                                    <div class="row mb-2">
+                                        <div class="col-12">
+                                            <label for="Description">Description</label>
+                                            <textarea v-model="state.description" id="Description" name="Description"
+                                                      class="form-control" rows="3"></textarea>
                                         </div>
                                     </div>
+
+                                    <!-- Buttons shown only if hasAttributes is true -->
+                                    <div class="row mt-3" v-if="state.hasAttributes">
+                                        <div class="col-md-12 d-flex gap-2">
+                                            
+                                                <!-- Add Attributes -->
+                                                <button v-if="state.showAddButton"
+                                                        type="button"
+                                                        class="btn btn-success me-2"
+                                                        v-bind:disabled="state.disableAddButton"
+                                                        v-on:click="openAddAttributes">
+                                                    Add Attributes
+                                                </button>
+
+                                                <!-- View Attributes -->
+                                                <button v-if="state.showViewButton"
+                                                        type="button"
+                                                        class="btn btn-info"
+                                                        v-bind:disabled="state.disableViewButton"
+                                                        v-on:click="openViewAttributes">
+                                                    View Attributes
+                                                </button>
+
+                                        </div>
+                                    </div>
+                                </div>
+
                                 </div>
                             </div>
                         </div>
@@ -73,7 +102,7 @@
     </div>
 
     <!-- Attributes Modal -->
-    <div class="modal fade"
+    @* <div class="modal fade"
          ref="attributesModalRef"
          id="AttributesModal"
          tabindex="-1"
@@ -125,7 +154,119 @@
 
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                    <button type="button" class="btn btn-success">Save</button>
+                    <button type="button" 
+                            class="btn"
+                            id="AttributeSaveButton"
+                            v-bind:class="state.deleteMode ? 'btn-danger' : 'btn-primary'"
+                            v-on:click="handler.saveAttributesData"
+                            v-bind:disabled="state.isSubmitting">
+                        <span class="spinner-border spinner-border-sm me-2" v-if="state.isSubmitting" role="status" aria-hidden="true"></span>
+                        <span v-if="!state.isSubmitting">{{ state.deleteMode ? 'Delete' : 'Save' }}</span>
+                        <span v-else>{{ state.deleteMode ? 'Deleting...' : 'Saving...' }}</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div> *@
+
+    <div class="modal fade"
+         ref="attributesModalRef"
+         id="AttributesModal"
+         tabindex="-1"
+         data-bs-focus="false"
+         data-bs-backdrop="static">
+        <div class="modal-dialog modal-lg modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        {{ state.isViewMode ? 'View Product Attributes' : 'Manage Product Attributes' }}
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+
+                <div class="modal-body">
+                    <!-- Loader -->
+                    <div v-if="state.isLoadingAttributes" class="text-center my-3">
+                        <div class="spinner-border text-primary" role="status"></div>
+                        <p class="mt-2 text-muted">Loading attributes...</p>
+                    </div>
+
+                    <!-- Table -->
+                    <div v-else>
+                        <table class="table table-bordered">
+                            <thead>
+                                <tr>
+                                    <th>Attribute Name</th>
+                                          <th>Attribute Values</th>
+                                    <th v-if="!state.isViewMode" style="width: 120px;">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr v-for="(attr, index) in state.attributes" :key="index">
+                                    <td>
+                                        <input v-model="attr.name"
+                                               type="text"
+                                               class="form-control"
+                                               placeholder="Enter attribute name"
+                                               :readonly="state.isViewMode" />
+                                    </td>
+                                    <td>
+                                        <div v-for="(val, j) in attr.values" :key="j" class="d-flex mb-1">
+                                            <input v-model="val.valueName"
+                                                   type="text"
+                                                   class="form-control me-2"
+                                                   placeholder="Enter value" />
+                                            <button v-if="!state.isViewMode"
+                                                    class="btn btn-danger btn-sm"
+                                                    @@click="handler.removeAttributeValue(index, j)">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+                                        </div>
+                                        <button v-if="!state.isViewMode"
+                                                class="btn btn-outline-primary btn-sm"
+                                                @@click="handler.addAttributeValue(index)">
+                                            + Add Value
+                                        </button>
+                                    </td>
+                                    <td v-if="!state.isViewMode">
+                                        <button type="button"
+                                                class="btn btn-danger btn-sm"
+                                                v-on:click="handler.removeAttribute(index)">
+                                            <i class="bi bi-trash"></i>Remove Attribute
+                                        </button>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+
+                        <!-- Add new row button (only in Add/Edit mode) -->
+                        <button v-if="!state.isViewMode"
+                                type="button"
+                                class="btn btn-primary btn-sm"
+                                v-on:click="handler.addAttribute">
+                            <i class="bi bi-plus-circle"></i> Add Attribute
+                        </button>
+                    </div>
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+
+                    <!-- Save button hidden in View mode -->
+                    <button v-if="!state.isViewMode"
+                            type="button"
+                            class="btn"
+                            id="AttributeSaveButton"
+                            v-bind:class="state.deleteMode ? 'btn-danger' : 'btn-primary'"
+                            v-on:click="handler.saveAttributesData"
+                            v-bind:disabled="state.isSubmitting">
+                        <span class="spinner-border spinner-border-sm me-2"
+                              v-if="state.isSubmitting"
+                              role="status"
+                              aria-hidden="true"></span>
+                        <span v-if="!state.isSubmitting">{{ state.deleteMode ? 'Delete' : 'Save' }}</span>
+                        <span v-else>{{ state.deleteMode ? 'Deleting...' : 'Saving...' }}</span>
+                    </button>
                 </div>
             </div>
         </div>

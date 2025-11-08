@@ -51,7 +51,12 @@ public class DataContext : IdentityDbContext<ApplicationUser>, IEntityDbSet
     public DbSet<NegativeAdjustment> NegativeAdjustment { get; set; }
     public DbSet<PositiveAdjustment> PositiveAdjustment { get; set; }
     public DbSet<Scrapping> Scrapping { get; set; }
-    public DbSet<GoodsReceiveItem> GoodsReceiveItem{ get; set; } // NEW
+   public DbSet<GoodsReceiveItem> GoodsReceiveItem{ get; set; } // NEW
+
+    public DbSet<ProductGroupAttributes> ProductGroupAttributes { get; set; } //Add this 
+
+    public DbSet<ProductGroupAttributeValue> ProductGroupAttributeValues { get; set; } //Add this 
+
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -106,6 +111,9 @@ public class DataContext : IdentityDbContext<ApplicationUser>, IEntityDbSet
         modelBuilder.ApplyConfiguration(new PositiveAdjustmentConfiguration());
         modelBuilder.ApplyConfiguration(new ScrappingConfiguration());
         modelBuilder.ApplyConfiguration(new GoodsReceiveItemConfiguration()); // NEW
+        modelBuilder.ApplyConfiguration(new ProductGroupAttributeConfiguration());
+        modelBuilder.ApplyConfiguration(new ProductGroupAttributeValueConfiguration());
+
     }
 
 }

@@ -2,6 +2,7 @@
 using Domain.Entities;
 using FluentValidation;
 using MediatR;
+using Microsoft.EntityFrameworkCore;
 
 namespace Application.Features.ProductGroupManager.Commands;
 
@@ -26,36 +27,64 @@ public class DeleteProductGroupValidator : AbstractValidator<DeleteProductGroupR
 
 public class DeleteProductGroupHandler : IRequestHandler<DeleteProductGroupRequest, DeleteProductGroupResult>
 {
-    private readonly ICommandRepository<ProductGroup> _repository;
+    private readonly ICommandRepository<ProductGroup> _groupRepository;
+    private readonly ICommandRepository<ProductGroupAttributes> _attributeRepository;
+    private readonly ICommandRepository<ProductGroupAttributeValue> _valueRepository;
     private readonly IUnitOfWork _unitOfWork;
 
     public DeleteProductGroupHandler(
-        ICommandRepository<ProductGroup> repository,
+        ICommandRepository<ProductGroup> groupRepository,
+        ICommandRepository<ProductGroupAttributes> attributeRepository,
+        ICommandRepository<ProductGroupAttributeValue> valueRepository,
         IUnitOfWork unitOfWork
-        )
+    )
     {
-        _repository = repository;
+        _groupRepository = groupRepository;
+        _attributeRepository = attributeRepository;
+        _valueRepository = valueRepository;
         _unitOfWork = unitOfWork;
     }
 
     public async Task<DeleteProductGroupResult> Handle(DeleteProductGroupRequest request, CancellationToken cancellationToken)
     {
+        // ✅ 1️⃣ Fetch ProductGroup
+        var group = await _groupRepository.GetAsync(request.Id ?? string.Empty, cancellationToken);
+        if (group == null)
+            throw new Exception($"Product Group not found: {request.Id}");
 
-        var entity = await _repository.GetAsync(request.Id ?? string.Empty, cancellationToken);
+        group.UpdatedById = request.DeletedById;
 
-        if (entity == null)
+        // ✅ 2️⃣ Get all Attributes linked to this ProductGroup
+        var attributes = await _attributeRepository
+            .GetQuery()
+            .Where(a => a.ProductGroupId == request.Id)
+            .ToListAsync(cancellationToken);
+
+        // ✅ 3️⃣ For each attribute, delete its values first
+        foreach (var attr in attributes)
         {
-            throw new Exception($"Entity not found: {request.Id}");
+            var values = await _valueRepository
+                .GetQuery()
+                .Where(v => v.AttributeId == attr.Id)
+                .ToListAsync(cancellationToken);
+
+            foreach (var val in values)
+            {
+                _valueRepository.Delete(val);
+            }
+
+            _attributeRepository.Delete(attr);
         }
 
-        entity.UpdatedById = request.DeletedById;
+        // ✅ 4️⃣ Finally delete the ProductGroup
+        _groupRepository.Delete(group);
 
-        _repository.Delete(entity);
+        // ✅ 5️⃣ Save all changes together
         await _unitOfWork.SaveAsync(cancellationToken);
 
         return new DeleteProductGroupResult
         {
-            Data = entity
+            Data = group
         };
     }
 }
