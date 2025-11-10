@@ -20,6 +20,13 @@ public record GetGoodsReceiveListDto
     public string? PurchaseOrderNumber { get; init; }
     public string? LocationId { get; init; }
     public DateTime? CreatedAtUtc { get; init; }
+
+    // ✅ Newly added fields
+    public double FreightCharges { get; init; }
+    public double OtherCharges { get; init; }
+
+    // ✅ Optional: number of items in this GRN
+    public int ItemCount { get; init; }
 }
 
 public class GetGoodsReceiveListProfile : Profile
@@ -34,8 +41,20 @@ public class GetGoodsReceiveListProfile : Profile
             .ForMember(
                 dest => dest.StatusName,
                 opt => opt.MapFrom(src => src.Status.HasValue ? src.Status.Value.ToFriendlyName() : string.Empty)
+            )
+            // ✅ New fields mapping
+            .ForMember(
+                dest => dest.FreightCharges,
+                opt => opt.MapFrom(src => src.FreightCharges)
+            )
+            .ForMember(
+                dest => dest.OtherCharges,
+                opt => opt.MapFrom(src => src.OtherCharges)
+            )
+            .ForMember(
+                dest => dest.ItemCount,
+                opt => opt.MapFrom(src => src.GoodsReceiveItems != null ? src.GoodsReceiveItems.Count : 0)
             );
-
     }
 }
 
@@ -49,7 +68,6 @@ public class GetGoodsReceiveListRequest : IRequest<GetGoodsReceiveListResult>
     public bool IsDeleted { get; init; } = false;
     public string? LocationId { get; init; }
 }
-
 
 public class GetGoodsReceiveListHandler : IRequestHandler<GetGoodsReceiveListRequest, GetGoodsReceiveListResult>
 {
@@ -69,9 +87,9 @@ public class GetGoodsReceiveListHandler : IRequestHandler<GetGoodsReceiveListReq
             .AsNoTracking()
             .ApplyIsDeletedFilter(request.IsDeleted)
             .Include(x => x.PurchaseOrder)
+            .Include(x => x.GoodsReceiveItems) // ✅ needed for ItemCount
             .AsQueryable();
 
-        // ✅ Handle Location filter (single or multiple comma-separated IDs)
         // ✅ Location filter via PurchaseOrder.LocationId
         if (!string.IsNullOrEmpty(request.LocationId))
         {
@@ -85,13 +103,10 @@ public class GetGoodsReceiveListHandler : IRequestHandler<GetGoodsReceiveListReq
                 x.PurchaseOrder.LocationId != null &&
                 locationIds.Contains(x.PurchaseOrder.LocationId.Trim().ToLower()));
         }
-        // ✅ Apply location filter
-        //if (!string.IsNullOrEmpty(request.LocationId))
-        //{
-        //    query = query.Where(x => x.PurchaseOrder !=null && x.PurchaseOrder.LocationId == request.LocationId);
-        //}
 
-        var entities = await query.ToListAsync(cancellationToken);
+        var entities = await query
+            .OrderByDescending(x => x.CreatedAtUtc)
+            .ToListAsync(cancellationToken);
 
         var dtos = _mapper.Map<List<GetGoodsReceiveListDto>>(entities);
 
@@ -100,9 +115,4 @@ public class GetGoodsReceiveListHandler : IRequestHandler<GetGoodsReceiveListReq
             Data = dtos
         };
     }
-
-
 }
-
-
-

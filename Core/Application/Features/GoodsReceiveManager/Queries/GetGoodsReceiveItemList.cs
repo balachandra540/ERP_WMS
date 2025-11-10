@@ -14,8 +14,19 @@ public record GetGoodsReceiveItemListDto
     public string? GoodsReceiveId { get; init; }
     public string? PurchaseOrderItemId { get; init; }
     public string? ProductId { get; init; }
+    public string? ProductName { get; init; }
+    public string? ProductNumber { get; init; }
+
     public double ReceivedQuantity { get; init; }
     public double ActualQuantity { get; init; }
+    public double RemainingQuantity { get; init; }
+
+    public double? UnitPrice { get; init; }
+    public double? TaxAmount { get; init; }
+    public double? FinalUnitPrice { get; init; }
+    public double? MRP { get; init; }
+
+    
     public string? Notes { get; init; }
     public DateTime? CreatedAtUtc { get; init; }
 }
@@ -36,7 +47,32 @@ public class GetGoodsReceiveItemListProfile : Profile
 {
     public GetGoodsReceiveItemListProfile()
     {
-        CreateMap<GoodsReceiveItem, GetGoodsReceiveItemListDto>();
+        CreateMap<GoodsReceiveItem, GetGoodsReceiveItemListDto>()
+            .ForMember(
+                dest => dest.ProductName,
+                opt => opt.MapFrom(src => src.PurchaseOrderItem.Product.Name)
+            )
+            .ForMember(
+                dest => dest.ProductNumber,
+                opt => opt.MapFrom(src => src.PurchaseOrderItem.Product.Number)
+            )
+            .ForMember(
+                dest => dest.UnitPrice,
+                opt => opt.MapFrom(src => src.UnitPrice)
+            )
+            .ForMember(
+                dest => dest.TaxAmount,
+                opt => opt.MapFrom(src => src.TaxAmount)
+            )
+            .ForMember(
+                dest => dest.FinalUnitPrice,
+                opt => opt.MapFrom(src => src.FinalUnitPrice)
+            )
+            .ForMember(
+                dest => dest.MRP,
+                opt => opt.MapFrom(src => src.MRP)
+            );
+            
     }
 }
 
@@ -57,18 +93,18 @@ public class GetGoodsReceiveItemListHandler : IRequestHandler<GetGoodsReceiveIte
         var items = await _context.GoodsReceiveItem
             .AsNoTracking()
             .Include(x => x.PurchaseOrderItem)
-            .ThenInclude(poi => poi.Product)
+                .ThenInclude(poi => poi.Product)
             .Where(x => x.GoodsReceiveId == request.GoodsReceiveId && !x.IsDeleted)
             .ToListAsync(cancellationToken);
 
+        // ✅ Manual calculation for ActualQuantity & RemainingQuantity
         var dtoList = items.Select(x =>
         {
             var poItem = x.PurchaseOrderItem;
             var orderedQty = poItem?.Quantity ?? 0;
-            var receivedQty = poItem?.ReceivedQuantity ?? 0;
+            var totalReceivedQty = poItem?.ReceivedQuantity ?? 0;
 
-            // ✅ Remaining quantity calculation
-            var remainingQty = orderedQty - receivedQty;
+            var remainingQty = orderedQty - totalReceivedQty;
             if (remainingQty < 0) remainingQty = 0;
 
             return new GetGoodsReceiveItemListDto
@@ -77,8 +113,18 @@ public class GetGoodsReceiveItemListHandler : IRequestHandler<GetGoodsReceiveIte
                 GoodsReceiveId = x.GoodsReceiveId,
                 PurchaseOrderItemId = x.PurchaseOrderItemId,
                 ProductId = poItem?.ProductId,
-                ActualQuantity = remainingQty,      // show remaining quantity instead of ordered
+                ProductName = poItem?.Product?.Name,
+                ProductNumber = poItem?.Product?.Number,
+                ActualQuantity = orderedQty,
+                RemainingQuantity = remainingQty,
                 ReceivedQuantity = x.ReceivedQuantity,
+
+                // ✅ Cost & Tax details
+                UnitPrice = x.UnitPrice,
+                TaxAmount = x.TaxAmount,
+                FinalUnitPrice = x.FinalUnitPrice,
+                MRP = x.MRP,
+              
                 Notes = x.Notes,
                 CreatedAtUtc = x.CreatedAtUtc
             };
