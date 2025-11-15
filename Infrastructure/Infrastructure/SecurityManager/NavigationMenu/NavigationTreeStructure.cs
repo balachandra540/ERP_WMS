@@ -127,6 +127,12 @@ public static class NavigationTreeStructure
                     "Name": "Product",
                     "IsModule": false
                 },
+             {
+                "URL": "/Attributes/AttributesList",
+                "Name": "Attribute",
+                "IsModule": false
+            },
+            
                 {
                     "URL": "/Products/ProductPriceDefinition",
                     "Name": "Price Definition",

@@ -53,6 +53,29 @@
                                             </div>
                                         </div>
                                         <div class="row mb-2">
+                                            <div class="col-md-6">
+                                                <label>Transport Charges</label>
+                                                <input type="number"
+                                                       ref="transportChargesRef"
+                                                       class="form-control text-end"
+                                                       v-model.number="state.transportCharges"
+                                                       min="0"
+                                                       placeholder="Enter Transport Charges" />
+                                                <label class="text-danger">{{ state.errors.transportCharges }}</label>
+                                            </div>
+
+                                            <div class="col-md-6">
+                                                <label>Other Charges</label>
+                                                <input type="number"
+                                                       ref="otherChargesRef"
+                                                       class="form-control text-end"
+                                                       v-model.number="state.otherCharges"
+                                                       min="0"
+                                                       placeholder="Enter Other Charges" />
+                                                <label class="text-danger">{{ state.errors.otherCharges }}</label>
+                                            </div>
+                                        </div>
+                                        <div class="row mb-2">
                                             <div class="col-md-12">
                                                 <label for="Description">Description</label>
                                                 <textarea class="form-control" rows="3" v-model="state.description"></textarea>
@@ -69,7 +92,7 @@
                             <div class="col-md-12">
                                 <div class="card">
                                     <div class="card-header">
-                                        <h5>Receive Item</h5>
+                                        <h5>Receive Items</h5>
                                     </div>
                                     <div class="card-body">
                                         <div class="row">
@@ -93,7 +116,7 @@
                                         <div class="row justify-content-end">
                                             <div class="col-md-6">
                                                 <div class="d-flex justify-content-between py-2">
-                                                    <span class="fw-bold">Total Movement</span>
+                                                    <span class="fw-bold">Total Recieved Items Quantity</span>
                                                     <span id="TotalMovement" class="fw-bold text-success">{{ state.totalMovementFormatted }}</span>
                                                 </div>
                                             </div>

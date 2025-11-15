@@ -1,5 +1,6 @@
 ﻿using Domain.Entities;
 using Infrastructure.DataAccessManager.EFCore.Common;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using static Domain.Common.Constants;
 
@@ -16,6 +17,16 @@ public class GoodsReceiveConfiguration : BaseEntityConfiguration<GoodsReceive>
         builder.Property(x => x.Status).IsRequired(false);
         builder.Property(x => x.Description).HasMaxLength(DescriptionConsts.MaxLength).IsRequired(false);
         builder.Property(x => x.PurchaseOrderId).HasMaxLength(IdConsts.MaxLength).IsRequired(false);
+        // ✅ Newly added fields
+        // ✅ Fixed: Non-nullable numeric fields (remove IsRequired(false))
+        builder.Property(x => x.FreightCharges)
+            .HasDefaultValue(0);
+
+        builder.Property(x => x.OtherCharges)
+            .HasDefaultValue(0);
+
+
+        // ✅ Index for faster number lookups
 
         builder.HasIndex(e => e.Number);
     }

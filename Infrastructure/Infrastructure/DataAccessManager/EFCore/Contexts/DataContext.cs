@@ -52,6 +52,9 @@ public class DataContext : IdentityDbContext<ApplicationUser>, IEntityDbSet
     public DbSet<PositiveAdjustment> PositiveAdjustment { get; set; }
     public DbSet<Scrapping> Scrapping { get; set; }
    public DbSet<GoodsReceiveItem> GoodsReceiveItem{ get; set; } // NEW
+    public DbSet<Domain.Entities.Attribute> Attribute { get; set; }
+
+    public DbSet<AttributeDetail> AttributeDetail { get; set; }
 
     public DbSet<ProductGroupAttributes> ProductGroupAttributes { get; set; } //Add this 
 

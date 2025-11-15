@@ -26,7 +26,30 @@ namespace Infrastructure.DataAccessManager.EFCore.Configurations
             builder.Property(e => e.ReceivedQuantity)
                    .HasColumnType("double precision")
                    .IsRequired();
+            // ✅ Added pricing-related fields
+            builder.Property(e => e.UnitPrice)
+                   .IsRequired()
+                   .HasDefaultValue(0);
 
+            builder.Property(e => e.TaxAmount)
+                   .IsRequired()
+                   .HasDefaultValue(0);
+
+            builder.Property(e => e.FreightChargesPerUnit)
+    .IsRequired()
+    .HasDefaultValue(0);
+
+            builder.Property(e => e.OtherChargesPerUnit)
+                .IsRequired()
+                .HasDefaultValue(0);
+
+            builder.Property(e => e.FinalUnitPrice)
+                   .IsRequired()
+                   .HasDefaultValue(0);
+
+            builder.Property(e => e.MRP)
+                   .IsRequired()
+                   .HasDefaultValue(0);
             builder.Property(e => e.Notes)
                    .HasMaxLength(4000);
 
@@ -52,11 +75,7 @@ namespace Infrastructure.DataAccessManager.EFCore.Configurations
                    .HasForeignKey(e => e.GoodsReceiveId)
                    .OnDelete(DeleteBehavior.Restrict);
 
-            //builder.HasOne(e => e.PurchaseOrderItem)
-            //       .WithMany(p => p.GoodsReceiveItems) // Requires ICollection<GoodsReceiveItem> in PurchaseOrderItem
-            //       .HasForeignKey(e => e.PurchaseOrderItemId)
-            //       .OnDelete(DeleteBehavior.Restrict);
-
+            
             // Indexes
             builder.HasIndex(e => e.GoodsReceiveId)
                    .HasDatabaseName("IX_GoodsReceiveItem_GoodsReceiveId");

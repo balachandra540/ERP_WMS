@@ -96,6 +96,27 @@ public class PurchaseOrderItemController : BaseApiController
             Content = response
         });
     }
+    [Authorize]
+    [HttpGet("GetGoodsReceivedByPurchaseOrderId")]
+    public async Task<ActionResult<ApiSuccessResult<GetGoodsReceivedByPurchaseOrderIdResult>>> GetGoodsReceivedByPurchaseOrderIdAsync(
+    CancellationToken cancellationToken,
+    [FromQuery] string purchaseOrderId
+)
+    {
+        var request = new GetGoodsReceivedByPurchaseOrderIdRequest
+        {
+            PurchaseOrderId = purchaseOrderId
+        };
+
+        var response = await _sender.Send(request, cancellationToken);
+
+        return Ok(new ApiSuccessResult<GetGoodsReceivedByPurchaseOrderIdResult>
+        {
+            Code = StatusCodes.Status200OK,
+            Message = $"Success executing {nameof(GetGoodsReceivedByPurchaseOrderIdAsync)}",
+            Content = response
+        });
+    }
 
 
 }

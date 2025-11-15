@@ -260,7 +260,7 @@ namespace Application.Features.PurchaseOrderManager.Queries
                         {
                             // Replace Ordered Quantity with Remaining Quantity for display
                             var remaining = (i.Quantity ?? 0) - i.ReceivedQuantity;
-                            i.Quantity = remaining;
+                            i.RemaingQuantity = remaining;
                             return i;
                         })
                         .ToList();

@@ -891,11 +891,16 @@ const App = {
             purchaseOrderId: null,
             status: null,
             locationId: '',
+            transportCharges: 0,   // ✅ now at root level
+            otherCharges: 0,       // ✅ now at root level
             errors: {
                 receiveDate: '',
                 purchaseOrderId: '',
                 status: '',
-                description: ''
+                description: '',
+                transportCharges: '',
+                otherCharges: ''
+
             },
             showComplexDiv: false,
             isSubmitting: false,
@@ -910,9 +915,12 @@ const App = {
         const purchaseOrderIdRef = Vue.ref(null);
         const statusRef = Vue.ref(null);
         const numberRef = Vue.ref(null);
+        const transportChargesRef = Vue.ref(null);
+        const otherChargesRef = Vue.ref(null);
 
         // **ENHANCED VALIDATION FUNCTION - SUBMIT TIME ONLY**
         const validateForm = function () {
+            debugger;
             // Reset all errors
             state.errors.receiveDate = '';
             state.errors.purchaseOrderId = '';
@@ -922,7 +930,7 @@ const App = {
             let isValid = true;
             let hasValidReceivedQuantity = false;
 
-            // Header validation
+            // ✅ Header validation
             if (!state.receiveDate) {
                 state.errors.receiveDate = 'Receive date is required.';
                 isValid = false;
@@ -936,20 +944,23 @@ const App = {
                 isValid = false;
             }
 
-            // Secondary data validation (only at submit time)
+            // ✅ Secondary grid data validation
             if (!state.deleteMode && state.secondaryData.length > 0) {
+                if (secondaryGrid.obj.isEdit) {
+                    secondaryGrid.obj.endEdit();
+                }
                 const batchChanges = secondaryGrid.obj ? secondaryGrid.obj.getBatchChanges() : {
                     changed: [],
                     deleted: [],
                     added: []
                 };
 
-                // Get current state of all secondary data
+                // Merge current state + batch changes
                 let currentSecondaryData = state.id !== ""
                     ? [...state.secondaryData]
                     : [...batchChanges.changedRecords];
 
-                // Apply batch changes to get final state
+                // Apply batch edits
                 for (let changed of (batchChanges.changed || [])) {
                     const index = currentSecondaryData.findIndex(item =>
                         (item.purchaseOrderItemId === changed.purchaseOrderItemId) ||
@@ -960,7 +971,7 @@ const App = {
                     }
                 }
 
-                // Remove deleted items from validation
+                // Remove deleted items
                 for (let deleted of (batchChanges.deletedRecords || [])) {
                     const index = currentSecondaryData.findIndex(item =>
                         (deleted.purchaseOrderItemId && item.purchaseOrderItemId === deleted.purchaseOrderItemId) ||
@@ -971,14 +982,29 @@ const App = {
                     }
                 }
 
-                // Add new items
+                // Add newly added rows
                 currentSecondaryData.push(...(batchChanges.addedRecords || []));
 
-                // Validate received quantities
+                // ✅ Validate each item
                 for (let item of currentSecondaryData) {
-                    if (item.receivedQuantity > 0) {
+                    const rcvQty = parseFloat(item.receivedQuantity || 0);
+                    const mrpVal = parseFloat(item.MRP || 0);
+
+                    if (rcvQty > 0) {
                         hasValidReceivedQuantity = true;
-                    } else if (item.receivedQuantity < 0) {
+
+                        // 🔹 Check for missing or invalid MRP
+                        if (!item.MRP || isNaN(mrpVal) || mrpVal <= 0) {
+                            Swal.fire({
+                                icon: 'error',
+                                title: 'Validation Error',
+                                text: `MRP is required for product "${item.productName || ''}" having received quantity greater than 0.`,
+                                confirmButtonText: 'OK'
+                            });
+                            isValid = false;
+                            break;
+                        }
+                    } else if (rcvQty < 0) {
                         Swal.fire({
                             icon: 'error',
                             title: 'Validation Error',
@@ -990,7 +1016,7 @@ const App = {
                     }
                 }
 
-                // At least one item should have received quantity > 0
+                // ✅ At least one item must have received quantity > 0
                 if (isValid && !hasValidReceivedQuantity) {
                     Swal.fire({
                         icon: 'error',
@@ -1164,6 +1190,19 @@ const App = {
                 state.errors.status = '';
             }
         );
+        let recalcTimer = null;
+
+        Vue.watch(
+            () => [state.transportCharges, state.otherCharges],
+            async () => {
+                clearTimeout(recalcTimer);
+                recalcTimer = setTimeout(async () => {
+                    await methods.recalculateFinalPrices();
+                }, 500);
+            }
+        );
+
+
 
         // **UPDATED SERVICES FOR GOODS RECEIVE ITEMS**
         const services = {
@@ -1187,19 +1226,46 @@ const App = {
                     throw error;
                 }
             },
-            createMainData: async (receiveDate, description, status, purchaseOrderId, userId, items = [], defaultWarehouseId = null) => {
+            createMainData: async (
+                receiveDate,
+                description,
+                status,
+                purchaseOrderId,
+                userId,
+                items = [],
+                defaultWarehouseId = null,
+                freightCharges = 0,
+                otherCharges = 0
+            ) => {
                 try {
                     const locationId = StorageManager.getLocation();
+
                     const payload = {
                         ReceiveDate: receiveDate,
                         Description: description,
                         Status: status,
                         PurchaseOrderId: purchaseOrderId,
                         CreatedById: userId,
-                        Items: items,
                         DefaultWarehouseId: defaultWarehouseId,
-                        LocationId: locationId  // <-- add here
+                        LocationId: locationId,
+
+                        // ✅ Header-level charges
+                        FreightCharges: parseFloat(freightCharges || 0),
+                        OtherCharges: parseFloat(otherCharges || 0),
+
+                        // ✅ Item-level details
+                        Items: (items || []).map(item => ({
+                            PurchaseOrderItemId: item.PurchaseOrderItemId,
+                            ReceivedQuantity: parseFloat(item.ReceivedQuantity || 0),
+                            UnitPrice: parseFloat(item.UnitPrice || 0),
+                            TaxAmount: parseFloat(item.TaxAmount || 0),
+                            FinalUnitPrice: parseFloat(item.FinalUnitPrice || 0),
+                            MRP: parseFloat(item.MRP || 0),
+                            Notes: item.Notes || '',
+                            WarehouseId: item.WarehouseId || defaultWarehouseId
+                        }))
                     };
+
                     const response = await AxiosManager.post('/GoodsReceive/CreateGoodsReceive', payload);
                     return response;
                 } catch (error) {
@@ -1207,13 +1273,51 @@ const App = {
                 }
             },
 
-            updateMainData: async (id, receiveDate, description, status, purchaseOrderId, updatedById, items, defaultWarehouseId) => {
+
+            updateMainData: async (
+                id,
+                receiveDate,
+                description,
+                status,
+                purchaseOrderId,
+                updatedById,
+                items = [],
+                defaultWarehouseId = null,
+                freightCharges = 0,
+                otherCharges = 0
+            ) => {
                 try {
                     const locationId = StorageManager.getLocation();
-                    const response = await AxiosManager.post('/GoodsReceive/UpdateGoodsReceive', {
-                        id, receiveDate, description, status, purchaseOrderId, updatedById,
-                        Items: items, DefaultWarehouseId: defaultWarehouseId, LocationId: locationId
-                    });
+
+                    const payload = {
+                        Id: id,
+                        ReceiveDate: receiveDate,
+                        Description: description,
+                        Status: status,
+                        PurchaseOrderId: purchaseOrderId,
+                        UpdatedById: updatedById,
+                        DefaultWarehouseId: defaultWarehouseId,
+                        LocationId: locationId,
+
+                        // ✅ Header-level charges
+                        FreightCharges: parseFloat(freightCharges || 0),
+                        OtherCharges: parseFloat(otherCharges || 0),
+
+                        // ✅ Item-level details
+                        Items: (items || []).map(item => ({
+                            Id: item.Id || null,
+                            PurchaseOrderItemId: item.PurchaseOrderItemId,
+                            ReceivedQuantity: parseFloat(item.ReceivedQuantity || 0),
+                            UnitPrice: parseFloat(item.UnitPrice || 0),
+                            TaxAmount: parseFloat(item.TaxAmount || 0),
+                            FinalUnitPrice: parseFloat(item.FinalUnitPrice || 0),
+                            MRP: parseFloat(item.MRP || 0),
+                            Notes: item.Notes || '',
+                            WarehouseId: item.WarehouseId || defaultWarehouseId
+                        }))
+                    };
+
+                    const response = await AxiosManager.post('/GoodsReceive/UpdateGoodsReceive', payload);
                     return response;
                 } catch (error) {
                     throw error;
@@ -1243,7 +1347,7 @@ const App = {
 
             getPurchaseOrderById: async (id) => {
                 try {
-                    const response = await AxiosManager.get('/PurchaseOrder/GetPurchaseOrder?purchaseOrderId=' + id, {});
+                    const response = await AxiosManager.get('/PurchaseOrderItem/GetGoodsReceivedByPurchaseOrderId?purchaseOrderId=' + id, {});
                     return response;
                 } catch (error) {
                     throw error;
@@ -1319,6 +1423,7 @@ const App = {
 
         const methods = {
             populateMainData: async () => {
+                debugger;
                 const response = await services.getMainData();
                 state.mainData = response?.data?.content?.data.map(item => ({
                     ...item,
@@ -1430,18 +1535,25 @@ const App = {
                         const response = await services.getSecondaryData(state.id);
                         const goodsReceiveItems = response?.data?.content?.data || [];
 
-                        // Build secondary data directly from server response
                         secondary = goodsReceiveItems.map(grItem => ({
                             id: grItem.id,
-                            warehouseId: grItem.warehouseId || (state.warehouseListLookupData[0]?.id || ''),
                             goodsReceiveId: state.id,
+                            warehouseId: grItem.warehouseId || (state.warehouseListLookupData[0]?.id || ''),
                             purchaseOrderItemId: grItem.purchaseOrderItemId,
                             productId: grItem.productId,
-                            receivedQuantity: grItem.receivedQuantity || 0,
                             actualQuantity: grItem.actualQuantity || 0,
+                            receivedQuantity: grItem.receivedQuantity || 0,
+                            remaingQuantity: grItem.remainingQuantity || 0,
+                            unitPrice: grItem.unitPrice ?? 0,
+                            taxAmount: grItem.taxAmount ?? 0,
+                            FinalPrice: grItem.finalUnitPrice ?? 0,
+                            MRP: grItem.mrp ?? 0,
+
+                           
                             notes: grItem.notes || '',
-                            createdAtUtc: new Date(grItem.createdAtUtc)
+                            createdAtUtc: grItem.createdAtUtc ? new Date(grItem.createdAtUtc) : new Date()
                         }));
+
                     } else {
                         if (!state.purchaseOrderId) {
                             state.secondaryData = [];
@@ -1450,8 +1562,9 @@ const App = {
 
                         // Get Purchase Order items
                         const poResponse = await services.getPurchaseOrderById(state.purchaseOrderId);
-                        const poItems = poResponse?.data?.content?.data[0]?.items || [];
+                        const poItems = poResponse?.data?.content?.data || [];
                         const locationId = StorageManager.getLocation();
+
                         // Create fresh secondary data from PO
                         secondary = poItems.map(item => ({
                             id: '',
@@ -1461,10 +1574,13 @@ const App = {
                             productId: item.productId,
                             receivedQuantity: 0,
                             actualQuantity: item.quantity || 0,
+                            remaingQuantity: item.remainingQuantity || 0, // ✅ directly from API
                             notes: '',
+                            taxAmount: item.taxAmount,
                             unitPrice: item.unitPrice,
                             createdAtUtc: new Date()
                         }));
+
                     }
 
                     // Update state with fresh data
@@ -1479,35 +1595,35 @@ const App = {
                     console.error('Error populating secondary data:', error);
                 }
             },
-            refreshSummary: () => {
-                 debugger
-                let total = 0;
-                const batch = secondaryGrid.obj ? secondaryGrid.obj.getBatchChanges() : {
-                    changed: [],
-                    deleted: [],
-                    added: []
-                };
+            //refreshSummary: () => {
+            //     debugger
+            //    let total = 0;
+            //    const batch = secondaryGrid.obj ? secondaryGrid.obj.getBatchChanges() : {
+            //        changed: [],
+            //        deleted: [],
+            //        added: []
+            //    };
 
-                const changedMap = new Map();
-                for (let ch of batch.changed || []) {
-                    changedMap.set(ch.purchaseOrderItemId, ch.receivedQuantity);
-                }
-                for (let del of batch.deleted || []) {
-                    changedMap.set(del.purchaseOrderItemId, 0);
-                }
-                for (let add of batch.added || []) {
-                    total += add.receivedQuantity ?? 0;
-                }
-                for (let record of state.secondaryData) {
-                    if (changedMap.has(record.purchaseOrderItemId)) {
-                        total += changedMap.get(record.purchaseOrderItemId);
-                    } else {
-                        total += record.receivedQuantity ?? 0;
-                    }
-                }
+            //    const changedMap = new Map();
+            //    for (let ch of batch.changed || []) {
+            //        changedMap.set(ch.purchaseOrderItemId, ch.receivedQuantity);
+            //    }
+            //    for (let del of batch.deleted || []) {
+            //        changedMap.set(del.purchaseOrderItemId, 0);
+            //    }
+            //    for (let add of batch.added || []) {
+            //        total += add.receivedQuantity ?? 0;
+            //    }
+            //    for (let record of state.secondaryData) {
+            //        if (changedMap.has(record.purchaseOrderItemId)) {
+            //            total += changedMap.get(record.purchaseOrderItemId);
+            //        } else {
+            //            total += record.receivedQuantity ?? 0;
+            //        }
+            //    }
 
-                state.totalMovementFormatted = NumberFormatManager.formatToLocale(total);
-            },
+            //    state.totalMovementFormatted = NumberFormatManager.formatToLocale(total);
+            //},
             onMainModalHidden: () => {
                 state.errors.receiveDate = '';
                 state.errors.purchaseOrderId = '';
@@ -1516,12 +1632,9 @@ const App = {
             },
             // **BULK DATA PREPARATION FOR GOODS RECEIVE ITEMS**
             prepareSecondaryDataForSubmission: function () {
-                const batchChanges = secondaryGrid.obj ? secondaryGrid.obj.getBatchChanges() : {
-                    addedRecords: [],
-                    changedRecords: [],
-                    deletedRecords: []
-                };
-                debugger;
+                const batchChanges = secondaryGrid.obj
+                    ? secondaryGrid.obj.getBatchChanges()
+                    : { addedRecords: [], changedRecords: [], deletedRecords: [] };
 
                 let currentSecondaryData = state.id !== ""
                     ? [...state.secondaryData]
@@ -1531,18 +1644,15 @@ const App = {
                     (a.purchaseOrderItemId && b.purchaseOrderItemId && a.purchaseOrderItemId === b.purchaseOrderItemId) ||
                     (a.id && b.id && a.id === b.id);
 
-                // Apply batch changes to get final state
+                // ✅ Apply changed records
                 for (let changed of (batchChanges.changed || [])) {
-                    const index = currentSecondaryData.findIndex(item =>
-                        (item.purchaseOrderItemId === changed.purchaseOrderItemId) ||
-                        (item.id && item.id === changed.id)
-                    );
+                    const index = currentSecondaryData.findIndex(item => matchRecord(item, changed));
                     if (index !== -1) {
                         currentSecondaryData[index] = { ...currentSecondaryData[index], ...changed };
                     }
                 }
 
-                // Remove deleted items (filter instead of splice)
+                // ✅ Remove deleted items safely
                 const deletedItems = batchChanges.deletedRecords || [];
                 if (deletedItems.length > 0) {
                     currentSecondaryData = currentSecondaryData.filter(item =>
@@ -1550,18 +1660,107 @@ const App = {
                     );
                 }
 
-                // Add new items
+                // ✅ Add new records
                 if (batchChanges.addedRecords?.length) {
                     currentSecondaryData = [...currentSecondaryData, ...batchChanges.addedRecords];
                 }
 
-                // Final valid items (apply extra validation if needed)
-                const validItems = currentSecondaryData.filter(item =>
-                    item.receivedQuantity === undefined || item.receivedQuantity >= 0
-                );
+                // ✅ Final clean list with validation
+                const validItems = currentSecondaryData.filter(item => {
+                    const rcvQty = parseFloat(item.receivedQuantity || 0);
+                    const mrpVal = parseFloat(item.MRP || 0);
+
+                    // 🔸 Only include rows with received qty > 0
+                    if (rcvQty <= 0) return false;
+
+                    // 🔸 MRP must be valid & greater than 0
+                    if (isNaN(mrpVal) || mrpVal <= 0) {
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Validation Error',
+                            text: `MRP is required for product "${item.productName || ''}" having received quantity greater than 0.`,
+                            confirmButtonText: 'OK'
+                        });
+
+                        // ❌ Stop further processing by returning empty validItems list
+                        throw new Error('Invalid MRP found. Stopping submission.');
+                    }
+
+                    // ✅ Ensure numeric formatting before submission
+                    item.receivedQuantity = parseFloat(rcvQty.toFixed(2));
+                    item.unitPrice = parseFloat((item.unitPrice || 0).toFixed(2));
+                    item.taxAmount = parseFloat((item.taxAmount || 0).toFixed(2));
+                    item.FinalPrice = parseFloat((item.FinalPrice || 0).toFixed(2));
+                    item.MRP = parseFloat(mrpVal.toFixed(2));
+
+                    return true;
+                });
 
                 return { validItems, deletedItems };
+            },
+ // 🔹 2️⃣ CALCULATION METHODS (SYNCHRONOUS)
+            // 🔹 Final price calculator
+            recalculateFinalPrices: async () => {
+                const totalReceivedQty = state.secondaryData.reduce(
+                    (sum, item) => sum + (parseFloat(item.receivedQuantity) || 0),
+                    0
+                );
+
+                const totalFreight = parseFloat(state.transportCharges || 0);
+                const totalOther = parseFloat(state.otherCharges || 0);
+
+                // 🧮 No received quantities → reset all
+                if (totalReceivedQty <= 0) {
+                    state.secondaryData.forEach(item => {
+                        item.FinalPrice = 0.00;
+                    });
+                    secondaryGrid.refresh();
+                    await methods.refreshSummary();
+                    return;
+                }
+
+                // ✅ Per-unit distribution across all received quantity
+                const freightPerUnit = totalFreight / totalReceivedQty;
+                const otherPerUnit = totalOther / totalReceivedQty;
+
+                // 🧾 Apply per-unit charge and ensure 2 decimal format
+                state.secondaryData.forEach(item => {
+                    const rcvQty = parseFloat(item.receivedQuantity || 0);
+
+                    if (rcvQty > 0) {
+                        const finalCost =
+                            (parseFloat(item.unitPrice) || 0) +
+                            (parseFloat(item.taxAmount) || 0) +
+                            freightPerUnit +
+                            otherPerUnit;
+
+                        // ✅ Always store rounded numeric value
+                        item.FinalPrice = parseFloat(finalCost.toFixed(2));
+
+                        // ✅ If MRP exists, ensure proper decimal formatting
+                        if (item.MRP !== undefined && item.MRP !== null) {
+                            item.MRP = parseFloat(parseFloat(item.MRP).toFixed(2));
+                        }
+                    } else {
+                        item.FinalPrice = 0.00;
+                    }
+                });
+
+                // ✅ Refresh the grid for format application
+                secondaryGrid.refresh();
+                await methods.refreshSummary();
+            },
+
+
+            // 🔹 3️⃣ UI REFRESH OR SUMMARY METHODS
+            refreshSummary: async () => {
+                const totalMovement = state.secondaryData.reduce(
+                    (sum, item) => sum + (parseFloat(item.receivedQuantity) || 0),
+                    0
+                );
+                state.totalMovementFormatted = totalMovement.toFixed(2);
             }
+
     };
 
         // **ENHANCED SUBMIT HANDLER WITH BULK PROCESSING FOR GOODS RECEIVE ITEMS**
@@ -1578,13 +1777,22 @@ const App = {
                     let response;
                     const userId = StorageManager.getUserId();
                     const { validItems, deletedItems } = methods.prepareSecondaryDataForSubmission();
+
+                    // ✅ Header-level values
+                    const freightCharges = parseFloat(state.transportCharges || 0);
+                    const otherCharges = parseFloat(state.otherCharges || 0);
+
                     if (state.id === '') {
-                        // **CREATE NEW GOODS RECEIPT WITH ITEMS IN ONE REQUEST**
+                        // 🟩 CREATE NEW GOODS RECEIVE NOTE
                         const itemsDto = validItems.map(item => ({
                             PurchaseOrderItemId: item.purchaseOrderItemId,
-                            ReceivedQuantity: item.receivedQuantity,
+                            ReceivedQuantity: parseFloat(item.receivedQuantity || 0),
+                            UnitPrice: parseFloat(item.unitPrice || 0),
+                            TaxAmount: parseFloat(item.taxAmount || 0),
+                            FinalUnitPrice: parseFloat(item.FinalPrice || 0),
+                            MRP: parseFloat(item.MRP || 0),
                             Notes: item.notes || '',
-                            WarehouseId: item.warehouseId || null  // Include warehouse if available
+                            WarehouseId: item.warehouseId || null
                         }));
 
                         response = await services.createMainData(
@@ -1593,29 +1801,33 @@ const App = {
                             state.status,
                             state.purchaseOrderId,
                             userId,
-                            itemsDto, // Pass items as an additional parameter
-                            validItems[0]?.warehouseId || null  // Default warehouse if available
+                            itemsDto,
+                            validItems[0]?.warehouseId || null,
+                            freightCharges,
+                            otherCharges
                         );
 
                         if (response.data.code === 200) {
                             state.id = response?.data?.content?.data.id ?? '';
                             state.number = response?.data?.content?.data.number ?? '';
-                            // No need for separate item creation calls; items are created in the single request
                         }
                     } else if (state.deleteMode) {
-                        // **DELETE GOODS RECEIPT**
+                        // 🟥 DELETE GOODS RECEIVE NOTE
                         response = await services.deleteMainData(state.id, userId);
                     } else {
-                        // **UPDATE EXISTING GOODS RECEIPT WITH ITEMS IN ONE REQUEST**
+                        // 🟦 UPDATE EXISTING GOODS RECEIVE NOTE
                         const itemsDto = validItems.map(item => ({
-                            Id: item.id || null,  // Include ID for updates/deletes
+                            Id: item.id || null,
                             PurchaseOrderItemId: item.purchaseOrderItemId,
-                            ReceivedQuantity: item.receivedQuantity,
+                            ReceivedQuantity: parseFloat(item.receivedQuantity || 0),
+                            UnitPrice: parseFloat(item.unitPrice || 0),
+                            TaxAmount: parseFloat(item.taxAmount || 0),
+                            FinalUnitPrice: parseFloat(item.FinalPrice || 0),
+                            MRP: parseFloat(item.MRP || 0),
                             Notes: item.notes || '',
                             WarehouseId: item.warehouseId || null
                         }));
 
-                        // Filter out deleted items (zero quantity or explicitly marked; assume prepareSecondaryDataForSubmission handles this)
                         const filteredItemsDto = itemsDto.filter(item => item.ReceivedQuantity > 0);
 
                         response = await services.updateMainData(
@@ -1625,27 +1837,31 @@ const App = {
                             state.status,
                             state.purchaseOrderId,
                             userId,
-                            filteredItemsDto,  // Pass items for create/update/delete in single request
-                            validItems[0]?.warehouseId || null  // Default warehouse
+                            filteredItemsDto,
+                            validItems[0]?.warehouseId || null,
+                            freightCharges,
+                            otherCharges
                         );
-
-                        if (response.data.code === 200) {
-                            // No need for separate secondary calls; all handled in single request
-                        }
                     }
 
-                    // **HANDLE RESPONSE**
+                    // ✅ Handle Response
                     if (response.data.code === 200) {
                         await methods.populateMainData();
                         mainGrid.refresh();
 
                         if (!state.deleteMode) {
-                            // Refresh secondary data after successful save
                             await methods.populateSecondaryData();
+
+                            // Update header-level values after save
+                            const grnData = response?.data?.content?.data || {};
+                            state.transportCharges = grnData.transportCharges || 0;
+                            state.otherCharges = grnData.otherCharges || 0;
+
                             secondaryGrid.refresh();
 
                             state.mainTitle = 'Edit Goods Receive';
                             state.showComplexDiv = true;
+
                             Swal.fire({
                                 icon: 'success',
                                 title: 'Save Successful',
@@ -1684,7 +1900,7 @@ const App = {
                 } finally {
                     state.isSubmitting = false;
                 }
-            },
+            }
         };
         //const handler = {
         //    handleSubmit: async function () {
@@ -1873,113 +2089,132 @@ const App = {
                     sortSettings: { columns: [{ field: 'createdAtUtc', direction: 'Descending' }] },
                     pageSettings: { currentPage: 1, pageSize: 50, pageSizes: ["10", "20", "50", "100", "200", "All"] },
                     selectionSettings: { persistSelection: true, type: 'Single' },
+
                     autoFit: true,
                     showColumnMenu: true,
                     gridLines: 'Horizontal',
+
                     columns: [
                         { type: 'checkbox', width: 60 },
                         { field: 'id', isPrimaryKey: true, headerText: 'Id', visible: false },
-                        { field: 'number', headerText: 'Number', width: 150, minWidth: 150 },
-                        { field: 'receiveDate', headerText: 'Receive Date', width: 150, format: 'yyyy-MM-dd' },
-                        { field: 'purchaseOrderNumber', headerText: 'Purchase Order', width: 150, minWidth: 150 },
-                        { field: 'statusName', headerText: 'Status', width: 150, minWidth: 150 },
-                        { field: 'createdAtUtc', headerText: 'Created At UTC', width: 150, format: 'yyyy-MM-dd HH:mm' }
+                        { field: 'number', headerText: 'Number', width: 150 },
+                        { field: 'name', headerText: 'Name', width: 200 },
+                        { field: 'description', headerText: 'Description', width: 250 },
+                        {
+                            field: 'createdAtUtc',
+                            headerText: 'Created At',
+                            width: 180,
+                            format: 'yyyy-MM-dd HH:mm',
+                            valueAccessor: (f, d) =>
+                                d.createdAtUtc ? new Date(d.createdAtUtc).toLocaleString('en-GB') : ''
+                        }
                     ],
+
                     toolbar: [
                         'ExcelExport', 'Search',
                         { type: 'Separator' },
-                        { text: 'Add', tooltipText: 'Add', prefixIcon: 'e-add', id: 'AddCustom' },
-                        { text: 'Edit', tooltipText: 'Edit', prefixIcon: 'e-edit', id: 'EditCustom' },
-                        { text: 'Delete', tooltipText: 'Delete', prefixIcon: 'e-delete', id: 'DeleteCustom' },
-                        { type: 'Separator' },
-                        { text: 'Print PDF', tooltipText: 'Print PDF', id: 'PrintPDFCustom' },
+                        { text: 'Add', tooltipText: 'Add Attribute', prefixIcon: 'e-add', id: 'AddCustom' },
+                        { text: 'Edit', tooltipText: 'Edit Attribute', prefixIcon: 'e-edit', id: 'EditCustom' },
+                        { text: 'Delete', tooltipText: 'Delete Attribute', prefixIcon: 'e-delete', id: 'DeleteCustom' },
                     ],
-                    beforeDataBound: () => { },
+
+                    // =============== Grid Loaded ===============
                     dataBound: function () {
-                        mainGrid.obj.toolbarModule.enableItems(['EditCustom', 'DeleteCustom', 'PrintPDFCustom'], false);
-                        mainGrid.obj.autoFitColumns(['number', 'receiveDate', 'purchaseOrderNumber', 'statusName', 'createdAtUtc']);
+                        mainGrid.obj.toolbarModule.enableItems(['EditCustom', 'DeleteCustom'], false);
+                        mainGrid.obj.autoFitColumns(['number', 'name', 'description', 'createdAtUtc']);
                     },
-                    excelExportComplete: () => { },
+
+                    // =============== Selection ===============
                     rowSelected: () => {
-                        if (mainGrid.obj.getSelectedRecords().length == 1) {
-                            mainGrid.obj.toolbarModule.enableItems(['EditCustom', 'DeleteCustom', 'PrintPDFCustom'], true);
+                        if (mainGrid.obj.getSelectedRecords().length === 1) {
+                            mainGrid.obj.toolbarModule.enableItems(['EditCustom', 'DeleteCustom'], true);
                         } else {
-                            mainGrid.obj.toolbarModule.enableItems(['EditCustom', 'DeleteCustom', 'PrintPDFCustom'], false);
+                            mainGrid.obj.toolbarModule.enableItems(['EditCustom', 'DeleteCustom'], false);
                         }
                     },
                     rowDeselected: () => {
-                        if (mainGrid.obj.getSelectedRecords().length == 1) {
-                            mainGrid.obj.toolbarModule.enableItems(['EditCustom', 'DeleteCustom', 'PrintPDFCustom'], true);
+                        if (mainGrid.obj.getSelectedRecords().length === 1) {
+                            mainGrid.obj.toolbarModule.enableItems(['EditCustom', 'DeleteCustom'], true);
                         } else {
-                            mainGrid.obj.toolbarModule.enableItems(['EditCustom', 'DeleteCustom', 'PrintPDFCustom'], false);
+                            mainGrid.obj.toolbarModule.enableItems(['EditCustom', 'DeleteCustom'], false);
                         }
                     },
+
+                    // Prevent multi-select on click
                     rowSelecting: () => {
                         if (mainGrid.obj.getSelectedRecords().length) {
                             mainGrid.obj.clearSelection();
                         }
                     },
+
+                    // =============== Toolbar Clicks ===============
                     toolbarClick: async (args) => {
+
+                        // Export
                         if (args.item.id === 'MainGrid_excelexport') {
                             mainGrid.obj.excelExport();
+                            return;
                         }
+
+                        // ADD
                         if (args.item.id === 'AddCustom') {
-                            state.deleteMode = false;
-                            state.mainTitle = 'Add Goods Receive';
                             resetFormState();
-                            state.showComplexDiv = false;
+                            state.deleteMode = false;
+                            state.mainTitle = 'Add Attribute';
+                            numberText.refresh();
                             mainModal.obj.show();
+                            return;
                         }
+
+                        const selected = mainGrid.obj.getSelectedRecords();
+
+                        if ((args.item.id === 'EditCustom' || args.item.id === 'DeleteCustom') &&
+                            selected.length !== 1) {
+                            Swal.fire({ icon: 'warning', text: 'Please select exactly one row.' });
+                            return;
+                        }
+
+                        const row = selected[0];
+
+                        // EDIT
                         if (args.item.id === 'EditCustom') {
                             state.deleteMode = false;
-                            if (mainGrid.obj.getSelectedRecords().length) {
-                                const selectedRecord = mainGrid.obj.getSelectedRecords()[0];
-                                state.mainTitle = 'Edit Goods Receive';
-                                state.id = selectedRecord.id ?? '';
-                                state.number = selectedRecord.number ?? '';
-                                state.receiveDate = selectedRecord.receiveDate ? new Date(selectedRecord.receiveDate) : null;
-                                state.description = selectedRecord.description ?? '';
-                                state.purchaseOrderId = selectedRecord.purchaseOrderId ?? '';
-                                state.status = String(selectedRecord.status ?? '');
-                                await methods.populateSecondaryData();
-                                secondaryGrid.refresh();
-                                state.showComplexDiv = true;
-                                mainModal.obj.show();
-                            }
+
+                            Object.assign(state, {
+                                id: row.id,
+                                number: row.number,
+                                name: row.name,
+                                description: row.description,
+                                createdAt: new Date(row.createdAtUtc).toLocaleString('en-GB')
+                            });
+
+                            numberText.refresh();
+                            secondaryGrid.clearBatchChanges();
+                            await methods.populateSecondaryData(row.id);
+                            secondaryGrid.refresh();
+
+                            mainModal.obj.show();
+                            return;
                         }
+
+                        // DELETE
                         if (args.item.id === 'DeleteCustom') {
                             state.deleteMode = true;
-                            if (mainGrid.obj.getSelectedRecords().length) {
-                                const selectedRecord = mainGrid.obj.getSelectedRecords()[0];
-                                state.mainTitle = 'Delete Goods Receive?';
-                                state.id = selectedRecord.id ?? '';
-                                state.number = selectedRecord.number ?? '';
-                                state.receiveDate = selectedRecord.receiveDate ? new Date(selectedRecord.receiveDate) : null;
-                                state.description = selectedRecord.description ?? '';
-                                state.purchaseOrderId = selectedRecord.purchaseOrderId ?? '';
-                                state.status = String(selectedRecord.status ?? '');
-                                await methods.populateSecondaryData();
-                                secondaryGrid.refresh();
-                                state.showComplexDiv = false;
-                                mainModal.obj.show();
-                            }
-                        }
-                        if (args.item.id === 'PrintPDFCustom') {
-                            if (mainGrid.obj.getSelectedRecords().length) {
-                                const selectedRecord = mainGrid.obj.getSelectedRecords()[0];
-                                window.open('/GoodsReceives/GoodsReceivePdf?id=' + (selectedRecord.id ?? ''), '_blank');
-                            }
+                            Object.assign(state, row);
+                            state.mainTitle = 'Delete Attribute?';
+                            mainModal.obj.show();
+                            return;
                         }
                     }
                 });
+
                 mainGrid.obj.appendTo(mainGridRef.value);
             },
+
             refresh: () => {
                 mainGrid.obj.setProperties({ dataSource: state.mainData });
             }
         };
-
-        // **UPDATED SECONDARY GRID FOR GOODS RECEIVE ITEMS**
         const secondaryGrid = {
             obj: null,
             create: async (dataSource) => {
@@ -1990,195 +2225,360 @@ const App = {
                         allowEditing: true,
                         allowAdding: false,
                         allowDeleting: true,
-                        showDeleteConfirmDialog: true,
                         mode: 'Batch'
                     },
-                    allowFiltering: false,
-                    allowSorting: true,
-                    allowSelection: true,
-                    allowGrouping: false,
-                    allowTextWrap: true,
-                    allowResizing: true,
-                    allowPaging: false,
-                    allowExcelExport: true,
-                    filterSettings: { type: 'CheckBox' },
-                    sortSettings: { columns: [{ field: 'productId', direction: 'Ascending' }] },
-                    pageSettings: { currentPage: 1, pageSize: 50, pageSizes: ["10", "20", "50", "100", "200", "All"] },
-                    selectionSettings: { persistSelection: true, type: 'Single' },
-                    autoFit: false,
-                    showColumnMenu: false,
                     gridLines: 'Horizontal',
+                    allowSelection: true,
+                    allowSorting: true,
+                    allowPaging: false,
+                    allowResizing: true,
+                    allowTextWrap: true,
+                    selectionSettings: { persistSelection: true, type: 'Single' },
                     columns: [
-                        { type: 'checkbox', width: 60 },
-                        { field: 'id', headerText: 'Id', visible: false },
+                        { type: 'checkbox', width: 50 },
+                        { field: 'id', visible: false },
+                        { field: 'purchaseOrderItemId', isPrimaryKey: true, visible: false },
 
-                        { field: 'purchaseOrderItemId', isPrimaryKey: true, headerText: 'PO Item Id', visible: false },
-                        {
-                            field: 'warehouseId',
-                            headerText: 'Warehouse',
-                            width: 250,
-                            visible: false ,
-                            validationRules: { required: true },
-                            disableHtmlEncode: false,
-                            valueAccessor: (field, data, column) => {
-                                const warehouse = state.allWarehouses.find(item => item.id === data[field]);
-                                return warehouse ? `${warehouse.name}` : '';
-                            },
-                            allowEditing: false
-                        },
                         {
                             field: 'productId',
                             headerText: 'Product',
                             width: 200,
                             disableHtmlEncode: false,
-                            valueAccessor: (field, data, column) => {
+                            valueAccessor: (field, data) => {
                                 const product = state.productListLookupData.find(item => item.id === data[field]);
-                                return product ? `${product.numberName}` : '';
+                                return product ? product.numberName : '';
                             },
                             allowEditing: false
                         },
                         {
                             field: 'actualQuantity',
                             headerText: 'Order Quantity',
-                            width: 100,
-                            type: 'number',
-                            format: 'N2',
+                            width: 120,
                             textAlign: 'Right',
+                            format: 'N2',
+                            allowEditing: false
+                        },
+                        {
+                            field: 'remaingQuantity',
+                            headerText: 'Remaining Quantity',
+                            width: 120,
+                            textAlign: 'Right',
+                            format: 'N2',
                             allowEditing: false
                         },
                         {
                             field: 'receivedQuantity',
                             headerText: 'Received Quantity',
-                            width: 100,
-                            type: 'number',
-                            format: 'N2',
+                            width: 120,
                             textAlign: 'Right',
+                            format: 'N2',
                             editType: 'numericedit',
-                            edit: {
-                                params: {
-                                    decimals: 2,
-                                    min: 0,
-                                    step: 0.01
-                                }
+                            edit: { params: { decimals: 2, min: 0, step: 0.01 } },
+                            validationRules: {
+                                required: true,
+                                custom: [(args) => {
+                                    const rowIndex = args.element.closest('.e-row').rowIndex;
+                                    const rowObj = secondaryGrid.obj.getRowsObject()[rowIndex];
+                                    const rowData = rowObj.changes ?? rowObj.data;
+                                    const maxQty = parseFloat(rowData.remaingQuantity || 0);
+                                    const val = parseFloat(args.value || 0);
+                                    return val <= maxQty;
+                                }, 'Received Qty cannot exceed Remaining Qty']
                             }
                         },
                         {
                             field: 'unitPrice',
                             headerText: 'Unit Price',
                             width: 100,
-                            type: 'number',
-                            format: 'N2',
                             textAlign: 'Right',
+                            format: 'N2',
                             allowEditing: false
                         },
                         {
-                            field: 'tax_amount',
+                            field: 'taxAmount',
                             headerText: 'Tax Amount',
                             width: 100,
-                            type: 'number',
-                            format: 'N2',
                             textAlign: 'Right',
+                            format: 'N2',
                             allowEditing: false
-                        },
-
-                        {
-                            field: 'freight_charges',
-                            headerText: 'Transport Charges',
-                            width: 100,
-                            type: 'number',
-                            format: 'N2',
-                            textAlign: 'Right',
-                            allowEditing: true
-                        },
-                        {
-                            field: 'ohter_charges',
-                            headerText: 'Other Charges',
-                            width: 100,
-                            type: 'number',
-                            format: 'N2',
-                            textAlign: 'Right',
-                            allowEditing: true
                         },
                         {
                             field: 'FinalPrice',
-                            headerText: 'Final Price',
-                            width: 100,
+                            headerText: 'Final Price Per Unit',
+                            width: 130,
+                            textAlign: 'Right',
                             type: 'number',
                             format: 'N2',
-                            textAlign: 'Right',
-                            allowEditing: true
+                            allowEditing: false
                         },
                         {
                             field: 'MRP',
                             headerText: 'MRP',
-                            width: 100,
+                            width: 120,
+                            textAlign: 'Right',
                             type: 'number',
                             format: 'N2',
-                            textAlign: 'Right',
+                            editType: 'numericedit',
+                            edit: { params: { decimals: 2, min: 0, step: 0.01 } },
                             allowEditing: true
                         },
                         {
-                            
                             field: 'notes',
                             headerText: 'Notes',
-                            width: 100,
+                            width: 150,
                             editType: 'stringedit',
                             allowEditing: true
                         }
                     ],
-                    toolbar: [
-                        'ExcelExport',
-                        { type: 'Separator' },
-                        { text: 'Delete', tooltipText: 'Delete', prefixIcon: 'e-delete', id: 'DeleteCustom' }
-                    ],
-                    beforeDataBound: () => { },
-                    dataBound: function () {
-                        secondaryGrid.obj.toolbarModule.enableItems(['DeleteCustom'], false);
-                    },
-                    excelExportComplete: () => { },
-                    rowSelected: () => {
-                        if (secondaryGrid.obj.getSelectedRecords().length == 1) {
-                            secondaryGrid.obj.toolbarModule.enableItems(['DeleteCustom'], true);
-                        } else {
-                            secondaryGrid.obj.toolbarModule.enableItems(['DeleteCustom'], false);
+
+                    // ✅ Handle live recalculation when user edits "Received Quantity"
+                    cellEdit: (args) => {
+                        if (args.columnName === 'receivedQuantity') {
+                            setTimeout(() => {
+                                const inputEl = args.element?.querySelector('input');
+                                if (inputEl) {
+                                    inputEl.addEventListener('input', (e) => {
+                                        const val = parseFloat(e.target.value || 0);
+                                        const rowIndex = args.row?.rowIndex ?? 0;
+
+                                        if (state.secondaryData[rowIndex]) {
+                                            state.secondaryData[rowIndex].receivedQuantity = val;
+                                            methods.recalculateFinalPrices();
+                                        }
+                                    });
+                                }
+                            }, 0); // wait for next render tick
                         }
                     },
-                    rowDeselected: () => {
-                        if (secondaryGrid.obj.getSelectedRecords().length == 1) {
-                            secondaryGrid.obj.toolbarModule.enableItems(['DeleteCustom'], true);
-                        } else {
-                            secondaryGrid.obj.toolbarModule.enableItems(['DeleteCustom'], false);
-                        }
-                    },
-                    rowSelecting: () => {
-                        if (secondaryGrid.obj.getSelectedRecords().length) {
-                            secondaryGrid.obj.clearSelection();
-                        }
-                    },
-                    toolbarClick: (args) => {
-                        if (args.item.id === 'SecondaryGrid_excelexport') {
-                            secondaryGrid.obj.excelExport();
-                        }
-                        if (args.item.id === 'DeleteCustom') {
-                            const selectedRecord = secondaryGrid.obj.getSelectedRecords()[0];
-                            if (selectedRecord && selectedRecord.id) {
-                                state.deletedItems.push(selectedRecord);
+
+                    // ✅ Save handler when cell edit completes
+                    cellSave: (args) => {
+                        debugger
+                        if (args.columnName === 'receivedQuantity') {
+                            const newValue = parseFloat(args.value || 0);
+
+                            // Update state with final value
+                            const index = state.secondaryData.findIndex(
+                                x => x.purchaseOrderItemId === args.rowData.purchaseOrderItemId
+                            );
+                            if (index !== -1) {
+                                state.secondaryData[index].receivedQuantity = newValue;
                             }
-                            secondaryGrid.obj.deleteRecord();
+
+                            // Recalculate all after save
+                            methods.recalculateFinalPrices();
                         }
                     },
+
                     actionComplete: (args) => {
-                        if (args.requestType === 'save' || args.requestType === 'delete') {
+                        if (args.requestType === 'save' || args.requestType === 'batchSave') {
                             methods.refreshSummary();
                         }
                     }
                 });
+
                 secondaryGrid.obj.appendTo(secondaryGridRef.value);
             },
+
             refresh: () => {
                 secondaryGrid.obj.setProperties({ dataSource: state.secondaryData });
             }
         };
+
+
+        //// **UPDATED SECONDARY GRID FOR GOODS RECEIVE ITEMS**
+        //const secondaryGrid = {
+        //    obj: null,
+        //    create: async (dataSource) => {
+        //        secondaryGrid.obj = new ej.grids.Grid({
+        //            height: 400,
+        //            dataSource: dataSource,
+        //            editSettings: {
+        //                allowEditing: true,
+        //                allowAdding: false,
+        //                allowDeleting: true,
+        //                showDeleteConfirmDialog: true,
+        //                mode: 'Batch'
+        //            },
+        //            allowFiltering: false,
+        //            allowSorting: true,
+        //            allowSelection: true,
+        //            allowGrouping: false,
+        //            allowTextWrap: true,
+        //            allowResizing: true,
+        //            allowPaging: false,
+        //            allowExcelExport: true,
+        //            filterSettings: { type: 'CheckBox' },
+        //            sortSettings: { columns: [{ field: 'productId', direction: 'Ascending' }] },
+        //            pageSettings: { currentPage: 1, pageSize: 50, pageSizes: ["10", "20", "50", "100", "200", "All"] },
+        //            selectionSettings: { persistSelection: true, type: 'Single' },
+        //            autoFit: false,
+        //            showColumnMenu: false,
+        //            gridLines: 'Horizontal',
+        //            columns: [
+        //                { type: 'checkbox', width: 60 },
+        //                { field: 'id', headerText: 'Id', visible: false },
+        //                { field: 'purchaseOrderItemId', isPrimaryKey: true, headerText: 'PO Item Id', visible: false },
+        //                {
+        //                    field: 'warehouseId',
+        //                    headerText: 'Warehouse',
+        //                    width: 250,
+        //                    visible: false,
+        //                    validationRules: { required: true },
+        //                    disableHtmlEncode: false,
+        //                    valueAccessor: (field, data, column) => {
+        //                        const warehouse = state.allWarehouses.find(item => item.id === data[field]);
+        //                        return warehouse ? `${warehouse.name}` : '';
+        //                    },
+        //                    allowEditing: false
+        //                },
+        //                {
+        //                    field: 'productId',
+        //                    headerText: 'Product',
+        //                    width: 200,
+        //                    disableHtmlEncode: false,
+        //                    valueAccessor: (field, data, column) => {
+        //                        const product = state.productListLookupData.find(item => item.id === data[field]);
+        //                        return product ? `${product.numberName}` : '';
+        //                    },
+        //                    allowEditing: false
+        //                },
+        //                {
+        //                    field: 'actualQuantity',
+        //                    headerText: 'Order Quantity',
+        //                    width: 120,
+        //                    type: 'number',
+        //                    format: 'N2',
+        //                    textAlign: 'Right',
+        //                    allowEditing: false
+        //                },
+        //                {
+        //                    field: 'remaingQuantity',
+        //                    headerText: 'Remaining Quantity',
+        //                    width: 120,
+        //                    type: 'number',
+        //                    format: 'N2',
+        //                    textAlign: 'Right',
+        //                    allowEditing: false // ✅ read-only
+        //                },
+        //                {
+        //                    field: 'receivedQuantity',
+        //                    headerText: 'Received Quantity',
+        //                    width: 120,
+        //                    type: 'number',
+        //                    format: 'N2',
+        //                    textAlign: 'Right',
+        //                    editType: 'numericedit',
+        //                    edit: {
+        //                        params: {
+        //                            decimals: 2,
+        //                            min: 0,
+        //                            step: 0.01
+        //                        }
+        //                    },
+        //                    validationRules: {
+        //                        required: true,
+        //                        min: [0, 'Value cannot be less than 0'],
+        //                        // ✅ Custom validation: receivedQuantity <= remaingQuantity
+        //                        custom: [(args) => {
+        //                            const rowIndex = args.element.closest('.e-row').rowIndex;
+        //                            const rowObj = secondaryGrid.obj.getRowsObject()[rowIndex];
+        //                            const rowData = rowObj.changes ?? rowObj.data;
+        //                            return parseFloat(args.value || 0) <= parseFloat(rowData.remaingQuantity || 0);
+        //                        }, 'Received quantity cannot be greater than Remaining quantity']
+        //                    }
+        //                },
+        //                {
+        //                    field: 'unitPrice',
+        //                    headerText: 'Unit Price',
+        //                    width: 100,
+        //                    type: 'number',
+        //                    format: 'N2',
+        //                    textAlign: 'Right',
+        //                    allowEditing: false
+        //                },
+        //                {
+        //                    field: 'taxAmount',
+        //                    headerText: 'Tax Amount',
+        //                    width: 100,
+        //                    type: 'number',
+        //                    format: 'N2',
+        //                    textAlign: 'Right',
+        //                    allowEditing: false
+        //                },
+        //                {
+        //                    field: 'FinalPrice',
+        //                    headerText: 'Final Price',
+        //                    width: 100,
+        //                    type: 'number',
+        //                    format: 'N2',
+        //                    textAlign: 'Right',
+        //                    allowEditing: true
+        //                },
+        //                {
+        //                    field: 'MRP',
+        //                    headerText: 'MRP',
+        //                    width: 100,
+        //                    type: 'number',
+        //                    format: 'N2',
+        //                    textAlign: 'Right',
+        //                    allowEditing: true
+        //                },
+        //                {
+        //                    field: 'notes',
+        //                    headerText: 'Notes',
+        //                    width: 150,
+        //                    editType: 'stringedit',
+        //                    allowEditing: true
+        //                }
+        //            ],
+        //            toolbar: [
+        //                'ExcelExport',
+        //                { type: 'Separator' },
+        //                { text: 'Delete', tooltipText: 'Delete', prefixIcon: 'e-delete', id: 'DeleteCustom' }
+        //            ],
+        //            beforeDataBound: () => { },
+        //            dataBound: function () {
+        //                secondaryGrid.obj.toolbarModule.enableItems(['DeleteCustom'], false);
+        //            },
+        //            excelExportComplete: () => { },
+        //            rowSelected: () => {
+        //                const selected = secondaryGrid.obj.getSelectedRecords().length;
+        //                secondaryGrid.obj.toolbarModule.enableItems(['DeleteCustom'], selected === 1);
+        //            },
+        //            rowDeselected: () => {
+        //                const selected = secondaryGrid.obj.getSelectedRecords().length;
+        //                secondaryGrid.obj.toolbarModule.enableItems(['DeleteCustom'], selected === 1);
+        //            },
+        //            rowSelecting: () => {
+        //                if (secondaryGrid.obj.getSelectedRecords().length) {
+        //                    secondaryGrid.obj.clearSelection();
+        //                }
+        //            },
+        //            toolbarClick: (args) => {
+        //                if (args.item.id === 'SecondaryGrid_excelexport') {
+        //                    secondaryGrid.obj.excelExport();
+        //                }
+        //                if (args.item.id === 'DeleteCustom') {
+        //                    const selectedRecord = secondaryGrid.obj.getSelectedRecords()[0];
+        //                    if (selectedRecord && selectedRecord.id) {
+        //                        state.deletedItems.push(selectedRecord);
+        //                    }
+        //                    secondaryGrid.obj.deleteRecord();
+        //                }
+        //            },
+        //            actionComplete: (args) => {
+        //                if (args.requestType === 'save' || args.requestType === 'delete') {
+        //                    methods.refreshSummary();
+        //                }
+        //            }
+        //        });
+        //        secondaryGrid.obj.appendTo(secondaryGridRef.value);
+        //    },
+        //    refresh: () => {
+        //        secondaryGrid.obj.setProperties({ dataSource: state.secondaryData });
+        //    }
+        //};
 
         const mainModal = {
             obj: null,
