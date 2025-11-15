@@ -128,6 +128,74 @@
             </div>
         </div>
     </div>
+
+@*     not used modal
+ *@
+    <!-- Attribute Combination Modal -->
+    <div class="modal fade" id="AttributeModal" tabindex="-1" aria-labelledby="AttributeModalLabel" aria-hidden="true" data-bs-focus="false" data-bs-backdrop="static">
+        <div class="modal-dialog modal-lg modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title" id="AttributeModalLabel">Attribute Combinations</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+
+                <div class="modal-body">
+                    <table class="table table-bordered align-middle text-center">
+                        <thead>
+                            <tr>
+                                <th v-for="attr in state.currentProductAttributes" :key="attr.id">{{ attr.name }}</th>
+
+                                <th>Quantity</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr v-for="(row, rowIndex) in state.attributeRows" :key="row.id">
+                                <td v-for="attr in state.currentProductAttributes" :key="attr.id">
+                                    <select class="form-select form-select-sm"
+                                            v-model="row.values[attr.id]"
+                                            :disabled="!attr.values.length">
+                                        <option value="">Select {{ attr.name }}</option>
+                                        <option v-for="v in attr.values" :key="v.id" :value="v.id">{{ v.valueName }}</option>
+                                    </select>
+                                </td>
+                               
+                                <td>
+                                    <input type="number" min="1" class="form-control form-control-sm"
+                                           v-model.number="row.quantity"
+                                           @@change="methods.validateAttributeQuantity" />
+                                </td>
+
+                                <td>
+                                    <!-- ✅ use @@click -->
+                                    <button class="btn btn-danger btn-sm" @@click="methods.removeAttributeRow(rowIndex)">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+
+                    <div class="text-end">
+                        <!-- ✅ use @@click -->
+                        <button class="btn btn-sm btn-primary" @@click="methods.addAttributeRow">
+                            <i class="bi bi-plus-circle"></i> Add Row
+                        </button>
+                    </div>
+                </div>
+
+
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button class="btn btn-success" @@click ="methods.saveAttributeCombinations">
+                        Save Combinations
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
 </div>
 
 @section scripts {

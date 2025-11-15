@@ -57,6 +57,9 @@ public class DataContext : IdentityDbContext<ApplicationUser>, IEntityDbSet
 
     public DbSet<ProductGroupAttributeValue> ProductGroupAttributeValues { get; set; } //Add this 
 
+    public DbSet<PurchaseOrderItemAttributeCombination> PurchaseOrderItemAttributeCombination { get; set; } //Add this but not used
+
+    public DbSet<ProductPriceDefinition> ProductPriceDefinition { get; set; } //Add this 
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -113,6 +116,8 @@ public class DataContext : IdentityDbContext<ApplicationUser>, IEntityDbSet
         modelBuilder.ApplyConfiguration(new GoodsReceiveItemConfiguration()); // NEW
         modelBuilder.ApplyConfiguration(new ProductGroupAttributeConfiguration());
         modelBuilder.ApplyConfiguration(new ProductGroupAttributeValueConfiguration());
+        modelBuilder.ApplyConfiguration(new PurchaseOrderItemAttributeCombinationConfiguration());
+        modelBuilder.ApplyConfiguration(new ProductPriceDefinitionConfiguration());
 
     }
 

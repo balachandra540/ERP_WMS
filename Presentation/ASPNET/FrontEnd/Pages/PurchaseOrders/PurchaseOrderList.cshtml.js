@@ -28,7 +28,11 @@
             isSubmitting: false,
             subTotalAmount: '0.00',
             taxAmount: '0.00',
-            totalAmount: '0.00'
+            totalAmount: '0.00',
+            attributeRows: [],
+            attributeModal: null,
+            currentRowContext: null,
+            productGroupId : '',
         });
 
         const mainGridRef = Vue.ref(null);
@@ -167,7 +171,7 @@
             state.totalAmount = '0.00';
             state.showComplexDiv = false;
         };
-
+        
         const services = {           
             getMainData: async () => {
                 try {
@@ -335,6 +339,33 @@
                     throw error;
                 }
             }
+            //,
+            //getAttributesAndValuesByProductGroupId: async (productGroupId) => {
+            //    try {
+            //        if (!productGroupId) return [];
+
+            //        const [attrResponse, valResponse] = await Promise.all([
+            //            AxiosManager.get(`/ProductGroup/GetAttributes?productGroupId=${productGroupId}`),
+            //            AxiosManager.get(`/ProductGroup/GetAttributeValues?productGroupId=${productGroupId}`)
+            //        ]);
+
+            //        const attributes = attrResponse?.data?.content?.data || [];
+            //        const values = valResponse?.data?.content?.data || [];
+
+            //        // ✅ Only include attributes that have values
+            //        return attributes
+            //            .map(attr => ({
+            //                id: attr.id,
+            //                name: attr.attributeName,
+            //                values: values.filter(v => v.attributeId === attr.id)
+            //            }))
+            //            .filter(attr => attr.values && attr.values.length > 0);
+
+            //    } catch (error) {
+            //        console.error("Error fetching attributes and values:", error);
+            //        return [];
+            //    }
+            //},
         };
 
         const methods = {
@@ -628,6 +659,88 @@
                 state.errors.orderStatus = '';
                 taxListLookup.trackingChange = false;
             }
+            //,
+            // ───────── Attribute Combination Modal ─────────
+
+            //openAttributeModal: (attributes, rowData) => {
+            //    state.currentProductAttributes = attributes;
+            //    state.attributeRows = [];       // reset old data
+            //    state.currentRowContext = rowData;
+
+            //    if (!state.attributeModal) {
+            //        state.attributeModal = new bootstrap.Modal(document.getElementById('AttributeModal'));
+            //    }
+            //    state.attributeModal.show();
+            //    methods.addAttributeRow();
+            //},
+
+            //addAttributeRow: () => {
+            //    debugger;
+            //    const newRow = {
+            //        id: Date.now(),
+            //        values: {},
+            //        quantity: 1
+            //    };
+            //    state.attributeRows.push(newRow);
+            //},
+
+            //removeAttributeRow: (index) => {
+            //    state.attributeRows.splice(index, 1);
+            //},
+            //validateAttributeQuantity: () => {
+            //    const totalQty = state.attributeRows.reduce((sum, r) => sum + (r.quantity || 0), 0);
+            //    const expectedQty = state.currentRowContext.quantity;
+
+            //    if (totalQty > expectedQty) {
+            //        Swal.fire({
+            //            icon: 'warning',
+            //            title: 'Quantity Limit Exceeded',
+            //            text: `Total quantity (${totalQty}) cannot exceed ${expectedQty}.`
+            //        });
+            //    }
+            //},
+
+            //saveAttributeCombinations: () => {
+            //    if (!state.currentRowContext) return;
+
+            //    // Validation
+            //    let totalQty = 0;
+            //    for (const row of state.attributeRows) {
+            //        const missing = state.currentProductAttributes.filter(a => !row.values[a.id]);
+            //        if (missing.length) {
+            //            Swal.fire({ icon: 'warning', text: `Select values for: ${missing.map(a => a.name).join(', ')}` });
+            //            return;
+            //        }
+            //        if (!row.quantity || row.quantity <= 0) {
+            //            Swal.fire({ icon: 'warning', text: 'Each row must have quantity > 0' });
+            //            return;
+            //        }
+            //        totalQty += row.quantity;
+            //    }
+
+            //    const poQty = state.currentRowContext.quantity || 0;
+            //    if (totalQty !== poQty) {
+            //        Swal.fire({
+            //            icon: 'warning',
+            //            title: 'Quantity mismatch',
+            //            text: `Sum of attribute quantities (${totalQty}) must equal product quantity (${poQty}).`
+            //        });
+            //        return;
+            //    }
+
+            //    // Store combinations in the row data
+            //    state.currentRowContext.attributeCombinations = JSON.parse(JSON.stringify(state.attributeRows));
+
+            //    Swal.fire({
+            //        icon: 'success',
+            //        title: 'Saved!',
+            //        timer: 1000,
+            //        showConfirmButton: false
+            //    });
+
+            //    state.attributeModal.hide();
+            //},
+
         };
 
         const vendorListLookup = {
@@ -1002,6 +1115,7 @@
                                         value: args.rowData.productId,
                                         change: (e) => {
                                             const selectedProduct = state.productListLookupData.find(item => item.id === e.value);
+                                            state.productGroupId = selectedProduct.productGroupId;
                                             if (selectedProduct) {
                                                 args.rowData.productId = selectedProduct.id;
                                                 if (numberObj) {
@@ -1022,7 +1136,7 @@
                                                     if (totalObj) {
                                                         totalObj.value = total;
                                                     }
-                                                }
+                                                }                                                
                                             }
                                         },
                                         placeholder: 'Select a Product',
@@ -1032,6 +1146,72 @@
                                 }
                             }
                         },
+                        //{
+                        //    field: 'quantity',
+                        //    headerText: 'Quantity',
+                        //    width: 200,
+                        //    validationRules: {
+                        //        required: true,
+                        //        custom: [(args) => {
+                        //            return args['value'] > 0;
+                        //        }, 'Must be a positive number and not zero']
+                        //    },
+                        //    type: 'number', format: 'N2', textAlign: 'Right',
+                        //    edit: {
+                        //        create: () => {
+                        //            let quantityElem = document.createElement('input');
+                        //            return quantityElem;
+                        //        },
+                        //        read: () => {
+                        //            return quantityObj.value;
+                        //        },
+                        //        destroy: () => {
+                        //            quantityObj.destroy();
+                        //        },
+                        //        write: (args) => {
+                        //            quantityObj = new ej.inputs.NumericTextBox({
+                        //                value: args.rowData.quantity ?? 0,
+                        //                change: (e) => {
+                        //                    if (priceObj && totalObj) {
+                        //                        const unitPrice = priceObj.value || 0;
+                        //                        const quantity = e.value || 0;
+
+                        //                        const taxPercent = taxObj?.value
+                        //                            ? (state.taxListLookupData.find(t => t.id === taxObj.value)?.percentage || 0)
+                        //                            : 0;
+                        //                        let taxAmount;
+                        //                        let totalAfterTax;
+                        //                        if (taxPercent === 0) {
+                        //                            // Explicit zero-tax calculation: No tax applied
+                        //                            taxAmount = 0;
+                        //                            totalAfterTax = unitPrice;
+                        //                        } else {
+                        //                            // Original non-zero tax calculation
+                        //                            taxAmount = (unitPrice * taxPercent) / 100;
+                        //                            totalAfterTax = unitPrice + taxAmount;
+                        //                        }
+                        //                        const total = totalAfterTax * quantity;
+                        //                        totalObj.value = total;
+                        //                    }
+                        //                },
+                        //                //focusOut: async () => {  // ✅ Triggers more reliably than blur
+                        //                //    debugger;
+                        //                //    const product = state.productListLookupData.find(p => p.id === args.rowData.productId);
+                        //                //    if (product?.productGroupId) {
+                        //                //        const attributes = await services.getAttributesAndValuesByProductGroupId(product.productGroupId);
+                        //                //        if (attributes && attributes.length) {
+                        //                //            methods.openAttributeModal(attributes, args.rowData);
+                        //                //        }
+                        //                //    }
+                        //                //}
+                                        
+
+                        //            });
+                        //            quantityObj.appendTo(args.element);
+                        //        },
+                                
+                        //    }
+                        //},
                         {
                             field: 'unitPrice',
                             headerText: 'Unit Price',
@@ -1231,7 +1411,7 @@
                                     quantityObj.appendTo(args.element);
                                 }
                             }
-                        },
+                        },  
                         {
                             field: 'total',
                             headerText: 'Total',
@@ -1335,10 +1515,23 @@
                             secondaryGrid.obj.excelExport();
                         }
                     },
+                    actionBegin: async (args) => {
+                        
+                    },
                     actionComplete: async (args) => {
                         const purchaseOrderId = state.id;
                         const userId = StorageManager.getUserId();
+                        //if (args.requestType === 'save' && args.data.quantity > 0) {
+                        //    const rowData = args.data;
+                        //    const product = state.productListLookupData.find(p => p.id === rowData.productId);
 
+                        //    if (product?.productGroupId && rowData.quantity > 0) {
+                        //        const attributes = await services.getAttributesAndValuesByProductGroupId(product.productGroupId);
+                        //        if (attributes && attributes.length) {
+                        //            methods.openAttributeModal(attributes, rowData);
+                        //        }
+                        //    }
+                        //}
                         // Track changes manually
                         if (args.requestType === 'save' && args.action === 'add') {
                             // Track added record

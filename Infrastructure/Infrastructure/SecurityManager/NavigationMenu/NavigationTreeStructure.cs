@@ -128,6 +128,11 @@ public static class NavigationTreeStructure
                     "IsModule": false
                 },
                 {
+                    "URL": "/Products/ProductPriceDefinition",
+                    "Name": "Price Definition",
+                    "IsModule": false
+                },
+                {
                     "URL": "/DeliveryOrders/DeliveryOrderList",
                     "Name": "Delivery Order",
                     "IsModule": false

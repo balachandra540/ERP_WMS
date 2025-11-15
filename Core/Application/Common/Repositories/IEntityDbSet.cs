@@ -46,6 +46,11 @@ public interface IEntityDbSet
     public DbSet<ProductGroupAttributes> ProductGroupAttributes { get; set; } // Add this line
     public DbSet<ProductGroupAttributeValue> ProductGroupAttributeValues { get; set; } // Add this line
 
+    public DbSet<PurchaseOrderItemAttributeCombination> PurchaseOrderItemAttributeCombination { get; set; }//not use this
+
+    public DbSet<ProductPriceDefinition> ProductPriceDefinition { get; set; }
+
+
 
 }
 

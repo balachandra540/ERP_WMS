@@ -80,6 +80,72 @@ public class ProductController : BaseApiController
             Content = response
         });
     }
+
+    // --------------------------------------------
+    // PRODUCT PRICE DEFINITION
+    // --------------------------------------------
+
+    [Authorize]
+    [HttpGet("GetProductPriceDefinitionList")]
+    public async Task<ActionResult<ApiSuccessResult<GetProductPriceDefinitionListResult>>> GetProductPriceDefinitionListAsync(CancellationToken cancellationToken)
+    {
+        var request = new GetProductPriceDefinitionListRequest();
+
+        var response = await _sender.Send(request, cancellationToken);
+
+        return Ok(new ApiSuccessResult<GetProductPriceDefinitionListResult>
+        {
+            Code = StatusCodes.Status200OK,
+            Message = $"Success executing {nameof(GetProductPriceDefinitionListAsync)}",
+            Content = response
+        });
+    }
+
+    [Authorize]
+    [HttpPost("CreateProductPriceDefinition")]
+    public async Task<ActionResult<ApiSuccessResult<CreateProductPriceDefinitionResult>>> CreateProductPriceDefinitionAsync(
+        CreateProductPriceDefinitionRequest request, CancellationToken cancellationToken)
+    {
+        var response = await _sender.Send(request, cancellationToken);
+
+        return Ok(new ApiSuccessResult<CreateProductPriceDefinitionResult>
+        {
+            Code = StatusCodes.Status200OK,
+            Message = $"Success executing {nameof(CreateProductPriceDefinitionAsync)}",
+            Content = response
+        });
+    }
+
+    [Authorize]
+    [HttpPost("UpdateProductPriceDefinition")]
+    public async Task<ActionResult<ApiSuccessResult<UpdateProductPriceDefinitionResult>>> UpdateProductPriceDefinitionAsync(
+        UpdateProductPriceDefinitionRequest request, CancellationToken cancellationToken)
+    {
+        var response = await _sender.Send(request, cancellationToken);
+
+        return Ok(new ApiSuccessResult<UpdateProductPriceDefinitionResult>
+        {
+            Code = StatusCodes.Status200OK,
+            Message = $"Success executing {nameof(UpdateProductPriceDefinitionAsync)}",
+            Content = response
+        });
+    }
+
+    [Authorize]
+    [HttpPost("DeleteProductPriceDefinition")]
+    public async Task<ActionResult<ApiSuccessResult<DeleteProductPriceDefinitionResult>>> DeleteProductPriceDefinitionAsync(
+        DeleteProductPriceDefinitionRequest request, CancellationToken cancellationToken)
+    {
+        var response = await _sender.Send(request, cancellationToken);
+
+        return Ok(new ApiSuccessResult<DeleteProductPriceDefinitionResult>
+        {
+            Code = StatusCodes.Status200OK,
+            Message = $"Success executing {nameof(DeleteProductPriceDefinitionAsync)}",
+            Content = response
+        });
+    }
+
     [Authorize]
     [HttpGet("GetInventoryProductList")]
     public async Task<ActionResult<ApiSuccessResult<GetProductListResult>>> GetInventoryProductListAsync(
