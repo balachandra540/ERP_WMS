@@ -534,16 +534,7 @@ public class UpdateGoodsReceiveHandler : IRequestHandler<UpdateGoodsReceiveReque
         // ✅ Step 9: Final save and propagate
         await _unitOfWork.SaveAsync(cancellationToken);
 
-        //await _inventoryTransactionService.PropagateParentUpdate(
-        //    entity.Id,
-        //    nameof(GoodsReceive),
-        //    entity.ReceiveDate,
-        //    (InventoryTransactionStatus?)entity.Status,
-        //    entity.IsDeleted,
-        //    entity.UpdatedById,
-        //    null,
-        //    cancellationToken);
-
+        
         return new UpdateGoodsReceiveResult { Data = entity };
     }
 }

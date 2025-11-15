@@ -45,6 +45,9 @@ public interface IEntityDbSet
     public DbSet<Scrapping> Scrapping { get; set; }
     public DbSet<ProductGroupAttributes> ProductGroupAttributes { get; set; } // Add this line
     public DbSet<ProductGroupAttributeValue> ProductGroupAttributeValues { get; set; } // Add this line
+    public DbSet<Domain.Entities.Attribute> Attribute { get; set; }
+
+    public DbSet<AttributeDetail> AttributeDetail { get; set; }
 
 
 }

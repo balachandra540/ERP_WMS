@@ -2089,111 +2089,128 @@ const App = {
                     sortSettings: { columns: [{ field: 'createdAtUtc', direction: 'Descending' }] },
                     pageSettings: { currentPage: 1, pageSize: 50, pageSizes: ["10", "20", "50", "100", "200", "All"] },
                     selectionSettings: { persistSelection: true, type: 'Single' },
+
                     autoFit: true,
                     showColumnMenu: true,
                     gridLines: 'Horizontal',
+
                     columns: [
                         { type: 'checkbox', width: 60 },
                         { field: 'id', isPrimaryKey: true, headerText: 'Id', visible: false },
-                        { field: 'number', headerText: 'Number', width: 150, minWidth: 150 },
-                        { field: 'receiveDate', headerText: 'Receive Date', width: 150, format: 'yyyy-MM-dd' },
-                        { field: 'purchaseOrderNumber', headerText: 'Purchase Order', width: 150, minWidth: 150 },
-                        { field: 'statusName', headerText: 'Status', width: 150, minWidth: 150 },
-                        { field: 'createdAtUtc', headerText: 'Created At UTC', width: 150, format: 'yyyy-MM-dd HH:mm' }
+                        { field: 'number', headerText: 'Number', width: 150 },
+                        { field: 'name', headerText: 'Name', width: 200 },
+                        { field: 'description', headerText: 'Description', width: 250 },
+                        {
+                            field: 'createdAtUtc',
+                            headerText: 'Created At',
+                            width: 180,
+                            format: 'yyyy-MM-dd HH:mm',
+                            valueAccessor: (f, d) =>
+                                d.createdAtUtc ? new Date(d.createdAtUtc).toLocaleString('en-GB') : ''
+                        }
                     ],
+
                     toolbar: [
                         'ExcelExport', 'Search',
                         { type: 'Separator' },
-                        { text: 'Add', tooltipText: 'Add', prefixIcon: 'e-add', id: 'AddCustom' },
-                        { text: 'Edit', tooltipText: 'Edit', prefixIcon: 'e-edit', id: 'EditCustom' },
-                        { text: 'Delete', tooltipText: 'Delete', prefixIcon: 'e-delete', id: 'DeleteCustom' },
-                        { type: 'Separator' },
-                        { text: 'Print PDF', tooltipText: 'Print PDF', id: 'PrintPDFCustom' },
+                        { text: 'Add', tooltipText: 'Add Attribute', prefixIcon: 'e-add', id: 'AddCustom' },
+                        { text: 'Edit', tooltipText: 'Edit Attribute', prefixIcon: 'e-edit', id: 'EditCustom' },
+                        { text: 'Delete', tooltipText: 'Delete Attribute', prefixIcon: 'e-delete', id: 'DeleteCustom' },
                     ],
-                    beforeDataBound: () => { },
+
+                    // =============== Grid Loaded ===============
                     dataBound: function () {
-                        mainGrid.obj.toolbarModule.enableItems(['EditCustom', 'DeleteCustom', 'PrintPDFCustom'], false);
-                        mainGrid.obj.autoFitColumns(['number', 'receiveDate', 'purchaseOrderNumber', 'statusName', 'createdAtUtc']);
+                        mainGrid.obj.toolbarModule.enableItems(['EditCustom', 'DeleteCustom'], false);
+                        mainGrid.obj.autoFitColumns(['number', 'name', 'description', 'createdAtUtc']);
                     },
-                    excelExportComplete: () => { },
+
+                    // =============== Selection ===============
                     rowSelected: () => {
-                        if (mainGrid.obj.getSelectedRecords().length == 1) {
-                            mainGrid.obj.toolbarModule.enableItems(['EditCustom', 'DeleteCustom', 'PrintPDFCustom'], true);
+                        if (mainGrid.obj.getSelectedRecords().length === 1) {
+                            mainGrid.obj.toolbarModule.enableItems(['EditCustom', 'DeleteCustom'], true);
                         } else {
-                            mainGrid.obj.toolbarModule.enableItems(['EditCustom', 'DeleteCustom', 'PrintPDFCustom'], false);
+                            mainGrid.obj.toolbarModule.enableItems(['EditCustom', 'DeleteCustom'], false);
                         }
                     },
                     rowDeselected: () => {
-                        if (mainGrid.obj.getSelectedRecords().length == 1) {
-                            mainGrid.obj.toolbarModule.enableItems(['EditCustom', 'DeleteCustom', 'PrintPDFCustom'], true);
+                        if (mainGrid.obj.getSelectedRecords().length === 1) {
+                            mainGrid.obj.toolbarModule.enableItems(['EditCustom', 'DeleteCustom'], true);
                         } else {
-                            mainGrid.obj.toolbarModule.enableItems(['EditCustom', 'DeleteCustom', 'PrintPDFCustom'], false);
+                            mainGrid.obj.toolbarModule.enableItems(['EditCustom', 'DeleteCustom'], false);
                         }
                     },
+
+                    // Prevent multi-select on click
                     rowSelecting: () => {
                         if (mainGrid.obj.getSelectedRecords().length) {
                             mainGrid.obj.clearSelection();
                         }
                     },
+
+                    // =============== Toolbar Clicks ===============
                     toolbarClick: async (args) => {
+
+                        // Export
                         if (args.item.id === 'MainGrid_excelexport') {
                             mainGrid.obj.excelExport();
+                            return;
                         }
-                        if (args.item.id === 'AddCustom') {
-                            state.deleteMode = false;
-                            state.mainTitle = 'Add Goods Receive';
-                            resetFormState();
-                            state.showComplexDiv = false;
-                            mainModal.obj.show();
-                        }
-                        if (args.item.id === 'EditCustom') {
-                            debugger;
-                            state.deleteMode = false;
-                            if (mainGrid.obj.getSelectedRecords().length) {
-                                const selectedRecord = mainGrid.obj.getSelectedRecords()[0];
-                                state.mainTitle = 'Edit Goods Receive';
-                                state.id = selectedRecord.id ?? '';
-                                state.number = selectedRecord.number ?? '';
-                                state.receiveDate = selectedRecord.receiveDate ? new Date(selectedRecord.receiveDate) : null;
-                                state.description = selectedRecord.description ?? '';
-                                state.purchaseOrderId = selectedRecord.purchaseOrderId ?? '';
-                                state.status = String(selectedRecord.status ?? '');
-                                state.transportCharges = selectedRecord.freightCharges ?? 0
-                                state.otherCharges = selectedRecord.otherCharges ?? 0
 
-                                await methods.populateSecondaryData();
-                                secondaryGrid.refresh();
-                                state.showComplexDiv = true;
-                                mainModal.obj.show();
-                            }
+                        // ADD
+                        if (args.item.id === 'AddCustom') {
+                            resetFormState();
+                            state.deleteMode = false;
+                            state.mainTitle = 'Add Attribute';
+                            numberText.refresh();
+                            mainModal.obj.show();
+                            return;
                         }
+
+                        const selected = mainGrid.obj.getSelectedRecords();
+
+                        if ((args.item.id === 'EditCustom' || args.item.id === 'DeleteCustom') &&
+                            selected.length !== 1) {
+                            Swal.fire({ icon: 'warning', text: 'Please select exactly one row.' });
+                            return;
+                        }
+
+                        const row = selected[0];
+
+                        // EDIT
+                        if (args.item.id === 'EditCustom') {
+                            state.deleteMode = false;
+
+                            Object.assign(state, {
+                                id: row.id,
+                                number: row.number,
+                                name: row.name,
+                                description: row.description,
+                                createdAt: new Date(row.createdAtUtc).toLocaleString('en-GB')
+                            });
+
+                            numberText.refresh();
+                            secondaryGrid.clearBatchChanges();
+                            await methods.populateSecondaryData(row.id);
+                            secondaryGrid.refresh();
+
+                            mainModal.obj.show();
+                            return;
+                        }
+
+                        // DELETE
                         if (args.item.id === 'DeleteCustom') {
                             state.deleteMode = true;
-                            if (mainGrid.obj.getSelectedRecords().length) {
-                                const selectedRecord = mainGrid.obj.getSelectedRecords()[0];
-                                state.mainTitle = 'Delete Goods Receive?';
-                                state.id = selectedRecord.id ?? '';
-                                state.number = selectedRecord.number ?? '';
-                                state.receiveDate = selectedRecord.receiveDate ? new Date(selectedRecord.receiveDate) : null;
-                                state.description = selectedRecord.description ?? '';
-                                state.purchaseOrderId = selectedRecord.purchaseOrderId ?? '';
-                                state.status = String(selectedRecord.status ?? '');
-                                await methods.populateSecondaryData();
-                                secondaryGrid.refresh();
-                                state.showComplexDiv = false;
-                                mainModal.obj.show();
-                            }
-                        }
-                        if (args.item.id === 'PrintPDFCustom') {
-                            if (mainGrid.obj.getSelectedRecords().length) {
-                                const selectedRecord = mainGrid.obj.getSelectedRecords()[0];
-                                window.open('/GoodsReceives/GoodsReceivePdf?id=' + (selectedRecord.id ?? ''), '_blank');
-                            }
+                            Object.assign(state, row);
+                            state.mainTitle = 'Delete Attribute?';
+                            mainModal.obj.show();
+                            return;
                         }
                     }
                 });
+
                 mainGrid.obj.appendTo(mainGridRef.value);
             },
+
             refresh: () => {
                 mainGrid.obj.setProperties({ dataSource: state.mainData });
             }
