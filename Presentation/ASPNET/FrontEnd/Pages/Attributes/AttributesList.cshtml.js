@@ -71,7 +71,13 @@
         // ✅ API
         const services = {
             getMainData: async () => AxiosManager.get('/Attribute/GetAttributeList'),
-            getSecondaryData: async (id) => AxiosManager.get('/AttributeDetail/GetAttributeDetailsByAttributeId?attributeId=' + id),
+            getSecondaryData: async (id) => {
+                const requestBody = {
+                    attributeId: id,
+                    isDeleted: false
+                };
+                return AxiosManager.post('/Attribute/GetAttributeDetails', requestBody);
+            },
             createMainData: async (payload) => AxiosManager.post('/Attribute/CreateAttribute', payload),
             updateMainData: async (payload) => AxiosManager.post('/Attribute/UpdateAttribute', payload),
             deleteMainData: async (id) => AxiosManager.post('/Attribute/DeleteAttribute', { id })
@@ -87,6 +93,9 @@
             populateSecondaryData: async (attributeId) => {
                 const res = await services.getSecondaryData(attributeId);
                 state.secondaryData = res?.data?.content?.data ?? [];
+                secondaryGrid.refresh(state.secondaryData);  // Pass dataSource explicitly
+                state.showComplexDiv = true;
+
             },
 
 
@@ -176,10 +185,10 @@
 
 
         // Main Grid
-        const secondaryGrid = {
+        const mainGrid = {
             obj: null,
             create: async (dataSource) => {
-                secondaryGrid.obj = new ej.grids.Grid({
+                mainGrid.obj = new ej.grids.Grid({
                     height: '240px',
                     dataSource,
                     allowPaging: true,
@@ -216,8 +225,8 @@
                         // Could enable/disable toolbar if needed
                     },
                     rowSelecting: () => {
-                        if (secondaryGrid.obj.getSelectedRecords().length > 0) {
-                            secondaryGrid.obj.clearSelection();  // Prevents multi-select
+                        if (mainGrid.obj.getSelectedRecords().length > 0) {
+                            mainGrid.obj.clearSelection();  // Prevents multi-select
                         }
                     },
                     toolbarClick: async (args) => {
@@ -235,7 +244,7 @@
                         // =====================================================
                         // Common Selection Logic for Edit / Delete
                         // =====================================================
-                        const selected = secondaryGrid.obj.getSelectedRecords();
+                        const selected = mainGrid.obj.getSelectedRecords();
                         if (args.item.id === 'EditCustom' || args.item.id === 'DeleteCustom') {
                             if (selected.length === 0) {
                                 Swal.fire({ icon: 'warning', text: 'Please select a row.' });
@@ -263,10 +272,10 @@
                             numberText.refresh();
                             // Reset batch changes before edit
                             // Note: If this is the secondary grid, adjust reference if needed (e.g., mainGrid.clearBatchChanges())
-                            secondaryGrid.clearBatchChanges();  // Self-reference if batch editing enabled
+                           // mainGrid.clearBatchChanges();  // Self-reference if batch editing enabled
                             await methods.populateSecondaryData(row.id);
                             // Assuming secondaryGrid.refresh() is for another grid; adjust if this is self-refresh
-                            secondaryGrid.refresh();
+                            mainGrid.refresh();
                             mainModal.obj.show();
                             return;
                         }
@@ -283,9 +292,9 @@
                         }
                     }
                 });
-                secondaryGrid.obj.appendTo(secondaryGridRef.value);  // Updated ref
+                mainGrid.obj.appendTo(mainGridRef.value);  // Updated ref
             },
-            refresh: () => secondaryGrid.obj.setProperties({ dataSource: state.secondaryData })  // Updated data source
+            refresh: () => mainGrid.obj.setProperties({ dataSource: state.mainData })  // Updated data source
         };
 
         // Secondary Grid (Only "value")

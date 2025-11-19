@@ -78,7 +78,20 @@ public class AttributeController : BaseApiController
             Content = response
         });
     }
-
+    // GET ATTRIBUTE DETAILS
+    [HttpPost("GetAttributeDetails")]
+    public async Task<ActionResult<ApiSuccessResult<GetAttributeDetailsResult>>> GetAttributeDetailsAsync(
+        [FromBody] GetAttributeDetailsRequest request,
+        CancellationToken cancellationToken)
+    {
+        var response = await _sender.Send(request, cancellationToken);
+        return Ok(new ApiSuccessResult<GetAttributeDetailsResult>
+        {
+            Code = StatusCodes.Status200OK,
+            Message = $"Success executing {nameof(GetAttributeDetailsAsync)}",
+            Content = response
+        });
+    }
     // GET SINGLE ATTRIBUTE
     //[HttpGet("GetAttributeSingle")]
     //public async Task<ActionResult<ApiSuccessResult<GetAttributeSingleResult>>> GetAttributeSingleAsync(

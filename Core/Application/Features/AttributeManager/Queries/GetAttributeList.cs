@@ -8,8 +8,7 @@ using Attribute = Domain.Entities.Attribute;
 
 namespace Application.Features.AttributeManager.Queries;
 
-#region DTO
-
+#region DTOs
 public record GetAttributeListDto
 {
     public string? Id { get; init; }
@@ -19,10 +18,15 @@ public record GetAttributeListDto
     public DateTime? CreatedAtUtc { get; init; }
 }
 
+public record GetAttributeDetailDto
+{
+    public string? Id { get; init; }
+    public string? Value { get; init; }
+    public DateTime? CreatedAtUtc { get; init; }
+}
 #endregion
 
-#region Mapper Profile
-
+#region Mapper Profiles
 public class GetAttributeListProfile : Profile
 {
     public GetAttributeListProfile()
@@ -31,10 +35,16 @@ public class GetAttributeListProfile : Profile
     }
 }
 
+public class GetAttributeDetailsProfile : Profile
+{
+    public GetAttributeDetailsProfile()
+    {
+        CreateMap<AttributeDetail, GetAttributeDetailDto>();
+    }
+}
 #endregion
 
-#region Result & Request
-
+#region Results & Requests
 public class GetAttributeListResult
 {
     public List<GetAttributeListDto>? Data { get; init; }
@@ -45,10 +55,19 @@ public class GetAttributeListRequest : IRequest<GetAttributeListResult>
     public bool IsDeleted { get; init; } = false;
 }
 
+public class GetAttributeDetailsResult
+{
+    public List<GetAttributeDetailDto>? Data { get; init; }
+}
+
+public class GetAttributeDetailsRequest : IRequest<GetAttributeDetailsResult>
+{
+    public string AttributeId { get; init; } = string.Empty;
+    public bool IsDeleted { get; init; } = false;
+}
 #endregion
 
-#region Handler
-
+#region Handlers
 public class GetAttributeListHandler : IRequestHandler<GetAttributeListRequest, GetAttributeListResult>
 {
     private readonly IMapper _mapper;
@@ -70,7 +89,6 @@ public class GetAttributeListHandler : IRequestHandler<GetAttributeListRequest, 
             .AsQueryable();
 
         var entities = await query.ToListAsync(cancellationToken);
-
         var dtos = _mapper.Map<List<GetAttributeListDto>>(entities);
 
         return new GetAttributeListResult
@@ -80,4 +98,39 @@ public class GetAttributeListHandler : IRequestHandler<GetAttributeListRequest, 
     }
 }
 
+public class GetAttributeDetailsHandler : IRequestHandler<GetAttributeDetailsRequest, GetAttributeDetailsResult>
+{
+    private readonly IMapper _mapper;
+    private readonly IQueryContext _context;
+
+    public GetAttributeDetailsHandler(IMapper mapper, IQueryContext context)
+    {
+        _mapper = mapper;
+        _context = context;
+    }
+
+    public async Task<GetAttributeDetailsResult> Handle(GetAttributeDetailsRequest request, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrEmpty(request.AttributeId))
+        {
+            return new GetAttributeDetailsResult { Data = new List<GetAttributeDetailDto>() };
+        }
+
+        var query = _context
+            .AttributeDetail
+            .AsNoTracking()
+            .ApplyIsDeletedFilter(request.IsDeleted)
+            .Where(x => x.AttributeId == request.AttributeId)
+            .OrderByDescending(x => x.CreatedAtUtc)
+            .AsQueryable();
+
+        var entities = await query.ToListAsync(cancellationToken);
+        var dtos = _mapper.Map<List<GetAttributeDetailDto>>(entities);
+
+        return new GetAttributeDetailsResult
+        {
+            Data = dtos
+        };
+    }
+}
 #endregion

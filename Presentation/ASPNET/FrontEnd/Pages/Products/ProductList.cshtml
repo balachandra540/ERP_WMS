@@ -66,14 +66,51 @@
                                         </div>
                                         <div class="row mb-2">
                                             <div class="col-md-6">
+                                                <label for="">Attribute1</label>
+                                                <div ref="attribute1Ref"></div>
+                                                <label class="text-danger">{{ state.errors.attribute1 }}</label>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <label for="">Attribute2</label>
+                                                <div ref="attribute2Ref"></div>
+                                                <label class="text-danger">{{ state.errors.attribute2 }}</label>
+                                            </div>
+                                        </div>
+
+                                        <div class="row mb-2">
+                                            <div class="col-md-6">
                                                 <div class="form-check mt-4">
                                                     <input v-model="state.physical" id="Physical" name="Physical" type="checkbox" class="form-check-input">
                                                     <label for="Physical" class="form-check-label">Is Physical Product?</label>
                                                 </div>
                                             </div>
+                                            <div class="col-md-6">
+
+                                                <div class="form-check mt-4">
+                                                    <input v-model="state.serviceNo" id="serviceNo" name="serviceNo" type="checkbox" class="form-check-input">
+                                                    <label for="serviceNo" class="form-check-label">Is serviceNo Required?</label>
+                                                </div>
+                                            </div>
 
                                             </div>
                                         <div class="row mb-2">
+                                            <div class="col-md-6">
+                                                <div class="form-check mt-4">
+                                                    <input v-model="state.IMEI1" id="IMEI1" name="IMEI1" type="checkbox" class="form-check-input">
+                                                    <label for="IMEI1" class="form-check-label">Is IMEI1 Required?</label>
+                                                </div>
+                                                </div>
+                                                <div class="col-md-6">
+
+                                                <div class="form-check mt-4">
+                                                    <input v-model="state.IMEI2" id="IMEI2" name="IMEI2" type="checkbox" class="form-check-input">
+                                                    <label for="IMEI2" class="form-check-label">Is IMEI2 Required?</label>
+                                                </div>
+                                            </div>
+
+                                        </div>
+
+                                            <div class="row mb-2">
                                             <div class="col-12">
                                                 <label for="Description">Description</label>
                                                 <textarea v-model="state.description" id="Description" name="Description" class="form-control" rows="3"></textarea>
