@@ -244,10 +244,12 @@
 //    }
 //}
 
+using Application.Common.CQS.Queries;
 using Application.Common.Extensions;
 using Application.Common.Repositories;
 using Application.Common.Services.SecurityManager;
 using Application.Features.InventoryTransactionManager;
+using Application.Features.InventoryTransactionManager.Queries;
 using Application.Features.NumberSequenceManager;
 using Domain.Entities;
 using Domain.Enums;
@@ -274,6 +276,8 @@ namespace Application.Features.GoodsReceiveManager.Commands
         public GoodsReceive? Data { get; set; }
         public List<GoodsReceiveItem>? Items { get; set; } = new();
         public List<string>? CreatedInventoryTransactions { get; set; } = new();
+        public List<ProductStockSummaryDto>? ProductStockQty { get; set; } = new();
+        
     }
 
     public class CreateGoodsReceiveRequest : IRequest<CreateGoodsReceiveResult>
@@ -318,10 +322,13 @@ namespace Application.Features.GoodsReceiveManager.Commands
         private readonly ICommandRepository<PurchaseOrder> _purchaseOrderReadRepository;
         private readonly ICommandRepository<PurchaseOrder> _purchaseOrderRepository;
         private readonly ICommandRepository<Warehouse> _warehouseRepository;
+        private readonly ICommandRepository<ProductPriceDefinition> _productpriceDefRepository;
+
         private readonly IUnitOfWork _unitOfWork;
         private readonly NumberSequenceService _numberSequenceService;
         private readonly InventoryTransactionService _inventoryTransactionService;
         private readonly ISecurityService _securityService;
+        private readonly IQueryContext _queryContext;
 
         public CreateGoodsReceiveHandler(
             ICommandRepository<GoodsReceive> goodsReceiveRepository,
@@ -330,10 +337,12 @@ namespace Application.Features.GoodsReceiveManager.Commands
             ICommandRepository<PurchaseOrder> purchaseOrderReadRepository,
             ICommandRepository<PurchaseOrder> purchaseOrderRepository,
             ICommandRepository<Warehouse> warehouseRepository,
+            ICommandRepository<ProductPriceDefinition> productpricedefinitionrepository,
             IUnitOfWork unitOfWork,
             NumberSequenceService numberSequenceService,
             InventoryTransactionService inventoryTransactionService,
-            ISecurityService securityService)
+            ISecurityService securityService,
+            IQueryContext queryContext)
         {
             _goodsReceiveRepository = goodsReceiveRepository;
             _goodsReceiveItemRepository = goodsReceiveItemRepository;
@@ -341,11 +350,13 @@ namespace Application.Features.GoodsReceiveManager.Commands
             _purchaseOrderReadRepository = purchaseOrderReadRepository;
             _purchaseOrderRepository = purchaseOrderRepository;
             _warehouseRepository = warehouseRepository;
+            _productpriceDefRepository = productpricedefinitionrepository;
             _unitOfWork = unitOfWork;
             _numberSequenceService = numberSequenceService;
             _inventoryTransactionService = inventoryTransactionService;
             _securityService = securityService;
-        }
+            _queryContext = queryContext;
+                    }
 
         public async Task<CreateGoodsReceiveResult> Handle(CreateGoodsReceiveRequest request, CancellationToken cancellationToken)
         {
@@ -436,6 +447,95 @@ namespace Application.Features.GoodsReceiveManager.Commands
 
                 await _goodsReceiveItemRepository.CreateAsync(grItem, cancellationToken);
                 await _unitOfWork.SaveAsync(cancellationToken);
+
+                // ===============================
+                // PRICE DEFINITION CHECK & UPDATE
+                // ===============================
+                var productId = poItem.ProductId;
+
+                // 1️⃣ Fetch ACTIVE price definition for this product
+                var existingPrice = await _productpriceDefRepository.GetQuery()
+                    .Where(p => p.ProductId == productId && p.IsActive && !p.IsDeleted)
+                    .OrderByDescending(p => p.EffectiveFrom)
+                    .FirstOrDefaultAsync(cancellationToken);
+
+                // If not exists → create first entry and continue
+                if (existingPrice == null)
+                {
+                    var newPrice = new ProductPriceDefinition
+                    {
+                        ProductId = productId,
+                       // ProductName = request.ProductName,
+                        CostPrice = Convert.ToDecimal(grItem.UnitPrice),   // OR grItem.UnitPrice based on your rule
+                        EffectiveFrom = _securityService.ConvertToIst(DateTime.UtcNow),
+                        IsActive = true,                        
+                   };
+
+                    await _productpriceDefRepository.CreateAsync(newPrice, cancellationToken);
+                    await _unitOfWork.SaveAsync(cancellationToken);
+                }
+                else
+                {
+                    // Compare prices
+                    double oldPrice = Convert.ToDouble(existingPrice.CostPrice);
+                    double newPrice = grItem.UnitPrice;
+
+                    if (Math.Round(oldPrice, 2) != Math.Round(newPrice, 2))
+                    {
+                        // 2️⃣ Fetch stock for weighted average
+                        //var stockQty = await _inventoryTransactionService.GetCurrentStock(productId, cancellationToken);
+                        var stockQty = 0.0; // TEMP FIX: Replace with actual stock fetch logic
+                        // Weighted Average Price Formula:
+                        // (ExistingStock * OldPrice + ReceivedQty * NewPrice) / (ExistingStock + ReceivedQty)
+                        var result = await _queryContext
+                            .InventoryTransaction
+                            .AsNoTracking()
+                            .ApplyIsDeletedFilter(false)
+                            .Where(x => x.Status == InventoryTransactionStatus.Confirmed &&
+                                        x.WarehouseId == request.DefaultWarehouseId && x.ProductId == productId)
+                            .GroupBy(x => x.ProductId)
+                            .Select(g => new ProductStockSummaryDto
+                            {
+                                ProductId = g.Key,
+                                TotalStock = (decimal)(g.Sum(x => x.Stock) ?? 0),
+                                TotalMovement = (decimal)(g.Sum(x => x.Movement) ?? 0),
+                                RequestStock = 0
+                            })
+                            // ✅ Only include records where stock > 0
+                            .Where(dto => dto.TotalStock > 0)
+                            .ToListAsync(cancellationToken);
+                        stockQty = result.ToArray().Length > 0 ? Convert.ToDouble(result.ToArray()[0].TotalStock) : 0.0;
+                        //double stockQty = result?.TotalStock ?? 0;
+
+                        double existingValue = stockQty * oldPrice;
+                        double receivedValue = grItem.ReceivedQuantity * newPrice;
+
+                        double weightedAveragePrice =
+                            (existingValue + receivedValue) / (stockQty + grItem.ReceivedQuantity);
+
+                        weightedAveragePrice = Math.Round(weightedAveragePrice, 2);
+
+                        // 3️⃣ Mark old price inactive
+                        existingPrice.IsActive = false;
+                        existingPrice.EffectiveTo =_securityService.ConvertToIst(DateTime.UtcNow);
+                        _productpriceDefRepository.Update(existingPrice);
+
+                        // 4️⃣ Insert new price definition row
+                        var newPriceDef = new ProductPriceDefinition
+                        {
+                            ProductId = productId,
+                            ProductName =existingPrice.ProductName,
+                            CostPrice = Convert.ToDecimal(weightedAveragePrice),
+                            EffectiveFrom = _securityService.ConvertToIst(DateTime.UtcNow),
+                            IsActive = true,
+                            MarginPercentage =existingPrice.MarginPercentage,
+                            CurrencyCode =existingPrice.CurrencyCode
+                        };
+
+                        await _productpriceDefRepository.CreateAsync(newPriceDef, cancellationToken);
+                        await _unitOfWork.SaveAsync(cancellationToken);
+                    }
+                }
 
                 createdItems.Add(grItem);
 

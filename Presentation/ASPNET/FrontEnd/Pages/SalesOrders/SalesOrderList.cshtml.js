@@ -996,7 +996,7 @@ const App = {
             salesOrderStatusListLookupData: [],
             secondaryData: [],
             productListLookupData: [],
-            mainTitle: null,
+            mainTitle: '',
             id: '',
             number: '',
             orderDate: '',
@@ -1025,7 +1025,7 @@ const App = {
             customerGroupListLookupData: [],
             customerCategoryListLookupData: [],
             secondaryData: [],
-            mainTitle: null,
+            mainTitle: '',
             manageContactTitle: 'Manage Contact',
             id: '',
             name: '',
@@ -1252,6 +1252,20 @@ const App = {
                 emailAddress: '',
             };
         };
+        function createTextInput(ref, stateObj, fieldName, placeholder = "", readOnly = false) {
+            const textBox = new ej.inputs.TextBox({
+                placeholder: placeholder,
+                value: stateObj[fieldName],
+                readonly: readOnly,
+                input: function (args) {
+                    stateObj[fieldName] = args.value;
+                }
+            });
+
+            textBox.appendTo(ref);
+            return textBox;
+        }
+
 
         // Services
         const services = {
@@ -1395,24 +1409,45 @@ const App = {
                 }
             };
 
-        // Customer Text Inputs
-        const nameText = createTextInput(nameRef, customerState, 'name', 'Enter Name');
-        const CustomernumberText = createTextInput(CustomernumberRef, customerState, 'number', '[auto]', true);
-        const streetText = createTextInput(streetRef, customerState, 'street', 'Enter Street');
-        const cityText = createTextInput(cityRef, customerState, 'city', 'Enter City');
-        const stateText = createTextInput(stateRef, customerState, 'state', 'Enter State');
-        const zipCodeText = createTextInput(zipCodeRef, customerState, 'zipCode', 'Enter Zip Code');
-        const countryText = createTextInput(countryRef, customerState, 'country', 'Enter Country');
-        const phoneNumberText = createTextInput(phoneNumberRef, customerState, 'phoneNumber', 'Enter Phone Number');
-        const faxNumberText = createTextInput(faxNumberRef, customerState, 'faxNumber', 'Enter Fax Number');
-        const emailAddressText = createTextInput(emailAddressRef, customerState, 'emailAddress', 'Enter Email Address');
-        const websiteText = createTextInput(websiteRef, customerState, 'website', 'Enter Website');
-        const whatsAppText = createTextInput(whatsAppRef, customerState, 'whatsApp', 'Enter WhatsApp');
-        const linkedInText = createTextInput(linkedInRef, customerState, 'linkedIn', 'Enter LinkedIn');
-        const facebookText = createTextInput(facebookRef, customerState, 'facebook', 'Enter Facebook');
-        const instagramText = createTextInput(instagramRef, customerState, 'instagram', 'Enter Instagram');
-        const twitterXText = createTextInput(twitterXRef, customerState, 'twitterX', 'Enter Twitter/X');
-        const tikTokText = createTextInput(tikTokRef, customerState, 'tikTok', 'Enter TikTok');
+        //// Customer Text Inputs
+        //const nameText = createTextInput(nameRef, customerState, 'name', 'Enter Name');
+        //const CustomernumberText = createTextInput(CustomernumberRef, customerState, 'number', '[auto]', true);
+        //const streetText = createTextInput(streetRef, customerState, 'street', 'Enter Street');
+        //const cityText = createTextInput(cityRef, customerState, 'city', 'Enter City');
+        //const stateText = createTextInput(stateRef, customerState, 'state', 'Enter State');
+        //const zipCodeText = createTextInput(zipCodeRef, customerState, 'zipCode', 'Enter Zip Code');
+        //const countryText = createTextInput(countryRef, customerState, 'country', 'Enter Country');
+        //const phoneNumberText = createTextInput(phoneNumberRef, customerState, 'phoneNumber', 'Enter Phone Number');
+        //const faxNumberText = createTextInput(faxNumberRef, customerState, 'faxNumber', 'Enter Fax Number');
+        //const emailAddressText = createTextInput(emailAddressRef, customerState, 'emailAddress', 'Enter Email Address');
+        //const websiteText = createTextInput(websiteRef, customerState, 'website', 'Enter Website');
+        //const whatsAppText = createTextInput(whatsAppRef, customerState, 'whatsApp', 'Enter WhatsApp');
+        //const linkedInText = createTextInput(linkedInRef, customerState, 'linkedIn', 'Enter LinkedIn');
+        //const facebookText = createTextInput(facebookRef, customerState, 'facebook', 'Enter Facebook');
+        //const instagramText = createTextInput(instagramRef, customerState, 'instagram', 'Enter Instagram');
+        //const twitterXText = createTextInput(twitterXRef, customerState, 'twitterX', 'Enter Twitter/X');
+        //const tikTokText = createTextInput(tikTokRef, customerState, 'tikTok', 'Enter TikTok');
+
+        Vue.onMounted(() => {
+            createTextInput(nameRef.value, customerState, 'name', 'Enter Name');
+            createTextInput(CustomernumberRef.value, customerState, 'number', '[auto]', true);
+            createTextInput(streetRef.value, customerState, 'street', 'Enter Street');
+            createTextInput(cityRef.value, customerState, 'city', 'Enter City');
+            createTextInput(stateRef.value, customerState, 'state', 'Enter State');
+            createTextInput(zipCodeRef.value, customerState, 'zipCode', 'Enter Zip Code');
+            createTextInput(countryRef.value, customerState, 'country', 'Enter Country');
+            createTextInput(phoneNumberRef.value, customerState, 'phoneNumber', 'Enter Phone Number');
+            createTextInput(faxNumberRef.value, customerState, 'faxNumber', 'Enter Fax Number');
+            createTextInput(emailAddressRef.value, customerState, 'emailAddress', 'Enter Email Address');
+            createTextInput(websiteRef.value, customerState, 'website', 'Enter Website');
+            createTextInput(whatsAppRef.value, customerState, 'whatsApp', 'Enter WhatsApp');
+            createTextInput(linkedInRef.value, customerState, 'linkedIn', 'Enter LinkedIn');
+            createTextInput(facebookRef.value, customerState, 'facebook', 'Enter Facebook');
+            createTextInput(instagramRef.value, customerState, 'instagram', 'Enter Instagram');
+            createTextInput(twitterXRef.value, customerState, 'twitterX', 'Enter Twitter/X');
+            createTextInput(tikTokRef.value, customerState, 'tikTok', 'Enter TikTok');
+        });
+
 
         // Methods
         const methods = {

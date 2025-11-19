@@ -946,6 +946,7 @@ const App = {
 
             // ✅ Secondary grid data validation
             if (!state.deleteMode && state.secondaryData.length > 0) {
+                debugger;
                 if (secondaryGrid.obj.isEdit) {
                     secondaryGrid.obj.endEdit();
                 }
@@ -1554,7 +1555,8 @@ const App = {
                             createdAtUtc: grItem.createdAtUtc ? new Date(grItem.createdAtUtc) : new Date()
                         }));
 
-                    } else {
+                    }
+                    else {
                         if (!state.purchaseOrderId) {
                             state.secondaryData = [];
                             return;
@@ -1629,6 +1631,7 @@ const App = {
                 state.errors.purchaseOrderId = '';
                 state.errors.status = '';
                 state.errors.description = '';
+
             },
             // **BULK DATA PREPARATION FOR GOODS RECEIVE ITEMS**
             prepareSecondaryDataForSubmission: function () {
@@ -2185,11 +2188,19 @@ const App = {
                                 number: row.number,
                                 name: row.name,
                                 description: row.description,
+                                status: row.statusName,
+                                transportCharges: row.freightCharges,
+                                otherCharges: row.otherCharges,
+                                receiveDate: row.receiveDate,
+                                purchaseOrderId: row.purchaseOrderId,
+                                //purchaseOrderNumber: purchaseOrderNumber,
                                 createdAt: new Date(row.createdAtUtc).toLocaleString('en-GB')
                             });
-
+                            
                             numberText.refresh();
-                            secondaryGrid.clearBatchChanges();
+                            if (secondaryGrid && typeof secondaryGrid.clearBatchChanges === "function") {
+                                secondaryGrid.clearBatchChanges();
+                            }
                             await methods.populateSecondaryData(row.id);
                             secondaryGrid.refresh();
 
@@ -2292,7 +2303,7 @@ const App = {
                             width: 100,
                             textAlign: 'Right',
                             format: 'N2',
-                            allowEditing: false
+                            allowEditing: true
                         },
                         {
                             field: 'taxAmount',
@@ -2300,7 +2311,7 @@ const App = {
                             width: 100,
                             textAlign: 'Right',
                             format: 'N2',
-                            allowEditing: false
+                            allowEditing: true
                         },
                         {
                             field: 'FinalPrice',
@@ -2309,7 +2320,7 @@ const App = {
                             textAlign: 'Right',
                             type: 'number',
                             format: 'N2',
-                            allowEditing: false
+                            allowEditing: true
                         },
                         {
                             field: 'MRP',
@@ -2589,7 +2600,15 @@ const App = {
                 });
             }
         };
-
+        const secondaryModal = {
+            obj: null,
+            create: () => {
+                secondaryModal.obj = new bootstrap.Modal(secondaryModalRef.value, {
+                    backdrop: 'static',
+                    keyboard: false
+                });
+            }
+        };
         return {
             mainGridRef,
             mainModalRef,
