@@ -8,6 +8,9 @@ EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Infrastructure", "Infrastructure", "{A3B16AAE-E73E-4A4C-967D-B038EFE3C952}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Presentation", "Presentation", "{A4CBDC0C-F04E-4461-9109-AB6BE9CDA824}"
+	ProjectSection(SolutionItems) = preProject
+		databasescripts.txt = databasescripts.txt
+	EndProjectSection
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Domain", "Core\Domain\Domain.csproj", "{D98A77C6-5AB0-4420-BD5C-9C9FEF01DDBC}"
 EndProject
@@ -48,5 +51,8 @@ Global
 		{3412BDBE-7691-42A2-8EF3-F3EFC3F28350} = {0940F3AB-99E5-4ACB-8781-F35847A043C6}
 		{6883968C-42FC-4ADB-9B72-7B9E446F8544} = {A3B16AAE-E73E-4A4C-967D-B038EFE3C952}
 		{FD5D5CD6-FE42-473F-B15D-A7623968BF94} = {A4CBDC0C-F04E-4461-9109-AB6BE9CDA824}
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {A853D4E8-DCEA-4CAC-84F5-B0152C9C5A98}
 	EndGlobalSection
 EndGlobal
