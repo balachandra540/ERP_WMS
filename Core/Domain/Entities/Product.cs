@@ -46,4 +46,11 @@ public class Product : BaseEntity
 
     [NotMapped]
     public string? Attribute2Name => Attribute2?.Name;
+
+    public virtual ICollection<ProductVariant> Variants { get; set; }
+    = new List<ProductVariant>();
+
+    public virtual ICollection<ProductPriceDefinition> PriceDefinitions { get; set; }
+        = new List<ProductPriceDefinition>();
+
 }

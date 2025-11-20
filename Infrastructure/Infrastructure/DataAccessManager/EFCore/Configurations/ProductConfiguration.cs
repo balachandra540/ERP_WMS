@@ -58,6 +58,25 @@ public class ProductConfiguration : BaseEntityConfiguration<Product>
 
         // Great for filtering mobile/service products in grids
         builder.HasIndex(x => new { x.Physical, x.ServiceNo, x.Imei1, x.Imei2 });
+
+        // ===============================
+        // NEW: Navigation Relationships
+        // ===============================
+
+        // Product → ProductPriceDefinition (1:M)
+        builder.HasMany(p => p.PriceDefinitions)
+            .WithOne()
+            .HasForeignKey(pd => pd.ProductId)
+            .OnDelete(DeleteBehavior.Cascade)
+            .HasConstraintName("FK_Product_ProductPriceDefinition");
+
+        // Product → ProductVariant (1:M)
+        builder.HasMany(p => p.Variants)
+            .WithOne()
+            .HasForeignKey(v => v.ProductId)
+            .OnDelete(DeleteBehavior.Cascade)
+            .HasConstraintName("FK_Product_ProductVariant");
+
     }
 }
 

@@ -52,11 +52,12 @@ namespace Infrastructure.DataAccessManager.EFCore.Configurations
     .HasComputedColumnSql("\"CostPrice\" + (\"CostPrice\" * \"MarginPercentage\" / 100)", stored: true);
 
 
-            // Relationship (if Product table exists)
-            builder.HasOne(x => x.Product)
-                .WithMany()
-                .HasForeignKey(x => x.ProductId)
-                .OnDelete(DeleteBehavior.Restrict);
+            // === CRITICAL FIX: Proper relationship to avoid shadow property ProductId1 ===
+            builder.HasOne(x => x.Product)                    // navigation property on PriceDefinition
+                   .WithMany(p => p.PriceDefinitions)         // ← inverse collection on Product!
+                   .HasForeignKey(x => x.ProductId)
+                   .OnDelete(DeleteBehavior.Restrict)
+                   .HasConstraintName("FK_ProductPriceDefinition_Product");
         }
     }
 

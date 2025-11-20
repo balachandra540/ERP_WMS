@@ -53,10 +53,14 @@
         const attribute2Ref = Vue.ref(null);
 
         const validateForm = function () {
+            // Reset all errors
             state.errors.name = '';
             state.errors.unitPrice = '';
             state.errors.productGroupId = '';
             state.errors.unitMeasureId = '';
+            state.errors.taxId = '';
+            state.errors.attribute1 = '';
+            state.errors.attribute2 = '';
 
             let isValid = true;
 
@@ -72,17 +76,25 @@
                 isValid = false;
             }
             if (!state.productGroupId) {
-                state.errors.productGroupId = 'ProductGroup is required.';
+                state.errors.productGroupId = 'Product Group is required.';
                 isValid = false;
             }
             if (!state.unitMeasureId) {
-                state.errors.unitMeasureId = 'UnitMeasure is required.';
+                state.errors.unitMeasureId = 'Unit Measure is required.';
                 isValid = false;
             }
             if (!state.taxId) {
                 state.errors.taxId = 'Tax is required.';
                 isValid = false;
             }
+
+            // NEW: Attribute1 and Attribute2 cannot be the same
+            if (state.attribute1 && state.attribute2 && state.attribute1 === state.attribute2) {
+                state.errors.attribute1 = 'Attribute 1 and Attribute 2 cannot be the same.';
+                state.errors.attribute2 = 'Cannot select the same attribute twice.';
+                isValid = false;
+            }
+
             return isValid;
         };
 
@@ -108,10 +120,9 @@
                 productGroupId: '',
                 unitMeasureId: '',
                 attribute1: '',
-                attribute2:''
+                attribute2: ''
             };
         };
-
         const services = {
             getMainData: async () => {
                 try {
@@ -128,7 +139,9 @@
                     const response = await AxiosManager.post('/Product/CreateProduct', {
                         name, unitPrice, physical, description, productGroupId, unitMeasureId,
                         createdById, warehouseId, taxId,
-                        attribute1, attribute2, serviceNo, IMEI1, IMEI2   // ← ADD THESE
+                        attribute1Id: attribute1,     // ← matches backend Attribute1Id
+                        attribute2Id: attribute2,     // ← matches backend Attribute2Id
+                        serviceNo, IMEI1, IMEI2
                     });
                     return response;
                 } catch (error) {
@@ -138,9 +151,22 @@
             updateMainData: async (id, name, unitPrice, physical, description, productGroupId, unitMeasureId, updatedById, warehouseId, taxId, attribute1, attribute2, serviceNo, IMEI1, IMEI2) => {
                 try {
                     const response = await AxiosManager.post('/Product/UpdateProduct', {
-                        id, name, unitPrice, physical, description, productGroupId, unitMeasureId,
-                        updatedById, warehouseId, taxId,
-                        attribute1, attribute2, serviceNo, IMEI1, IMEI2   // ← ADD THESE
+                        id,
+                        name,
+                        unitPrice,
+                        physical,
+                        description,
+                        productGroupId,
+                        unitMeasureId,
+                        updatedById,
+                        warehouseId,
+                        taxId,
+                        attribute1Id: attribute1,
+                        attribute2Id: attribute2,
+
+                        serviceNo,
+                        imei1: IMEI1,   // <-- backend expects "Imei1"
+                        imei2: IMEI2    // <-- backend expects "Imei2"
                     });
                     return response;
                 } catch (error) {
@@ -248,15 +274,25 @@
                     Attribute1ListLookup.obj = new ej.dropdowns.DropDownList({
                         dataSource: state.AttributeListLookupData,
                         fields: { value: 'id', text: 'name' },
-                        placeholder: 'Select Attribute 1',  // 👈 Fixed placeholder
+                        placeholder: 'Select Attribute 1 (Optional)',
                         popupHeight: '200px',
                         change: (e) => {
                             state.attribute1 = e.value;
+
+                            // If user picks the same as Attribute2 → auto-clear Attribute2
+                            if (e.value && state.attribute2 === e.value) {
+                                state.attribute2 = null;
+                                if (Attribute2ListLookup.obj) {
+                                    Attribute2ListLookup.obj.value = null;
+                                }
+                            }
+
+                            // Clear errors
+                            state.errors.attribute1 = '';
+                            state.errors.attribute2 = '';
                         }
                     });
                     Attribute1ListLookup.obj.appendTo(attribute1Ref.value);
-                } else {
-                    console.error('Attribute list lookup data is not available or invalid.');
                 }
             },
             refresh: () => {
@@ -273,15 +309,24 @@
                     Attribute2ListLookup.obj = new ej.dropdowns.DropDownList({
                         dataSource: state.AttributeListLookupData,
                         fields: { value: 'id', text: 'name' },
-                        placeholder: 'Select Attribute 2',  // 👈 Fixed placeholder
+                        placeholder: 'Select Attribute 2 (Optional)',
                         popupHeight: '200px',
                         change: (e) => {
-                            state.attribute2 = e.value;  // 👈 Fixed missing space
+                            state.attribute2 = e.value;
+
+                            // If user picks the same as Attribute1 → auto-clear Attribute1
+                            if (e.value && state.attribute1 === e.value) {
+                                state.attribute1 = null;
+                                if (Attribute1ListLookup.obj) {
+                                    Attribute1ListLookup.obj.value = null;
+                                }
+                            }
+
+                            state.errors.attribute1 = '';
+                            state.errors.attribute2 = '';
                         }
                     });
-                    Attribute2ListLookup.obj.appendTo(attribute2Ref.value);  // 👈 Fixed typo: AttributeL2istLookup -> Attribute2ListLookup
-                } else {
-                    console.error('Attribute list lookup data is not available or invalid.');
+                    Attribute2ListLookup.obj.appendTo(attribute2Ref.value);
                 }
             },
             refresh: () => {
@@ -428,20 +473,27 @@
                 unitMeasureListLookup.refresh();
             }
         );
-        Vue.watch(
-            () => state.attribute1,
-            (newVal, oldVal) => {
-                state.errors.attribute1 = '';
-                Attribute1ListLookup.refresh();
+        Vue.watch(() => state.attribute1, () => {
+            state.errors.attribute1 = '';
+            state.errors.attribute2 = '';
+            Attribute1ListLookup.refresh();
+
+            if (state.attribute1 && state.attribute2 && state.attribute1 === state.attribute2) {
+                state.errors.attribute1 = 'Attribute 1 and Attribute 2 cannot be the same.';
+                state.errors.attribute2 = 'Cannot select the same attribute twice.';
             }
-        );
-        Vue.watch(
-            () => state.attribute2,
-            (newVal, oldVal) => {
-                state.errors.attribute2 = '';
-                Attribute2ListLookup.refresh();
+        });
+
+        Vue.watch(() => state.attribute2, () => {
+            state.errors.attribute1 = '';
+            state.errors.attribute2 = '';
+            Attribute2ListLookup.refresh();
+
+            if (state.attribute1 && state.attribute2 && state.attribute1 === state.attribute2) {
+                state.errors.attribute1 = 'Attribute 1 and Attribute 2 cannot be the same.';
+                state.errors.attribute2 = 'Cannot select the same attribute twice.';
             }
-        );
+        });
         const handler = {
             handleSubmit: async function () {
                 try {
@@ -457,7 +509,7 @@
                             state.name, state.unitPrice, state.physical, state.description,
                             state.productGroupId, state.unitMeasureId,
                             StorageManager.getUserId(), state.location, state.taxId,
-                            state.attribute1, state.attribute2, state.serviceNo, state.IMEI1, state.IMEI2   // ← ADD
+                            state.attribute1, state.attribute2, state.serviceNo, state.IMEI1, state.IMEI2
                         )
                         : state.deleteMode
                             ? await services.deleteMainData(state.id, StorageManager.getUserId())
@@ -465,7 +517,7 @@
                                 state.id, state.name, state.unitPrice, state.physical, state.description,
                                 state.productGroupId, state.unitMeasureId,
                                 StorageManager.getUserId(), state.location, state.taxId,
-                                state.attribute1, state.attribute2, state.serviceNo, state.IMEI1, state.IMEI2   // ← ADD
+                                state.attribute1, state.attribute2, state.serviceNo, state.IMEI1, state.IMEI2
                             );
                     if (response.data.code === 200) {
                         await methods.populateMainData();
@@ -657,6 +709,7 @@
                         }
 
                         if (args.item.id === 'EditCustom') {
+                            debugger;
                             state.deleteMode = false;
                             if (mainGrid.obj.getSelectedRecords().length) {
                                 const selectedRecord = mainGrid.obj.getSelectedRecords()[0];
@@ -669,6 +722,13 @@
                                 state.productGroupId = selectedRecord.productGroupId ?? '';
                                 state.unitMeasureId = selectedRecord.unitMeasureId ?? '';
                                 state.physical = selectedRecord.physical ?? false;
+                                state.taxId = selectedRecord.taxId ?? null;
+                                // THESE WERE MISSING — NOW ADDED!
+                                state.attribute1 = selectedRecord.attribute1Id ?? null;    // maps to Attribute1Id
+                                state.attribute2 = selectedRecord.attribute2Id ?? null;    // maps to Attribute2Id
+                                state.serviceNo = selectedRecord.serviceNo ?? false;
+                                state.IMEI1 = selectedRecord.imei1 ?? false;               // or imei1 if lowercase in API
+                                state.IMEI2 = selectedRecord.imei2 ?? false;               // or imei2
                                 mainModal.obj.show();
                             }
                         }

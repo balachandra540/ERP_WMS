@@ -30,13 +30,11 @@ public class ProductVariantConfiguration : BaseEntityConfiguration<ProductVarian
                .HasMaxLength(NameConsts.MaxLength * 3) // Product + Attr1 + Attr2
                .IsRequired();
 
-        // Relationships
         builder.HasOne(x => x.Product)
-               .WithMany()
-               .HasForeignKey(x => x.ProductId)
-               .OnDelete(DeleteBehavior.Cascade)
-               .HasConstraintName("FK_ProductVariant_Product");
-
+       .WithMany(p => p.Variants)   // ← THIS IS THE KEY LINE
+       .HasForeignKey(x => x.ProductId)
+       .OnDelete(DeleteBehavior.Cascade)
+       .HasConstraintName("FK_ProductVariant_Product");
         builder.HasOne(x => x.Attribute1Detail)
                .WithMany()
                .HasForeignKey(x => x.Attribute1DetailId)

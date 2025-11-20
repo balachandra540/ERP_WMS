@@ -64,19 +64,31 @@
                                                 <label class="text-danger">{{ state.errors.taxId }}</label>
                                             </div>
                                         </div>
-                                        <div class="row mb-2">
+                                        <div class="row mb-3">
                                             <div class="col-md-6">
-                                                <label for="">Attribute1</label>
+                                                <label class="form-label">
+                                                    Attribute 1 <span class="text-muted">(Optional)</span>
+                                                </label>
                                                 <div ref="attribute1Ref"></div>
-                                                <label class="text-danger">{{ state.errors.attribute1 }}</label>
+                                                <small class="text-danger d-block mt-1" v-show="state.errors.attribute1">
+                                                    {{ state.errors.attribute1 }}
+                                                </small>
                                             </div>
+
                                             <div class="col-md-6">
-                                                <label for="">Attribute2</label>
+                                                <label class="form-label">
+                                                    Attribute 2 <span class="text-muted">(Optional)</span>
+                                                </label>
                                                 <div ref="attribute2Ref"></div>
-                                                <label class="text-danger">{{ state.errors.attribute2 }}</label>
+                                                <small class="text-danger d-block mt-1" v-show="state.errors.attribute2">
+                                                    {{ state.errors.attribute2 }}
+                                                </small>
+                                                <!-- Nice touch: helpful hint when both are same (auto-cleared already prevents it, but just in case) -->
+                                                <small class="text-info fst-italic" v-if="state.attribute1 && state.attribute2 && state.attribute1 === state.attribute2">
+                                                    Tip: Choose different attributes to generate variants
+                                                </small>
                                             </div>
                                         </div>
-
                                         <div class="row mb-2">
                                             <div class="col-md-6">
                                                 <div class="form-check mt-4">
