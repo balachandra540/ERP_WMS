@@ -10,7 +10,7 @@ namespace Domain.Entities
     public class ProductPriceDefinition : BaseEntity
     {
         public string ProductId { get; set; } = null!;
-
+        public virtual Product Product { get; set; } = null!;
         public string? ProductName { get; set; }
 
         public decimal CostPrice { get; set; }
@@ -26,8 +26,6 @@ namespace Domain.Entities
 
        
 
-        // Navigation property (optional)
-        public Product Product { get; set; } = null!;
     }
 
 }

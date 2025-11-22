@@ -24,6 +24,16 @@ public record GetProductListDto
     public string? TaxId { get; init; }
     public string? TaxName { get; init; }
 
+    // ────────────────────── NEW FIELDS ──────────────────────
+    public string? Attribute1Id { get; init; }
+    public string? Attribute1Name { get; init; }   // Optional: display name
+    public string? Attribute2Id { get; init; }
+    public string? Attribute2Name { get; init; }   // Optional: display name
+
+    public bool ServiceNo { get; init; }
+    public bool Imei1 { get; init; }
+    public bool Imei2 { get; init; }
+    // ────────────────────────────────────────────────────────
 }
 
 public class GetProductListProfile : Profile
@@ -31,19 +41,29 @@ public class GetProductListProfile : Profile
     public GetProductListProfile()
     {
         CreateMap<Product, GetProductListDto>()
-            .ForMember(
-                dest => dest.UnitMeasureName,
-                opt => opt.MapFrom(src => src.UnitMeasure != null ? src.UnitMeasure.Name : string.Empty)
-            )
-            .ForMember(
-                dest => dest.TaxName,
-                opt => opt.MapFrom(src => src.Tax != null ? src.Tax.Name : string.Empty)
-            )
-            .ForMember(
-                dest => dest.ProductGroupName,
-                opt => opt.MapFrom(src => src.ProductGroup != null ? src.ProductGroup.Name : string.Empty)
-            );
+            .ForMember(dest => dest.UnitMeasureName,
+                opt => opt.MapFrom(src => src.UnitMeasure != null ? src.UnitMeasure.Name : string.Empty))
+            .ForMember(dest => dest.TaxName,
+                opt => opt.MapFrom(src => src.Tax != null ? src.Tax.Name : string.Empty))
+            .ForMember(dest => dest.ProductGroupName,
+                opt => opt.MapFrom(src => src.ProductGroup != null ? src.ProductGroup.Name : string.Empty))
 
+            // NEW MAPPINGS
+            .ForMember(dest => dest.Attribute1Id,
+                opt => opt.MapFrom(src => src.Attribute1Id))
+            .ForMember(dest => dest.Attribute1Name,
+                opt => opt.MapFrom(src => src.Attribute1 != null ? src.Attribute1.Name : string.Empty))
+            .ForMember(dest => dest.Attribute2Id,
+                opt => opt.MapFrom(src => src.Attribute2Id))
+            .ForMember(dest => dest.Attribute2Name,
+                opt => opt.MapFrom(src => src.Attribute2 != null ? src.Attribute2.Name : string.Empty))
+
+            .ForMember(dest => dest.ServiceNo,
+                opt => opt.MapFrom(src => src.ServiceNo))
+            .ForMember(dest => dest.Imei1,
+                opt => opt.MapFrom(src => src.Imei1))
+            .ForMember(dest => dest.Imei2,
+                opt => opt.MapFrom(src => src.Imei2));
     }
 }
 
@@ -54,10 +74,9 @@ public class GetProductListResult
 
 public class GetProductListRequest : IRequest<GetProductListResult>
 {
-    public string? WarehouseId { get; init; } // optional filter by location/warehouse
+    public string? WarehouseId { get; init; }
     public bool IsDeleted { get; init; } = false;
 }
-
 
 public class GetProductListHandler : IRequestHandler<GetProductListRequest, GetProductListResult>
 {
@@ -72,39 +91,30 @@ public class GetProductListHandler : IRequestHandler<GetProductListRequest, GetP
 
     public async Task<GetProductListResult> Handle(GetProductListRequest request, CancellationToken cancellationToken)
     {
-        var query = _context
-            .Product
+        var query = _context.Product
             .AsNoTracking()
             .ApplyIsDeletedFilter(request.IsDeleted)
             .Include(x => x.UnitMeasure)
             .Include(x => x.ProductGroup)
             .Include(x => x.Tax)
-
+            // NEW INCLUDES — Critical for mapping names and edit form
+            .Include(x => x.Attribute1)
+            .Include(x => x.Attribute2)
             .AsQueryable();
 
-        // Filter by WarehouseId if provided
         if (!string.IsNullOrEmpty(request.WarehouseId))
         {
             query = query.Where(x => x.WarehouseId == request.WarehouseId);
         }
 
         var entities = await query.ToListAsync(cancellationToken);
-
         var dtos = _mapper.Map<List<GetProductListDto>>(entities);
 
-        return new GetProductListResult
-        {
-            Data = dtos
-        };
+        return new GetProductListResult { Data = dtos };
     }
 }
 
-public class GetInventoryProductListRequest : IRequest<GetProductListResult>
-{
-    public string? WarehouseId { get; init; } // optional filter by location/warehouse
-    public bool IsDeleted { get; init; } = false;
-}
-
+// Optional: Keep this for inventory-specific lists (unchanged except includes)
 public class GetInventoryProductListHandler : IRequestHandler<GetInventoryProductListRequest, GetProductListResult>
 {
     private readonly IMapper _mapper;
@@ -118,34 +128,36 @@ public class GetInventoryProductListHandler : IRequestHandler<GetInventoryProduc
 
     public async Task<GetProductListResult> Handle(GetInventoryProductListRequest request, CancellationToken cancellationToken)
     {
-        var query = _context
-            .Product
+        var query = _context.Product
             .AsNoTracking()
             .ApplyIsDeletedFilter(request.IsDeleted)
             .Include(x => x.UnitMeasure)
             .Include(x => x.ProductGroup)
+            .Include(x => x.Tax)
+            .Include(x => x.Attribute1)
+            .Include(x => x.Attribute2)
             .AsQueryable();
 
-        // Filter by WarehouseId if provided, and ensure matching inventory transactions exist
         if (!string.IsNullOrEmpty(request.WarehouseId))
         {
             query = query.Where(x => x.WarehouseId == request.WarehouseId &&
-                                     _context.InventoryTransaction.Any(it => it.ProductId == x.Id &&
-                                                                             it.WarehouseId == request.WarehouseId));
+                                     _context.InventoryTransaction.Any(it =>
+                                         it.ProductId == x.Id && it.WarehouseId == request.WarehouseId));
         }
         else
         {
-            // If no WarehouseId, filter products that have any inventory transaction
             query = query.Where(x => _context.InventoryTransaction.Any(it => it.ProductId == x.Id));
         }
 
         var entities = await query.ToListAsync(cancellationToken);
-
         var dtos = _mapper.Map<List<GetProductListDto>>(entities);
 
-        return new GetProductListResult
-        {
-            Data = dtos
-        };
+        return new GetProductListResult { Data = dtos };
     }
+}
+
+public class GetInventoryProductListRequest : IRequest<GetProductListResult>
+{
+    public string? WarehouseId { get; init; }
+    public bool IsDeleted { get; init; } = false;
 }

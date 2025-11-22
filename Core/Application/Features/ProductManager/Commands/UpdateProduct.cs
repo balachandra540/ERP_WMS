@@ -1,4 +1,209 @@
-﻿using Application.Common.CQS.Queries;
+﻿//using Application.Common.Extensions;
+//using Application.Common.Repositories;
+//using Application.Common.Services.SecurityManager;
+//using Domain.Entities;
+//using FluentValidation;
+//using MediatR;
+//using Microsoft.EntityFrameworkCore;
+
+//namespace Application.Features.ProductManager.Commands;
+
+//public class UpdateProductResult
+//{
+//    public Product? Data { get; set; }
+//}
+
+//public class UpdateProductRequest : IRequest<UpdateProductResult>
+//{
+//    public string? Id { get; init; }
+//    public string? Number { get; init; }
+//    public string? Name { get; init; }
+//    public string? Description { get; init; }
+//    public double? UnitPrice { get; init; }
+//    public bool Physical { get; init; } = true;
+//    public string? UnitMeasureId { get; init; }
+//    public string? ProductGroupId { get; init; }
+//    public string? WarehouseId { get; init; }
+//    public string? UpdatedById { get; init; }
+//    public string? TaxId { get; set; }
+
+//    // NEW FIELDS
+//    public string? Attribute1Id { get; init; }
+//    public string? Attribute2Id { get; init; }
+//    public bool ServiceNo { get; init; } = false;
+//    public bool Imei1 { get; init; } = false;
+//    public bool Imei2 { get; init; } = false;
+//}
+
+//public class UpdateProductValidator : AbstractValidator<UpdateProductRequest>
+//{
+
+//    public UpdateProductValidator()
+//    {
+//        RuleFor(x => x.Id).NotEmpty();
+//        RuleFor(x => x.Name).NotEmpty();
+//        RuleFor(x => x.UnitPrice).NotNull().GreaterThan(0);
+//        RuleFor(x => x.UnitMeasureId).NotEmpty();
+//        RuleFor(x => x.ProductGroupId).NotEmpty();
+//        RuleFor(x => x.TaxId).NotEmpty();
+//    }
+//}
+
+//public class UpdateProductHandler : IRequestHandler<UpdateProductRequest, UpdateProductResult>
+//{
+//    private readonly ICommandRepository<Product> _productRepository;
+//    private readonly ICommandRepository<ProductPriceDefinition> _priceRepository;
+//    private readonly ICommandRepository<ProductVariant> _variantRepository;
+//    private readonly ICommandRepository<AttributeDetail> _attributeDetailRepository;
+//    private readonly IUnitOfWork _unitOfWork;
+
+//    public UpdateProductHandler(
+//        ICommandRepository<Product> productRepository,
+//        ICommandRepository<ProductPriceDefinition> priceRepository,
+//        ICommandRepository<ProductVariant> variantRepository,
+//        ICommandRepository<AttributeDetail> attributeDetailRepository,
+//        IUnitOfWork unitOfWork)
+//    {
+//        _productRepository = productRepository;
+//        _priceRepository = priceRepository;
+//        _variantRepository = variantRepository;
+//        _attributeDetailRepository = attributeDetailRepository;
+//        _unitOfWork = unitOfWork;
+//    }
+
+//    public async Task<UpdateProductResult> Handle(UpdateProductRequest request, CancellationToken cancellationToken)
+//    {
+//        // 1. Load main product (no navigation properties → no EF mapping issues)
+//        var product = await _productRepository.GetQuery()
+//            .FirstOrDefaultAsync(p => p.Id == request.Id && !p.IsDeleted, cancellationToken)
+//            ?? throw new KeyNotFoundException("Product not found.");
+
+//        // 2. Load variants separately
+//        var existingVariants = await _variantRepository.GetQuery()
+//            .Where(v => v.ProductId == product.Id && !v.IsDeleted)
+//            .ToListAsync(cancellationToken);
+
+//        // 3. Load active price definitions separately
+//        var priceDefinitions = await _priceRepository.GetQuery()
+//            .Where(p => p.ProductId == product.Id && p.IsActive && !p.IsDeleted)
+//            .OrderByDescending(p => p.EffectiveFrom)
+//            .ToListAsync(cancellationToken);
+
+//        var latestPriceDef = priceDefinitions.FirstOrDefault();
+
+//        // Old vs New attributes comparison
+//        var oldAttr1Id = product.Attribute1Id;
+//        var oldAttr2Id = product.Attribute2Id;
+//        var newAttr1Id = request.Attribute1Id;
+//        var newAttr2Id = request.Attribute2Id;
+//        var attributesChanged = oldAttr1Id != newAttr1Id || oldAttr2Id != newAttr2Id;
+
+//        // Update main product fields
+//        product.Name = request.Name!.Trim();
+//        product.Description = request.Description;
+//        product.UnitPrice = request.UnitPrice ?? 0;
+//        product.Physical = request.Physical;
+//        product.UnitMeasureId = request.UnitMeasureId!;
+//        product.ProductGroupId = request.ProductGroupId!;
+//        product.TaxId = request.TaxId!;
+//        product.UpdatedById = request.UpdatedById;
+//        product.Attribute1Id = newAttr1Id;
+//        product.Attribute2Id = newAttr2Id;
+//        product.ServiceNo = request.ServiceNo;
+//        product.Imei1 = request.Imei1;
+//        product.Imei2 = request.Imei2;
+
+//        _productRepository.Update(product);
+
+//        // Update latest active price definition
+//        if (latestPriceDef != null)
+//        {
+//            latestPriceDef.ProductName = product.Name;
+//            latestPriceDef.CostPrice = Convert.ToDecimal(product.UnitPrice);
+//            latestPriceDef.UpdatedById = request.UpdatedById;
+//            _priceRepository.Update(latestPriceDef);
+//        }
+
+//        // Helper: Load attribute details
+//        async Task<List<AttributeDetail>> LoadDetails(string? attrId)
+//        {
+//            if (string.IsNullOrEmpty(attrId))
+//                return new List<AttributeDetail>();
+
+//            return await _attributeDetailRepository.GetQuery()
+//                .Where(x => x.AttributeId == attrId && !x.IsDeleted)
+//                .ToListAsync(cancellationToken);
+//        }
+
+//        // Helper: Generate all variant combinations
+//        async Task GenerateVariantsAsync()
+//        {
+//            var attr1Details = await LoadDetails(newAttr1Id);
+//            var attr2Details = await LoadDetails(newAttr2Id);
+
+//            if (!attr1Details.Any() || !attr2Details.Any())
+//                return;
+
+//            foreach (var a1 in attr1Details)
+//            {
+//                foreach (var a2 in attr2Details)
+//                {
+//                    var pluCode = $"{product.Name}_{a1.Value}_{a2.Value}".Trim();
+
+//                    var newVariant = new ProductVariant
+//                    {
+//                        ProductId = product.Id,
+//                        Attribute1DetailId = a1.Id,
+//                        Attribute2DetailId = a2.Id,
+//                        PluCode = pluCode,
+//                        CreatedById = request.UpdatedById,
+//                        UpdatedById = request.UpdatedById,
+//                        CreatedAtUtc = DateTime.UtcNow,
+//                        UpdatedAtUtc = DateTime.UtcNow
+//                    };
+
+//                    await _variantRepository.CreateAsync(newVariant, cancellationToken);
+//                }
+//            }
+//        }
+
+//        // Variant Logic
+//        if (attributesChanged)
+//        {
+//            // CASE 1: Attributes changed → delete all existing variants and regenerate
+//            if (existingVariants.Any())
+//            {
+//                foreach (var variant in existingVariants)
+//                {
+//                    _variantRepository.Delete(variant);
+//                }
+//            }
+
+//            if (!string.IsNullOrEmpty(newAttr1Id) && !string.IsNullOrEmpty(newAttr2Id))
+//            {
+//                await GenerateVariantsAsync();
+//            }
+//        }
+//        else
+//        {
+//            // CASE 2: Attributes unchanged → generate only if missing
+//            bool hasAttributes = !string.IsNullOrEmpty(newAttr1Id) && !string.IsNullOrEmpty(newAttr2Id);
+//            bool hasNoVariants = !existingVariants.Any();
+
+//            if (hasAttributes && hasNoVariants)
+//            {
+//                await GenerateVariantsAsync();
+//            }
+//        }
+
+//        await _unitOfWork.SaveAsync(cancellationToken);
+
+//        return new UpdateProductResult { Data = product };
+//    }
+//}
+
+
+using Application.Common.Extensions;
 using Application.Common.Repositories;
 using Application.Common.Services.SecurityManager;
 using Domain.Entities;
@@ -16,16 +221,23 @@ public class UpdateProductResult
 public class UpdateProductRequest : IRequest<UpdateProductResult>
 {
     public string? Id { get; init; }
+    public string? Number { get; init; }
     public string? Name { get; init; }
     public string? Description { get; init; }
     public double? UnitPrice { get; init; }
-    public bool? Physical { get; init; } = true;
+    public bool Physical { get; init; } = true;
     public string? UnitMeasureId { get; init; }
     public string? ProductGroupId { get; init; }
-    public string? WarehouseId { get; init; }  // added
+    public string? WarehouseId { get; init; }
     public string? UpdatedById { get; init; }
     public string? TaxId { get; set; }
 
+    // NEW FIELDS
+    public string? Attribute1Id { get; init; }
+    public string? Attribute2Id { get; init; }
+    public bool ServiceNo { get; init; } = false;
+    public bool Imei1 { get; init; } = false;
+    public bool Imei2 { get; init; } = false;
 }
 
 public class UpdateProductValidator : AbstractValidator<UpdateProductRequest>
@@ -34,106 +246,155 @@ public class UpdateProductValidator : AbstractValidator<UpdateProductRequest>
     {
         RuleFor(x => x.Id).NotEmpty();
         RuleFor(x => x.Name).NotEmpty();
-        RuleFor(x => x.UnitPrice).NotEmpty();
-        RuleFor(x => x.Physical).NotEmpty();
+        RuleFor(x => x.UnitPrice).NotNull().GreaterThan(0);
         RuleFor(x => x.UnitMeasureId).NotEmpty();
         RuleFor(x => x.ProductGroupId).NotEmpty();
         RuleFor(x => x.TaxId).NotEmpty();
-
     }
 }
 
 public class UpdateProductHandler : IRequestHandler<UpdateProductRequest, UpdateProductResult>
 {
-    private readonly ICommandRepository<Product> _repository;
+    private readonly ICommandRepository<Product> _productRepository;
     private readonly ICommandRepository<ProductPriceDefinition> _priceRepository;
-    private readonly IQueryContext _context;
+    private readonly ICommandRepository<ProductVariant> _variantRepository;
+    private readonly ICommandRepository<AttributeDetail> _attributeDetailRepository;
     private readonly IUnitOfWork _unitOfWork;
-    private readonly ISecurityService _securityService;
-
 
     public UpdateProductHandler(
-        ICommandRepository<Product> repository,
+        ICommandRepository<Product> productRepository,
         ICommandRepository<ProductPriceDefinition> priceRepository,
-        IQueryContext context,
-        IUnitOfWork unitOfWork,
-           ISecurityService securityService
-
-    )
+        ICommandRepository<ProductVariant> variantRepository,
+        ICommandRepository<AttributeDetail> attributeDetailRepository,
+        IUnitOfWork unitOfWork)
     {
-        _repository = repository;
+        _productRepository = productRepository;
         _priceRepository = priceRepository;
-        _context = context;
+        _variantRepository = variantRepository;
+        _attributeDetailRepository = attributeDetailRepository;
         _unitOfWork = unitOfWork;
-        _securityService = securityService;
     }
 
     public async Task<UpdateProductResult> Handle(UpdateProductRequest request, CancellationToken cancellationToken)
     {
+        // Now safe to use Include() — all relationships are properly configured!
+        var product = await _productRepository.GetQuery()
+            .Include(p => p.Variants)
+            .Include(p => p.PriceDefinitions)
+            .FirstOrDefaultAsync(p => p.Id == request.Id && !p.IsDeleted, cancellationToken)
+            ?? throw new KeyNotFoundException("Product not found.");
 
-        var entity = await _repository.GetAsync(request.Id ?? string.Empty, cancellationToken);
+        // Track old attribute values
+        var oldAttr1Id = product.Attribute1Id;
+        var oldAttr2Id = product.Attribute2Id;
+        var newAttr1Id = request.Attribute1Id;
+        var newAttr2Id = request.Attribute2Id;
+        var attributesChanged = oldAttr1Id != newAttr1Id || oldAttr2Id != newAttr2Id;
 
-        if (entity == null)
-        { 
-            throw new Exception("Product not found");
+        // Update main product fields
+        product.Name = request.Name!.Trim();
+        product.Description = request.Description;
+        product.UnitPrice = request.UnitPrice ?? 0;
+        product.Physical = request.Physical;
+        product.UnitMeasureId = request.UnitMeasureId!;
+        product.ProductGroupId = request.ProductGroupId!;
+        product.TaxId = request.TaxId!;
+        product.UpdatedById = request.UpdatedById;
+        product.Attribute1Id = newAttr1Id;
+        product.Attribute2Id = newAttr2Id;
+        product.ServiceNo = request.ServiceNo;
+        product.Imei1 = request.Imei1;
+        product.Imei2 = request.Imei2;
+
+        _productRepository.Update(product);
+
+        // Update latest active price definition
+        var latestPriceDef = product.PriceDefinitions
+            .Where(p => p.IsActive)
+            .OrderByDescending(p => p.EffectiveFrom)
+            .FirstOrDefault();
+
+        if (latestPriceDef != null)
+        {
+            latestPriceDef.ProductName = product.Name;
+            latestPriceDef.CostPrice = Convert.ToDecimal(product.UnitPrice);
+            latestPriceDef.UpdatedById = request.UpdatedById;
+            _priceRepository.Update(latestPriceDef);
         }
 
-        // Step 2: Update product
-        
-        entity.UpdatedById = request.UpdatedById;
-
-        entity.Name = request.Name;
-        entity.UnitPrice = request.UnitPrice;
-        entity.Physical = request.Physical;
-        entity.Description = request.Description;
-        entity.UnitMeasureId = request.UnitMeasureId;
-        entity.ProductGroupId = request.ProductGroupId;
-        entity.WarehouseId = request.WarehouseId;
-
-        entity.TaxId = request.TaxId;
-        _repository.Update(entity);
-
-        // Step 3: Save product update
-        await _unitOfWork.SaveAsync(cancellationToken);
-
-        var priceDef = await _context.ProductPriceDefinition
-     .FirstOrDefaultAsync(x => x.ProductId == entity.Id, cancellationToken);
-
-
-        // Step 5: Create if not exists
-        if (priceDef == null)
+        // Helper: Load attribute details
+        async Task<List<AttributeDetail>> LoadDetails(string? attrId)
         {
-            priceDef = new ProductPriceDefinition
-            {
-                ProductId = entity.Id,
-                ProductName = entity.Name,
-                CostPrice = Convert.ToDecimal(entity.UnitPrice ?? 0),
-                MarginPercentage = 10,
-                CurrencyCode = "INR",
-                //SalePrice = 0, // will be computed by DB
-                EffectiveFrom = _securityService.ConvertToIst(DateTime.UtcNow),
-                 //EffectiveTo = null,
-                IsActive = true,
-                CreatedById = request.UpdatedById,
-            };
+            if (string.IsNullOrEmpty(attrId))
+                return new List<AttributeDetail>();
 
-            await _priceRepository.CreateAsync(priceDef, cancellationToken);
+            return await _attributeDetailRepository.GetQuery()
+                .Where(x => x.AttributeId == attrId && !x.IsDeleted)
+                .ToListAsync(cancellationToken);
+        }
+
+        // Helper: Generate variants
+        async Task GenerateVariantsAsync()
+        {
+            var attr1Details = await LoadDetails(newAttr1Id);
+            var attr2Details = await LoadDetails(newAttr2Id);
+
+            if (!attr1Details.Any() || !attr2Details.Any())
+                return;
+
+            foreach (var a1 in attr1Details)
+            {
+                foreach (var a2 in attr2Details)
+                {
+                    var pluCode = $"{product.Name}_{a1.Value}_{a2.Value}".Trim();
+
+                    var newVariant = new ProductVariant
+                    {
+                        ProductId = product.Id,
+                        Attribute1DetailId = a1.Id,
+                        Attribute2DetailId = a2.Id,
+                        PluCode = pluCode,
+                        CreatedById = request.UpdatedById,
+                    };
+
+                    await _variantRepository.CreateAsync(newVariant, cancellationToken);
+                }
+            }
+        }
+
+        // === Variant Management Logic ===
+        if (attributesChanged)
+        {
+            // Attributes changed → delete all existing variants
+            if (product.Variants.Any())
+            {
+                foreach (var variant in product.Variants.ToList())
+                {
+                    _variantRepository.Delete(variant);
+                }
+                product.Variants.Clear();
+            }
+
+            // Regenerate if both attributes are now set
+            if (!string.IsNullOrEmpty(newAttr1Id) && !string.IsNullOrEmpty(newAttr2Id))
+            {
+                await GenerateVariantsAsync();
+            }
         }
         else
         {
-            // Step 6: Update existing Price Definition
-            priceDef.CostPrice = Convert.ToDecimal(entity.UnitPrice ?? 0);
-            priceDef.UpdatedById = request.UpdatedById;
-            _priceRepository.Update(priceDef);
+            // Attributes unchanged → generate only if missing and needed
+            bool shouldHaveVariants = !string.IsNullOrEmpty(newAttr1Id) && !string.IsNullOrEmpty(newAttr2Id);
+            bool hasNoVariants = !product.Variants.Any();
+
+            if (shouldHaveVariants && hasNoVariants)
+            {
+                await GenerateVariantsAsync();
+            }
         }
 
-        // Step 7: Save in same transaction
         await _unitOfWork.SaveAsync(cancellationToken);
 
-        return new UpdateProductResult
-        {
-            Data = entity
-        };
+        return new UpdateProductResult { Data = product };
     }
 }
-
