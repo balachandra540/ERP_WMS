@@ -35,4 +35,6 @@ public class GetProductPriceDefinitionListHandler :
 
         return new GetProductPriceDefinitionListResult { Data = items };
     }
+
+    
 }

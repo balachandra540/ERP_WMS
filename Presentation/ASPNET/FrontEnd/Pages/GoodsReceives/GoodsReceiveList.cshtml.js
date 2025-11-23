@@ -1364,7 +1364,7 @@ const App = {
             },
             // **UPDATED SECONDARY DATA SERVICES FOR GOODS RECEIVE ITEMS**
             getSecondaryData: async (goodsReceiveId) => {
-                debugger
+                debugger;
                 try {
                     const response = await AxiosManager.get('/GoodsReceive/GetGoodsReceiveItemList?goodsReceiveId=' + goodsReceiveId, {});
                     return response;
@@ -2193,18 +2193,31 @@ const App = {
                                 otherCharges: row.otherCharges,
                                 receiveDate: row.receiveDate,
                                 purchaseOrderId: row.purchaseOrderId,
-                                //purchaseOrderNumber: purchaseOrderNumber,
                                 createdAt: new Date(row.createdAtUtc).toLocaleString('en-GB')
                             });
-                            
+
                             numberText.refresh();
-                            if (secondaryGrid && typeof secondaryGrid.clearBatchChanges === "function") {
-                                secondaryGrid.clearBatchChanges();
-                            }
+                            //if (secondaryGrid && typeof secondaryGrid?.clearBatchChanges === "function") {
+                            //    secondaryGrid.clearBatchChanges();
+                            //}
+
+
+                            // Load secondary data from API
                             await methods.populateSecondaryData(row.id);
-                            secondaryGrid.refresh();
+
+                            // Create or refresh grid
+                            if (!secondaryGrid.obj) {
+                                await secondaryGrid.create(state.secondaryData);
+                            } else {
+                                secondaryGrid.refresh();
+                            }
 
                             mainModal.obj.show();
+
+                            setTimeout(() => {
+                                if (secondaryGrid.obj) secondaryGrid.obj.refresh();
+                            }, 100);
+
                             return;
                         }
 

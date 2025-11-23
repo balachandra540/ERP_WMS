@@ -170,6 +170,23 @@ public class ProductController : BaseApiController
         });
     }
 
+    [Authorize]
+    [HttpGet("GetActiveProductPriceDefinitionList")]
+    public async Task<ActionResult<ApiSuccessResult<GetProductPriceDefinitionListResult>>> GetActiveProductPriceDefinitionListAsync(
+    CancellationToken cancellationToken)
+    {
+        var request = new GetProductPriceDefinitionListRequest();
+        var response = await _sender.Send(request, cancellationToken);
+
+        return Ok(new ApiSuccessResult<GetProductPriceDefinitionListResult>
+        {
+            Code = StatusCodes.Status200OK,
+            Message = $"Success executing {nameof(GetProductPriceDefinitionListAsync)}",
+            Content = response
+        });
+    }
+
+
 }
 
 

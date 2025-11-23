@@ -996,6 +996,7 @@ const App = {
             salesOrderStatusListLookupData: [],
             secondaryData: [],
             productListLookupData: [],
+            priceDefinitionListLookupData:[],
             mainTitle: '',
             id: '',
             number: '',
@@ -1406,7 +1407,15 @@ const App = {
                 } catch (error) {
                     throw error;
                 }
+            },
+            getpriceDefinitionListLookupData: async () => {
+                try {
+                    const response = await AxiosManager.get('/Product/GetProductPriceDefinitionList' , {});
+                    return response;
+                } catch (error) {
+                    throw error;
                 }
+            },
             };
 
         //// Customer Text Inputs
@@ -1465,7 +1474,7 @@ const App = {
             populateSalesOrderStatusListLookupData: async () => {
                 const response = await services.getSalesOrderStatusListLookupData();
                 state.salesOrderStatusListLookupData = response?.data?.content?.data;
-            },
+            },           
             openCustomerModal: async () => {
                 try {
                     await methods.populateCustomerGroupListLookupData();
@@ -1622,8 +1631,12 @@ const App = {
                 }
             },
             populateProductListLookupData: async () => {
-                const response = await services.getInventoryProductListLookupData();
+                const response = await services.getProductListLookupData();
                 state.productListLookupData = response?.data?.content?.data;
+            },
+            populateProductActivePriceLookupData : async () => {
+                const response = await services.getpriceDefinitionListLookupData();
+                state.priceDefinitionListLookupData = response?.data?.content?.data;
             },
             refreshPaymentSummary: async (id) => {
                 const record = state.mainData.find(item => item.id === id);
@@ -1984,12 +1997,29 @@ const App = {
                             mainGrid.obj.excelExport();
                         }
 
+                        //if (args.item.id === 'AddCustom') {
+                        //    state.deleteMode = false;
+                        //    state.mainTitle = 'Add Sales Order';
+                        //    resetFormState();
+                        //    state.secondaryData = [];
+                        //    secondaryGrid.refresh();
+                        //    state.showComplexDiv = false;
+                        //    mainModal.obj.show();
+                        //}
+                        
                         if (args.item.id === 'AddCustom') {
                             state.deleteMode = false;
                             state.mainTitle = 'Add Sales Order';
                             resetFormState();
                             state.secondaryData = [];
-                            secondaryGrid.refresh();
+
+                            // Create new grid properly
+                            if (secondaryGrid.obj == null) {
+                                await secondaryGrid.create(state.secondaryData);
+                            } else {
+                                secondaryGrid.refresh();
+                            }
+
                             state.showComplexDiv = false;
                             mainModal.obj.show();
                         }
@@ -2109,24 +2139,29 @@ const App = {
                                         value: args.rowData.productId,
                                         change: (e) => {
                                             const selectedProduct = state.productListLookupData.find(item => item.id === e.value);
-                                            if (selectedProduct) {
-                                                args.rowData.productId = selectedProduct.id;
-                                                if (numberObj) {
-                                                    numberObj.value = selectedProduct.number;
-                                                }
-                                                if (priceObj) {
-                                                    priceObj.value = selectedProduct.unitPrice;
-                                                }
-                                                if (summaryObj) {
-                                                    summaryObj.value = selectedProduct.description;
-                                                }
-                                                if (quantityObj) {
-                                                    quantityObj.value = 1;
-                                                    const total = selectedProduct.unitPrice * quantityObj.value;
-                                                    if (totalObj) {
-                                                        totalObj.value = total;
-                                                    }
-                                                }
+                                            if (!selectedProduct) return;
+                                            args.rowData.productId = selectedProduct.id;
+
+                                            // Set product number
+                                            if (numberObj) numberObj.value = selectedProduct.number;
+
+                                            // 🔥 GET PRICE FROM PRICE DEFINITION TABLE
+                                            const priceDef = state.priceDefinitionListLookupData
+                                                ?.find(x => x.productId === selectedProduct.id && x.isActive);
+
+                                            const finalPrice = priceDef ? priceDef.costPrice : selectedProduct.unitPrice;   // fallback if missing
+
+                                            // Set price into grid textbox
+                                            if (priceObj) priceObj.value = finalPrice;
+
+                                            // Set description/summary
+                                            if (summaryObj) summaryObj.value = selectedProduct.description;
+
+                                            // Update quantity and total
+                                            if (quantityObj) {
+                                                quantityObj.value = 1;
+
+                                                if (totalObj) totalObj.value = finalPrice * quantityObj.value;
                                             }
                                         },
                                         placeholder: 'Select a Product',
@@ -2362,6 +2397,7 @@ const App = {
                 secondaryGrid.obj.appendTo(secondaryGridRef.value);
             },
             refresh: () => {
+                if (!secondaryGrid.obj) return;   // <-- prevent crash
                 secondaryGrid.obj.setProperties({ dataSource: state.secondaryData });
             }
         };
@@ -2419,8 +2455,10 @@ const App = {
                 salesOrderStatusListLookup.create();
                 orderDatePicker.create();
                 numberText.create();
-                await methods.populateProductListLookupData();
                 await secondaryGrid.create(state.secondaryData);
+                await methods.populateProductListLookupData();
+                await methods.populateProductActivePriceLookupData();
+
             } catch (e) {
                 console.error('Page initialization error:', e);
             }
