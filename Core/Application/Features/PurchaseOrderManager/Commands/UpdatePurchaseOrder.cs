@@ -29,6 +29,8 @@ public class UpdatePurchaseOrderRequest : IRequest<UpdatePurchaseOrderResult>
     public double? AfterTaxAmount { get; init; }
     public List<PurchaseOrderItem>? Items { get; set; } = new();
     public List<string>? DeletedItemIds { get; set; } = new();  // Just IDs
+    public string? Attribute1DetailId { get; set; } // ✔ NEW
+    public string? Attribute2DetailId { get; set; } // ✔ NEW
 
 
 }
@@ -147,7 +149,9 @@ public class UpdatePurchaseOrderHandler : IRequestHandler<UpdatePurchaseOrderReq
                     TaxAmount = item.TaxAmount,
                     Total = item.Total,
                     TotalAfterTax = item.TotalAfterTax,
-                    CreatedById = request.UpdatedById
+                    CreatedById = request.UpdatedById,
+                    Attribute1DetailId=item.Attribute1DetailId,
+                    Attribute2DetailId=item.Attribute2DetailId
                 };
                 await _PurchaseOrderItemrepository.CreateAsync(newPurchaseOrderItem, cancellationToken);
             }
@@ -166,6 +170,8 @@ public class UpdatePurchaseOrderHandler : IRequestHandler<UpdatePurchaseOrderReq
                 PurchaseOrderItementity.TaxAmount = item.TaxAmount;
                 PurchaseOrderItementity.TotalAfterTax = item.TotalAfterTax;
                 PurchaseOrderItementity.TotalAfterTax = item.TotalAfterTax;
+                PurchaseOrderItementity.Attribute1DetailId = item.Attribute1DetailId;
+                PurchaseOrderItementity.Attribute2DetailId = item.Attribute2DetailId;
 
                 PurchaseOrderItementity.Total = item.Total;
 

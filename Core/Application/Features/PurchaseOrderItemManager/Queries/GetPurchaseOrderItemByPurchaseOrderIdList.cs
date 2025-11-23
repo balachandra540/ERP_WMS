@@ -28,6 +28,9 @@ public record GetPurchaseOrderItemByPurchaseOrderIdListDto
     public double? TaxAmount { get; init; }
     public double? TotalAfterTax { get; init; }
     public DateTime? CreatedAtUtc { get; init; }
+    public string? Attribute1DetailId { get; init; } // ✔ NEW
+    public string? Attribute2DetailId { get; init; } // ✔ NEW
+
 }
 
 public class GetPurchaseOrderItemByPurchaseOrderIdListProfile : Profile

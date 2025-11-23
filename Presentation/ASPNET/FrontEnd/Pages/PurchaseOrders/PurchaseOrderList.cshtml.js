@@ -338,7 +338,21 @@
                 } catch (error) {
                     throw error;
                 }
-            }
+            },
+            getAttributeDetails: async (attributeId) => {
+                debugger
+                try {
+                    const requestBody = {
+                        attributeId: attributeId,
+                        isDeleted: false
+                    };
+                    return AxiosManager.post('/Attribute/GetAttributeDetails', requestBody);
+
+                      } catch (error) {
+                    throw error;
+                }
+            },
+
             //,
             //getAttributesAndValuesByProductGroupId: async (productGroupId) => {
             //    try {
@@ -393,16 +407,49 @@
             populateSecondaryData: async (purchaseOrderId) => {
                 try {
                     const response = await services.getSecondaryData(purchaseOrderId);
-                    state.secondaryData = response?.data?.content?.data.map(item => ({
-                        ...item,
-                        createdAtUtc: new Date(item.createdAtUtc)
+                    const items = response?.data?.content?.data || [];
+
+                    // For each row, load attribute lists based on its productId (concurrently)
+                    await Promise.all(items.map(async (row) => {
+                        // Ensure createdAtUtc is a Date if present
+                        if (row.createdAtUtc) row.createdAtUtc = new Date(row.createdAtUtc);
+
+                        // Initialize lists so grid valueAccessors don't break
+                        row.attribute1List = [];
+                        row.attribute2List = [];
+
+                        // find product to get attribute definitions
+                        const product = state.productListLookupData.find(p => p.id === row.productId);
+                        if (product) {
+                            if (product.attribute1Id) {
+                                try {
+                                    const resp1 = await services.getAttributeDetails(product.attribute1Id);
+                                    row.attribute1List = resp1.data?.content?.data ?? [];
+                                } catch (e) {
+                                    row.attribute1List = [];
+                                }
+                            }
+                            if (product.attribute2Id) {
+                                try {
+                                    const resp2 = await services.getAttributeDetails(product.attribute2Id);
+                                    row.attribute2List = resp2.data?.content?.data ?? [];
+                                } catch (e) {
+                                    row.attribute2List = [];
+                                }
+                            }
+                        }
                     }));
+
+                    state.secondaryData = items;
                     methods.refreshPaymentSummary(purchaseOrderId);
+                    // Make sure grid refresh uses new row-level lists
+                    secondaryGrid.refresh();
                 } catch (error) {
+                    console.error('populateSecondaryData error:', error);
                     state.secondaryData = [];
                 }
             },
-            populateProductListLookupData: async () => {
+             populateProductListLookupData: async () => {
                 const response = await services.getProductListLookupData();
                 state.productListLookupData = response?.data?.content?.data;
             },
@@ -470,7 +517,10 @@
                             taxId: changed.taxId ?? currentSecondaryData[index].taxId,
                             taxAmount: changed.taxAmount ?? currentSecondaryData[index].taxAmount,
                             totalAfterTax: changed.totalAfterTax ?? currentSecondaryData[index].totalAfterTax,
-                            total: changed.total ?? currentSecondaryData[index].total
+                            total: changed.total ?? currentSecondaryData[index].total,
+                            // 🔥 ADD ATTRIBUTE FIELDS
+                            attribute1DetailId: changed.attribute1DetailId ?? currentSecondaryData[index].attribute1DetailId,
+                            attribute2DetailId: changed.attribute2DetailId ?? currentSecondaryData[index].attribute2DetailId
                         };
                     }
                 }
@@ -535,7 +585,10 @@
                             taxAmount: item.taxAmount,
                             totalAfterTax: item.totalAfterTax,
                             total: item.total,
-                            summary:item.summary
+                            summary: item.summary,
+                            attribute1DetailId: item.attribute1DetailId || null,  // 🔥 ADD
+                            attribute2DetailId: item.attribute2DetailId || null   // 🔥 ADD
+
                         }));
 
                         // Call API with all fields
@@ -576,7 +629,10 @@
                             taxAmount: item.taxAmount,
                             totalAfterTax: item.totalAfterTax,
                             total: item.total,
-                            summary:item.summary
+                            summary: item.summary,
+                            attribute1DetailId: item.attribute1DetailId || null,  // 🔥 ADD
+                            attribute2DetailId: item.attribute2DetailId || null   // 🔥 ADD
+
                         }));
 
                         // Filter out deleted items (zero quantity or explicitly marked; assume prepareSecondaryDataForSubmission handles this)
@@ -1093,6 +1149,7 @@
                             validationRules: { required: true },
                             disableHtmlEncode: false,
                             valueAccessor: (field, data, column) => {
+                                debugger
                                 const product = state.productListLookupData.find(item => item.id === data[field]);
                                 return product ? `${product.name}` : '';
                             },
@@ -1113,30 +1170,53 @@
                                         dataSource: state.productListLookupData,
                                         fields: { value: 'id', text: 'name' },
                                         value: args.rowData.productId,
-                                        change: (e) => {
+                                        change: async (e) => {
                                             const selectedProduct = state.productListLookupData.find(item => item.id === e.value);
-                                            state.productGroupId = selectedProduct.productGroupId;
+                                            state.productGroupId = selectedProduct?.productGroupId ?? '';
+
                                             if (selectedProduct) {
                                                 args.rowData.productId = selectedProduct.id;
-                                                if (numberObj) {
-                                                    numberObj.value = selectedProduct.number;
-                                                }
-                                                if (priceObj) {
-                                                    priceObj.value = selectedProduct.unitPrice;
-                                                }
-                                                if (summaryObj) {
-                                                    summaryObj.value = selectedProduct.description;
-                                                }
-                                                if (taxObj) {
-                                                    taxObj.value = selectedProduct.taxId;
-                                                }
+
+                                                if (numberObj) numberObj.value = selectedProduct.number;
+                                                if (priceObj) priceObj.value = selectedProduct.unitPrice;
+                                                if (summaryObj) summaryObj.value = selectedProduct.description;
+                                                if (taxObj) taxObj.value = selectedProduct.taxId;
+
                                                 if (quantityObj) {
                                                     quantityObj.value = 1;
-                                                    const total = selectedProduct.unitPrice * quantityObj.value;
-                                                    if (totalObj) {
-                                                        totalObj.value = total;
+                                                    const total = (selectedProduct.unitPrice || 0) * 1;
+                                                    if (totalObj) totalObj.value = total;
+                                                }
+
+                                                // ---- Load and attach attribute lists to THIS ROW ----
+                                                // Initialize to empty arrays first
+                                                args.rowData.attribute1List = [];
+                                                args.rowData.attribute2List = [];
+
+                                                if (selectedProduct.attribute1Id) {
+                                                    try {
+                                                        const resp1 = await services.getAttributeDetails(selectedProduct.attribute1Id);
+                                                        args.rowData.attribute1List = resp1.data?.content?.data ?? [];
+                                                    } catch (err) {
+                                                        args.rowData.attribute1List = [];
                                                     }
-                                                }                                                
+                                                }
+
+                                                if (selectedProduct.attribute2Id) {
+                                                    try {
+                                                        const resp2 = await services.getAttributeDetails(selectedProduct.attribute2Id);
+                                                        args.rowData.attribute2List = resp2.data?.content?.data ?? [];
+                                                    } catch (err) {
+                                                        args.rowData.attribute2List = [];
+                                                    }
+                                                }
+
+                                                // If previously selected attribute ids are not present in the new lists, clear them
+                                                const a1Exists = args.rowData.attribute1List.some(x => x.id === args.rowData.attribute1DetailId);
+                                                if (!a1Exists) args.rowData.attribute1DetailId = null;
+
+                                                const a2Exists = args.rowData.attribute2List.some(x => x.id === args.rowData.attribute2DetailId);
+                                                if (!a2Exists) args.rowData.attribute2DetailId = null;
                                             }
                                         },
                                         placeholder: 'Select a Product',
@@ -1147,71 +1227,139 @@
                             }
                         },
                         //{
-                        //    field: 'quantity',
-                        //    headerText: 'Quantity',
-                        //    width: 200,
-                        //    validationRules: {
-                        //        required: true,
-                        //        custom: [(args) => {
-                        //            return args['value'] > 0;
-                        //        }, 'Must be a positive number and not zero']
+                        //    field: 'attribute1DetailId',
+                        //    headerText: 'Attribute 1',
+                        //    width: 180,
+                        //    editType: 'dropdownedit',
+                        //    valueAccessor: (field, data) => {
+                        //        const item = state.attribute1List?.find(x => x.id === data[field]);
+                        //        return item ? item.value : '';
                         //    },
-                        //    type: 'number', format: 'N2', textAlign: 'Right',
                         //    edit: {
-                        //        create: () => {
-                        //            let quantityElem = document.createElement('input');
-                        //            return quantityElem;
-                        //        },
-                        //        read: () => {
-                        //            return quantityObj.value;
-                        //        },
-                        //        destroy: () => {
-                        //            quantityObj.destroy();
-                        //        },
-                        //        write: (args) => {
-                        //            quantityObj = new ej.inputs.NumericTextBox({
-                        //                value: args.rowData.quantity ?? 0,
-                        //                change: (e) => {
-                        //                    if (priceObj && totalObj) {
-                        //                        const unitPrice = priceObj.value || 0;
-                        //                        const quantity = e.value || 0;
+                        //        create: () => document.createElement('input'),
+                        //        read: () => attribute1Obj?.value,
+                        //        destroy: () => attribute1Obj?.destroy(),
 
-                        //                        const taxPercent = taxObj?.value
-                        //                            ? (state.taxListLookupData.find(t => t.id === taxObj.value)?.percentage || 0)
-                        //                            : 0;
-                        //                        let taxAmount;
-                        //                        let totalAfterTax;
-                        //                        if (taxPercent === 0) {
-                        //                            // Explicit zero-tax calculation: No tax applied
-                        //                            taxAmount = 0;
-                        //                            totalAfterTax = unitPrice;
-                        //                        } else {
-                        //                            // Original non-zero tax calculation
-                        //                            taxAmount = (unitPrice * taxPercent) / 100;
-                        //                            totalAfterTax = unitPrice + taxAmount;
-                        //                        }
-                        //                        const total = totalAfterTax * quantity;
-                        //                        totalObj.value = total;
-                        //                    }
-                        //                },
-                        //                //focusOut: async () => {  // ✅ Triggers more reliably than blur
-                        //                //    debugger;
-                        //                //    const product = state.productListLookupData.find(p => p.id === args.rowData.productId);
-                        //                //    if (product?.productGroupId) {
-                        //                //        const attributes = await services.getAttributesAndValuesByProductGroupId(product.productGroupId);
-                        //                //        if (attributes && attributes.length) {
-                        //                //            methods.openAttributeModal(attributes, args.rowData);
-                        //                //        }
-                        //                //    }
-                        //                //}
-                                        
+                        //        // 🔥 MAKE THIS ASYNC
+                        //        write: async (args) => {
 
+                        //            // Load list only if row selected + productId available
+                        //            const prod = state.productListLookupData.find(p => p.id === args.rowData.productId);
+
+                        //            if (prod?.attribute1Id) {
+                        //                const res = await services.getAttributeDetails(prod.attribute1Id);
+                        //                state.attribute1List = res.data?.content?.data ?? [];
+                        //            } else {
+                        //                state.attribute1List = [];
+                        //            }
+
+                        //            attribute1Obj = new ej.dropdowns.DropDownList({
+                        //                dataSource: state.attribute1List || [],
+                        //                fields: { value: 'id', text: 'value' },
+                        //                value: args.rowData.attribute1DetailId,
+                        //                placeholder: 'Select Attribute 1'
                         //            });
-                        //            quantityObj.appendTo(args.element);
-                        //        },
-                                
+
+                        //            attribute1Obj.appendTo(args.element);
+                        //        }
                         //    }
                         //},
+                        //{
+                        //    field: 'attribute2DetailId',
+                        //    headerText: 'Attribute 2',
+                        //    width: 180,
+                        //    editType: 'dropdownedit',
+                        //    valueAccessor: (field, data) => {
+                        //        const item = state.attribute2List?.find(x => x.id === data[field]);
+                        //        return item ? item.value : '';
+                        //    },
+                        //    edit: {
+                        //        create: () => document.createElement('input'),
+                        //        read: () => attribute2Obj?.value,
+                        //        destroy: () => attribute2Obj?.destroy(),
+                        //        write: async (args) => {
+
+                        //            const prod = state.productListLookupData.find(p => p.id === args.rowData.productId);
+
+                        //            if (prod?.attribute2Id) {
+                        //                const res = await services.getAttributeDetails(prod.attribute2Id);
+                        //                state.attribute2List = res.data?.content?.data ?? [];
+                        //            } else {
+                        //                state.attribute2List = [];
+                        //            }
+
+                        //            attribute2Obj = new ej.dropdowns.DropDownList({
+                        //                dataSource: state.attribute2List,
+                        //                fields: { value: 'id', text: 'value' },
+                        //                value: args.rowData.attribute2DetailId,
+                        //                placeholder: 'Select Attribute 2'
+                        //            });
+
+                        //            attribute2Obj.appendTo(args.element);
+                        //        }
+                        //    }
+                        //},
+
+                        {
+                            field: 'attribute1DetailId',
+                            headerText: 'Attribute 1',
+                            width: 180,
+                            editType: 'dropdownedit',
+                            // Use the row's own list (fall back to empty)
+                            valueAccessor: (field, data) => {
+                                const list = data.attribute1List || [];
+                                const item = list.find(x => x.id === data[field]);
+                                return item ? item.value : '';
+                            },
+                            edit: {
+                                create: () => document.createElement('input'),
+                                read: () => attribute1Obj?.value,
+                                destroy: () => attribute1Obj?.destroy(),
+                                write: async (args) => {
+                                    // Ensure the row has attribute list loaded (product change should already have set this)
+                                    const dataList = args.rowData.attribute1List || [];
+
+                                    attribute1Obj = new ej.dropdowns.DropDownList({
+                                        dataSource: dataList,
+                                        fields: { value: 'id', text: 'value' },
+                                        value: args.rowData.attribute1DetailId,
+                                        placeholder: 'Select Attribute 1'
+                                    });
+
+                                    attribute1Obj.appendTo(args.element);
+                                }
+                            }
+                        },
+                        {
+                            field: 'attribute2DetailId',
+                            headerText: 'Attribute 2',
+                            width: 180,
+                            editType: 'dropdownedit',
+                            valueAccessor: (field, data) => {
+                                const list = data.attribute2List || [];
+                                const item = list.find(x => x.id === data[field]);
+                                return item ? item.value : '';
+                            },
+                            edit: {
+                                create: () => document.createElement('input'),
+                                read: () => attribute2Obj?.value,
+                                destroy: () => attribute2Obj?.destroy(),
+                                write: async (args) => {
+                                    const dataList = args.rowData.attribute2List || [];
+
+                                    attribute2Obj = new ej.dropdowns.DropDownList({
+                                        dataSource: dataList,
+                                        fields: { value: 'id', text: 'value' },
+                                        value: args.rowData.attribute2DetailId,
+                                        placeholder: 'Select Attribute 2'
+                                    });
+
+                                    attribute2Obj.appendTo(args.element);
+                                }
+                            }
+                        },
+
+
                         {
                             field: 'unitPrice',
                             headerText: 'Unit Price',
