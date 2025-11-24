@@ -40,6 +40,24 @@ public class PurchaseOrderItemConfiguration : BaseEntityConfiguration<PurchaseOr
             .WithMany()
             .HasForeignKey(x => x.TaxId)
             .OnDelete(DeleteBehavior.NoAction);
+        builder.Property(x => x.Attribute1DetailId)
+    .HasMaxLength(IdConsts.MaxLength)
+    .IsRequired(false);
+
+        builder.Property(x => x.Attribute2DetailId)
+            .HasMaxLength(IdConsts.MaxLength)
+            .IsRequired(false);
+
+        builder.HasOne(x => x.Attribute1Detail)
+    .WithMany()
+    .HasForeignKey(x => x.Attribute1DetailId)
+    .OnDelete(DeleteBehavior.NoAction);
+
+        builder.HasOne(x => x.Attribute2Detail)
+            .WithMany()
+            .HasForeignKey(x => x.Attribute2DetailId)
+            .OnDelete(DeleteBehavior.NoAction);
+
 
     }
 }

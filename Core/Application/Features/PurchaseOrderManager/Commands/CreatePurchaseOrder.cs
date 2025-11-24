@@ -81,7 +81,7 @@ public class CreatePurchaseOrderValidator : AbstractValidator<CreatePurchaseOrde
 
             RuleFor(i => i.UnitPrice)
                 .GreaterThan(0).WithMessage("Unit price must be greater than zero.");
-
+            
             RuleFor(i => i.Quantity)
                 .GreaterThan(0).WithMessage("Quantity must be greater than zero.");
 
@@ -102,8 +102,7 @@ public class CreatePurchaseOrderValidator : AbstractValidator<CreatePurchaseOrde
 public class CreatePurchaseOrderHandler : IRequestHandler<CreatePurchaseOrderRequest, CreatePurchaseOrderResult>
 {
     private readonly ICommandRepository<PurchaseOrder> _repository;
-    private readonly ICommandRepository<PurchaseOrderItem> _PurchaseOrderItemrepository;
-
+    private readonly ICommandRepository<PurchaseOrderItem> _itemRepository;
     private readonly IUnitOfWork _unitOfWork;
     private readonly NumberSequenceService _numberSequenceService;
     private readonly PurchaseOrderService _purchaseOrderService;
@@ -115,63 +114,61 @@ public class CreatePurchaseOrderHandler : IRequestHandler<CreatePurchaseOrderReq
         NumberSequenceService numberSequenceService,
         PurchaseOrderService purchaseOrderService,
         ISecurityService securityService,
-        ICommandRepository<PurchaseOrderItem> PurchaseOrderItemrepository
-
-        )
+        ICommandRepository<PurchaseOrderItem> itemRepository)
     {
         _repository = repository;
         _unitOfWork = unitOfWork;
         _numberSequenceService = numberSequenceService;
         _purchaseOrderService = purchaseOrderService;
         _securityService = securityService;
-        _PurchaseOrderItemrepository = PurchaseOrderItemrepository;
+        _itemRepository = itemRepository;
     }
 
-    public async Task<CreatePurchaseOrderResult> Handle(CreatePurchaseOrderRequest request, CancellationToken cancellationToken = default)
+    public async Task<CreatePurchaseOrderResult> Handle(CreatePurchaseOrderRequest request,
+        CancellationToken cancellationToken)
     {
-        var entity = new PurchaseOrder();
-        entity.CreatedById = request.CreatedById;
-
-        entity.Number = _numberSequenceService.GenerateNumber(nameof(PurchaseOrder), "", "PO");
-        entity.OrderDate = _securityService.ConvertToIst(request.OrderDate); 
-        entity.OrderStatus = (PurchaseOrderStatus)int.Parse(request.OrderStatus!);
-        entity.Description = request.Description;
-        entity.VendorId = request.VendorId;
-        entity.LocationId = request.LocationId;
-        entity.BeforeTaxAmount = request.BeforeTaxAmount;
-        entity.TaxAmount = request.TaxAmount;
-        entity.AfterTaxAmount = request.AfterTaxAmount;
+        var entity = new PurchaseOrder
+        {
+            CreatedById = request.CreatedById,
+            Number = _numberSequenceService.GenerateNumber(nameof(PurchaseOrder), "", "PO"),
+            OrderDate = _securityService.ConvertToIst(request.OrderDate),
+            OrderStatus = (PurchaseOrderStatus)int.Parse(request.OrderStatus!),
+            Description = request.Description,
+            VendorId = request.VendorId,
+            LocationId = request.LocationId,
+            BeforeTaxAmount = request.BeforeTaxAmount,
+            TaxAmount = request.TaxAmount,
+            AfterTaxAmount = request.AfterTaxAmount
+        };
 
         await _repository.CreateAsync(entity, cancellationToken);
-        await _unitOfWork.SaveAsync(cancellationToken);
 
-
+        // ✔ Move SaveAsync AFTER items added
         foreach (var item in request.Items)
         {
-            var PurchaseOrderItementity = new PurchaseOrderItem();
-            PurchaseOrderItementity.CreatedById = request.CreatedById;
+            var itemEntity = new PurchaseOrderItem
+            {
+                CreatedById = request.CreatedById,
+                PurchaseOrderId = entity.Id,
+                ProductId = item.ProductId,
+                Summary = item.Summary,
+                UnitPrice = item.UnitPrice,
+                Quantity = item.Quantity,
+                TaxId = item.TaxId,
+                TaxAmount = item.TaxAmount,
+                TotalAfterTax = item.TotalAfterTax,
+                Total = item.Total,
 
-            PurchaseOrderItementity.PurchaseOrderId = entity.Id;
-            PurchaseOrderItementity.ProductId = item.ProductId;
-            PurchaseOrderItementity.Summary = item.Summary;
-            PurchaseOrderItementity.UnitPrice = item.UnitPrice;
-            PurchaseOrderItementity.Quantity = item.Quantity;
-            PurchaseOrderItementity.TaxId = item.TaxId;
-            PurchaseOrderItementity.TaxAmount = item.TaxAmount;
-            PurchaseOrderItementity.TotalAfterTax = item.TotalAfterTax;
-            PurchaseOrderItementity.TotalAfterTax = item.TotalAfterTax;
+                // ✔ NEW ADDITIONS
+                Attribute1DetailId = item.Attribute1DetailId,
+                Attribute2DetailId = item.Attribute2DetailId
+            };
 
-            PurchaseOrderItementity.Total = item.Total;
+            await _itemRepository.CreateAsync(itemEntity, cancellationToken);
+        }
 
-            await _PurchaseOrderItemrepository.CreateAsync(PurchaseOrderItementity, cancellationToken);
-            await _unitOfWork.SaveAsync(cancellationToken);
+        await _unitOfWork.SaveAsync(cancellationToken);
 
-            }
-
-        
-        return new CreatePurchaseOrderResult
-        {
-            Data = entity
-        };
+        return new CreatePurchaseOrderResult { Data = entity };
     }
 }

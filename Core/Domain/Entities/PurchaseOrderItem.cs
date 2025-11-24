@@ -29,5 +29,12 @@ namespace Domain.Entities
         public double? TotalAfterTax { get; set; }
 
         public double ReceivedQuantity { get; set; } = 0; // NEW: Cumulative received quantity
+
+        // 🔥 NEW FK properties
+        public string? Attribute1DetailId { get; set; }
+        public AttributeDetail? Attribute1Detail { get; set; }
+
+        public string? Attribute2DetailId { get; set; }
+        public AttributeDetail? Attribute2Detail { get; set; }
     }
 }
