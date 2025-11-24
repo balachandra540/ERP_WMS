@@ -326,8 +326,18 @@ public class UpdateGoodsReceiveItemDto
     public double? FinalUnitPrice { get; init; }
     public double? MRP { get; init; }
     public string? Notes { get; init; }
-}
+    public List<UpdateGoodsReceiveItemDetailDto> Attributes { get; init; } = new();
 
+}
+public class UpdateGoodsReceiveItemDetailDto
+{
+    public string GoodsReceiveItemId { get; init; } = string.Empty;
+    public int RowIndex { get; init; }
+    public string? IMEI1 { get; init; }
+    public string? IMEI2 { get; init; }
+    //public string? SerialNo { get; init; }
+    public string? ServiceNo { get; init; }
+}
 public class UpdateGoodsReceiveResult
 {
     public GoodsReceive? Data { get; set; }
@@ -365,6 +375,7 @@ public class UpdateGoodsReceiveHandler : IRequestHandler<UpdateGoodsReceiveReque
 {
     private readonly ICommandRepository<GoodsReceive> _goodsReceiveRepository;
     private readonly ICommandRepository<GoodsReceiveItem> _goodsReceiveItemRepository;
+    private readonly ICommandRepository<GoodsReceiveItemDetails> _goodsReceiveItemDetailsRepository;
     private readonly ICommandRepository<PurchaseOrder> _purchaseOrderRepository;
     private readonly ICommandRepository<Warehouse> _warehouseRepository;
     private readonly ICommandRepository<InventoryTransaction> _inventoryTransactionRepository;
@@ -377,6 +388,7 @@ public class UpdateGoodsReceiveHandler : IRequestHandler<UpdateGoodsReceiveReque
     public UpdateGoodsReceiveHandler(
         ICommandRepository<GoodsReceive> goodsReceiveRepository,
         ICommandRepository<GoodsReceiveItem> goodsReceiveItemRepository,
+        ICommandRepository<GoodsReceiveItemDetails> goodsReceiveItemDetailsRepository,
         ICommandRepository<PurchaseOrder> purchaseOrderRepository,
         ICommandRepository<Warehouse> warehouseRepository,
         ICommandRepository<InventoryTransaction> inventoryTransactionRepository,
@@ -388,10 +400,11 @@ public class UpdateGoodsReceiveHandler : IRequestHandler<UpdateGoodsReceiveReque
     {
         _goodsReceiveRepository = goodsReceiveRepository;
         _goodsReceiveItemRepository = goodsReceiveItemRepository;
+        _goodsReceiveItemDetailsRepository = goodsReceiveItemDetailsRepository;
         _purchaseOrderRepository = purchaseOrderRepository;
         _warehouseRepository = warehouseRepository;
-        _productpriceDefRepository = productpricedefinitionrepository;
         _inventoryTransactionRepository = inventoryTransactionRepository;
+        _productpriceDefRepository = productpricedefinitionrepository;
         _unitOfWork = unitOfWork;
         _inventoryTransactionService = inventoryTransactionService;
         _securityService = securityService;
@@ -431,15 +444,16 @@ public class UpdateGoodsReceiveHandler : IRequestHandler<UpdateGoodsReceiveReque
             .FirstOrDefaultAsync(x => x.Id == entity.PurchaseOrderId, cancellationToken)
             ?? throw new InvalidOperationException($"Purchase Order '{entity.PurchaseOrderId}' not found.");
 
-        var poItemsById = po.PurchaseOrderItemList.ToDictionary(i => i.Id);
+        var poItemsById = po.PurchaseOrderItemList.ToDictionary(x => x.Id);
 
         // ✅ Step 4: Remove old inventory transactions if old status was Approved
         if (oldStatus == GoodsReceiveStatus.Approved)
         {
-            var oldTxs = await _inventoryTransactionRepository.GetQuery()
+            var oldTx = await _inventoryTransactionRepository.GetQuery()
                 .Where(tx => tx.ModuleId == entity.Id)
                 .ToListAsync(cancellationToken);
-            foreach (var tx in oldTxs)
+
+            foreach (var tx in oldTx)
                 _inventoryTransactionRepository.Delete(tx);
         }
 
@@ -516,6 +530,34 @@ public class UpdateGoodsReceiveHandler : IRequestHandler<UpdateGoodsReceiveReque
 
             poItem.ReceivedQuantity += dto.ReceivedQuantity;
 
+            // =========================================
+            // ATTRIBUTE UPDATE (IMEI / Serial / Service)
+            // =========================================
+
+            // 1️⃣ Delete old records for this item id
+            var oldDetails = await _goodsReceiveItemDetailsRepository.GetQuery()
+                .Where(d => d.GoodsReceiveItemId == currentItem.Id)
+                .ToListAsync(cancellationToken);
+
+            foreach (var od in oldDetails)
+                _goodsReceiveItemDetailsRepository.Delete(od);
+
+            // 2️⃣ Insert new detail rows
+            foreach (var d in dto.Attributes)
+            {
+                var detail = new GoodsReceiveItemDetails
+                {
+                    GoodsReceiveItemId = currentItem.Id,   // existing or newly created
+                    RowIndex = d.RowIndex,
+                    IMEI1 = d.IMEI1,
+                    IMEI2 = d.IMEI2,
+                    ServiceNo = d.ServiceNo,
+                    CreatedById = request.UpdatedById,
+                    CreatedAtUtc = DateTime.UtcNow
+                };
+
+                await _goodsReceiveItemDetailsRepository.CreateAsync(detail, cancellationToken);
+            }
 
             // ---------------------------------------------------------
             // PRICE DEFINITION UPDATE LOGIC
@@ -608,7 +650,7 @@ public class UpdateGoodsReceiveHandler : IRequestHandler<UpdateGoodsReceiveReque
         // UPDATE PO
         _purchaseOrderRepository.Update(po);
         await _unitOfWork.SaveAsync(cancellationToken);
-    
+
 
         // ✅ Step 8: Recreate inventory transactions if Approved
         if (receiveStatus == GoodsReceiveStatus.Approved)
@@ -635,7 +677,7 @@ public class UpdateGoodsReceiveHandler : IRequestHandler<UpdateGoodsReceiveReque
         // ✅ Step 9: Final save and propagate
         await _unitOfWork.SaveAsync(cancellationToken);
 
-        
+
         return new UpdateGoodsReceiveResult { Data = entity };
     }
 }

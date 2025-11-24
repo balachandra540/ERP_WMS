@@ -29,6 +29,16 @@ public record GetGoodsReceiveItemListDto
     
     public string? Notes { get; init; }
     public DateTime? CreatedAtUtc { get; init; }
+
+    // ⭐ Add attribute list
+    public List<GoodsReceiveItemDetailDto> Attributes { get; init; } = new();
+}
+public class GoodsReceiveItemDetailDto
+{
+    public int RowIndex { get; set; }
+    public string? IMEI1 { get; set; }
+    public string? IMEI2 { get; set; }
+    public string? ServiceNo { get; set; }
 }
 
 // ---------------- Request & Result ----------------
@@ -88,12 +98,15 @@ public class GetGoodsReceiveItemListHandler : IRequestHandler<GetGoodsReceiveIte
         _context = context;
     }
 
-    public async Task<GetGoodsReceiveItemListResult> Handle(GetGoodsReceiveItemListRequest request, CancellationToken cancellationToken)
+    public async Task<GetGoodsReceiveItemListResult> Handle(
+        GetGoodsReceiveItemListRequest request,
+        CancellationToken cancellationToken)
     {
         var items = await _context.GoodsReceiveItem
             .AsNoTracking()
             .Include(x => x.PurchaseOrderItem)
                 .ThenInclude(poi => poi.Product)
+            .Include(x => x.Attributes)                 // ⭐ Add this include
             .Where(x => x.GoodsReceiveId == request.GoodsReceiveId && !x.IsDeleted)
             .ToListAsync(cancellationToken);
 
@@ -118,15 +131,21 @@ public class GetGoodsReceiveItemListHandler : IRequestHandler<GetGoodsReceiveIte
                 ActualQuantity = orderedQty,
                 RemainingQuantity = remainingQty,
                 ReceivedQuantity = x.ReceivedQuantity,
-
-                // ✅ Cost & Tax details
                 UnitPrice = x.UnitPrice,
                 TaxAmount = x.TaxAmount,
                 FinalUnitPrice = x.FinalUnitPrice,
                 MRP = x.MRP,
-              
                 Notes = x.Notes,
-                CreatedAtUtc = x.CreatedAtUtc
+                CreatedAtUtc = x.CreatedAtUtc,
+
+                // ⭐ Map attributes
+                Attributes = x.Attributes.Select(d => new GoodsReceiveItemDetailDto
+                {
+                    RowIndex = d.RowIndex,
+                    IMEI1 = d.IMEI1,
+                    IMEI2 = d.IMEI2,
+                    ServiceNo = d.ServiceNo
+                }).ToList()
             };
         }).ToList();
 

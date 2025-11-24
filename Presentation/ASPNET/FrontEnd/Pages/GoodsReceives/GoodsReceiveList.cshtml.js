@@ -926,7 +926,8 @@ const App = {
             state.errors.purchaseOrderId = '';
             state.errors.status = '';
             state.errors.description = '';
-
+            state.errors.transportCharges = 0;
+            state.errors.otherCharges = 0;
             let isValid = true;
             let hasValidReceivedQuantity = false;
 
@@ -1239,7 +1240,7 @@ const App = {
                 otherCharges = 0
             ) => {
                 try {
-                    const locationId = StorageManager.getLocation();
+                    //const locationId = StorageManager.getLocation();
 
                     const payload = {
                         ReceiveDate: receiveDate,
@@ -1248,7 +1249,7 @@ const App = {
                         PurchaseOrderId: purchaseOrderId,
                         CreatedById: userId,
                         DefaultWarehouseId: defaultWarehouseId,
-                        LocationId: locationId,
+                        //LocationId: locationId,
 
                         // ✅ Header-level charges
                         FreightCharges: parseFloat(freightCharges || 0),
@@ -1263,11 +1264,12 @@ const App = {
                             FinalUnitPrice: parseFloat(item.FinalUnitPrice || 0),
                             MRP: parseFloat(item.MRP || 0),
                             Notes: item.Notes || '',
-                            WarehouseId: item.WarehouseId || defaultWarehouseId
+                            WarehouseId: item.WarehouseId || defaultWarehouseId,
+                            Attributes : item.Attributes ?? [],
                         }))
                     };
 
-                    const response = await AxiosManager.post('/GoodsReceive/CreateGoodsReceive', payload);
+                    const response = await AxiosManager.post('/GoodsReceive/CreateGoodsReceive', payload, {});
                     return response;
                 } catch (error) {
                     throw error;
@@ -1314,11 +1316,13 @@ const App = {
                             FinalUnitPrice: parseFloat(item.FinalUnitPrice || 0),
                             MRP: parseFloat(item.MRP || 0),
                             Notes: item.Notes || '',
-                            WarehouseId: item.WarehouseId || defaultWarehouseId
+                            //WarehouseId: item.WarehouseId || defaultWarehouseId,
+                            Attributes: item.Attributes ?? [],
+
                         }))
                     };
 
-                    const response = await AxiosManager.post('/GoodsReceive/UpdateGoodsReceive', payload);
+                    const response = await AxiosManager.post('/GoodsReceive/UpdateGoodsReceive', payload, {});
                     return response;
                 } catch (error) {
                     throw error;
@@ -1495,6 +1499,7 @@ const App = {
 
                     // Refresh the grid
                     secondaryGrid.refresh();
+                    state.showComplexDiv = true;
 
                     console.log('Secondary data refreshed from server');
                 } catch (error) {
@@ -1532,7 +1537,9 @@ const App = {
                     let secondary = [];
 
                     if (state.id) {
-                        // If editing existing goods receive, get LATEST data from server
+                        // ============================
+                        // 🔹 EDIT MODE – Load from API
+                        // ============================
                         const response = await services.getSecondaryData(state.id);
                         const goodsReceiveItems = response?.data?.content?.data || [];
 
@@ -1550,51 +1557,61 @@ const App = {
                             FinalPrice: grItem.finalUnitPrice ?? 0,
                             MRP: grItem.mrp ?? 0,
 
-                           
                             notes: grItem.notes || '',
-                            createdAtUtc: grItem.createdAtUtc ? new Date(grItem.createdAtUtc) : new Date()
-                        }));
+                            createdAtUtc: grItem.createdAtUtc ? new Date(grItem.createdAtUtc) : new Date(),
 
+                            // ============================
+                            //  MAP ATTRIBUTES TO UI FIELD
+                            // ============================
+                            detailEntries: (grItem.attributes || []).map(a => ({
+                                IMEI1: a.imeI1 || '',
+                                IMEI2: a.imeI2 || '',
+                                ServiceNo: a.serviceNo || ''
+                            }))
+                        }));
                     }
                     else {
+                        // ============================
+                        // 🔹 CREATE MODE – Load from PO
+                        // ============================
                         if (!state.purchaseOrderId) {
                             state.secondaryData = [];
                             return;
                         }
 
-                        // Get Purchase Order items
                         const poResponse = await services.getPurchaseOrderById(state.purchaseOrderId);
                         const poItems = poResponse?.data?.content?.data || [];
                         const locationId = StorageManager.getLocation();
 
-                        // Create fresh secondary data from PO
                         secondary = poItems.map(item => ({
                             id: '',
-                            warehouseId: locationId || '',
                             goodsReceiveId: state.id,
+                            warehouseId: locationId || '',
                             purchaseOrderItemId: item.id,
                             productId: item.productId,
                             receivedQuantity: 0,
                             actualQuantity: item.quantity || 0,
-                            remaingQuantity: item.remainingQuantity || 0, // ✅ directly from API
-                            notes: '',
-                            taxAmount: item.taxAmount,
+                            remaingQuantity: item.remainingQuantity || 0,
+                            notes: item.notes,
                             unitPrice: item.unitPrice,
-                            createdAtUtc: new Date()
-                        }));
+                            taxAmount: item.taxAmount,
+                            createdAtUtc: new Date(),
 
+                            // ============================
+                            // CREATE MODE = empty details
+                            // ============================
+                            detailEntries: []
+                        }));
                     }
 
-                    // Update state with fresh data
                     state.secondaryData = secondary;
                     state.deletedItems = [];
 
-                    // Refresh summary
                     methods.refreshSummary();
 
                 } catch (error) {
-                    state.secondaryData = [];
                     console.error('Error populating secondary data:', error);
+                    state.secondaryData = [];
                 }
             },
             //refreshSummary: () => {
@@ -1762,6 +1779,246 @@ const App = {
                     0
                 );
                 state.totalMovementFormatted = totalMovement.toFixed(2);
+            },
+
+            openDetailModal: async (poItemId) => {
+                debugger;
+                // store ID
+                state.currentDetailPOItemId = poItemId;
+
+                // find row index manually
+                const rowIndex = state.secondaryData.findIndex(
+                    row => row.purchaseOrderItemId === poItemId
+                );
+
+                if (rowIndex === -1) {
+                    console.error("Row not found for PO:", poItemId);
+                    return;
+                }
+
+                state.currentDetailRowIndex = rowIndex;
+
+                const rowData = state.secondaryData[rowIndex];
+
+                const product = state.productListLookupData.find(p => p.id === rowData.productId);
+                if (!product) {
+                    console.error("Product not found:", productId);
+                    return;
+                }
+
+                const qty = parseFloat(rowData.receivedQuantity || 0);
+                if (!qty || qty <= 0) {
+                    document.getElementById("detailFormArea").innerHTML = `
+        <div class="alert alert-warning text-center p-2">
+            <strong>No Quantity Entered.</strong><br/>
+            Please enter Received Quantity first.
+        </div>
+    `;
+                    return;    // stop here
+                }
+
+                let fields = [];
+
+                if (product.imei1) fields.push("IMEI1");
+                if (product.imei1) fields.push("IMEI2");
+                if (product.serviceNo) fields.push("ServiceNo");
+
+                const existingDetails = rowData.detailEntries || [];
+
+                let html = `
+        <table class="table table-bordered table-sm">
+            <thead>
+                <tr>
+    `;
+
+                fields.forEach(f => {
+                    html += `<th>${f}</th>`;
+                });
+
+                html += `
+                </tr>
+            </thead>
+            <tbody>
+    `;
+
+                for (let i = 0; i < qty; i++) {
+                    html += `<tr>`;
+                    fields.forEach(field => {
+                        const val =
+                            existingDetails[i] && existingDetails[i][field]
+                                ? existingDetails[i][field]
+                                : "";
+                        html += `
+                <td>
+                    <input 
+                        type="text"
+                        class="form-control detail-input"
+                        data-index="${i}"
+                        data-field="${field}"
+                        value="${val}"
+                    />
+                </td>
+            `;
+                    });
+
+                    html += `</tr>`;
+                }
+
+                html += `
+            </tbody>
+        </table>
+    `;
+
+                document.getElementById("detailFormArea").innerHTML = html;
+
+                // show modal
+                const modal = new bootstrap.Modal(document.getElementById("detailModal"));
+                modal.show();
+
+                // attach save handler
+                document.getElementById("detailSaveBtn").onclick = () => {
+                    methods.saveDetailEntries();
+                    modal.hide();
+                };
+            },
+
+            saveDetailEntries: async () => {
+                const poItemId = state.currentDetailPOItemId;
+                const rowIndex = state.secondaryData.findIndex(
+                    item => item.purchaseOrderItemId === poItemId
+                );
+
+                if (rowIndex === -1) {
+                    console.error("Cannot save — row not found");
+                    return;
+                }
+                if (!methods.validateDetailEntries()) {
+                    return;
+                }
+
+
+                let entries = [];
+                const inputs = document.querySelectorAll(".detail-input");
+
+                inputs.forEach(input => {
+                    const i = input.dataset.index;
+                    const f = input.dataset.field;
+
+                    if (!entries[i]) entries[i] = {};
+                    entries[i][f] = input.value;
+                });
+
+                state.secondaryData[rowIndex].detailEntries = entries;
+                secondaryGrid.refresh(state.secondaryData);
+
+                console.log("Saved:", entries);
+            },
+            collectDetailAttributes: (row) => {
+                const Attributes = [];
+
+                //state.secondaryData.forEach(row => {
+
+                    if (!row.detailEntries) return; // skip empty
+
+                    row.detailEntries.forEach((entry, i) => {
+                        Attributes.push({
+                            //GoodsReceiveItemId: row.purchaseOrderItemId, // IMPORTANT mapping
+                            RowIndex: i,
+                            IMEI1: entry.IMEI1 || null,
+                            IMEI2: entry.IMEI2 || null,
+                            //SerialNo: entry.SerialNo || null,
+                            ServiceNo: entry.ServiceNo || null,
+                        });
+                    });
+                //});
+
+                return Attributes;
+            },
+            validateDetailEntries: () => {
+                const errors = [];
+
+                const globalIMEI1 = new Set();
+                const globalIMEI2 = new Set();
+                const globalServiceNo = new Set();
+
+                state.secondaryData.forEach(row => {
+                    if (!row.detailEntries) return;
+
+                    const localIMEI1 = new Set();
+                    const localIMEI2 = new Set();
+                    const localServiceNo = new Set();
+
+                    row.detailEntries.forEach((entry, index) => {
+                        const imei1 = (entry.IMEI1 || "").trim();
+                        const imei2 = (entry.IMEI2 || "").trim();
+                        const serviceNo = (entry.ServiceNo || "").trim();
+
+                        // -------------------------------
+                        // REQUIRED CHECK
+                        // -------------------------------
+                        if (!imei1) {
+                            errors.push(`IMEI1 missing at row ${index + 1} for product ${row.productId}`);
+                        }
+                        if (!imei2) {
+                            errors.push(`IMEI2 missing at row ${index + 1}`);
+                        }
+                        if (!serviceNo) {
+                            errors.push(`Service No missing at row ${index + 1}`);
+                        }
+
+                        // -------------------------------
+                        // IMEI1 ≠ IMEI2
+                        // -------------------------------
+                        if (imei1 && imei2 && imei1 === imei2) {
+                            errors.push(`IMEI1 and IMEI2 cannot be same at row ${index + 1}`);
+                        }
+
+                        // -------------------------------
+                        // LOCAL DUPLICATE CHECK (same item)
+                        // -------------------------------
+                        if (localIMEI1.has(imei1)) {
+                            errors.push(`Duplicate IMEI1 (${imei1}) inside same item`);
+                        }
+                        if (localIMEI2.has(imei2)) {
+                            errors.push(`Duplicate IMEI2 (${imei2}) inside same item`);
+                        }
+                        if (localServiceNo.has(serviceNo)) {
+                            errors.push(`Duplicate Service No (${serviceNo}) inside same item`);
+                        }
+
+                        localIMEI1.add(imei1);
+                        localIMEI2.add(imei2);
+                        localServiceNo.add(serviceNo);
+
+                        // -------------------------------
+                        // GLOBAL DUPLICATE CHECK (across all products)
+                        // -------------------------------
+                        if (globalIMEI1.has(imei1)) {
+                            errors.push(`IMEI1 (${imei1}) already used in another product`);
+                        }
+                        if (globalIMEI2.has(imei2)) {
+                            errors.push(`IMEI2 (${imei2}) already used in another product`);
+                        }
+                        if (globalServiceNo.has(serviceNo)) {
+                            errors.push(`Service No (${serviceNo}) already used in another product`);
+                        }
+
+                        globalIMEI1.add(imei1);
+                        globalIMEI2.add(imei2);
+                        globalServiceNo.add(serviceNo);
+                    });
+                });
+
+                if (errors.length > 0) {
+                    Swal.fire({
+                        icon: "error",
+                        title: "Attribute Validation Failed",
+                        html: errors.join("<br>")
+                    });
+                    return false;
+                }
+
+                return true;
             }
 
     };
@@ -1770,6 +2027,7 @@ const App = {
         const handler = {
             handleSubmit: async function () {
                 try {
+                    debugger;
                     state.isSubmitting = true;
                     await new Promise(resolve => setTimeout(resolve, 300));
 
@@ -1784,9 +2042,10 @@ const App = {
                     // ✅ Header-level values
                     const freightCharges = parseFloat(state.transportCharges || 0);
                     const otherCharges = parseFloat(state.otherCharges || 0);
+                    //const attribs =  methods.collectDetailAttributes();
 
                     if (state.id === '') {
-                        // 🟩 CREATE NEW GOODS RECEIVE NOTE
+                        // CREATE NEW GOODS RECEIVE NOTE
                         const itemsDto = validItems.map(item => ({
                             PurchaseOrderItemId: item.purchaseOrderItemId,
                             ReceivedQuantity: parseFloat(item.receivedQuantity || 0),
@@ -1795,7 +2054,8 @@ const App = {
                             FinalUnitPrice: parseFloat(item.FinalPrice || 0),
                             MRP: parseFloat(item.MRP || 0),
                             Notes: item.notes || '',
-                            WarehouseId: item.warehouseId || null
+                            WarehouseId: item.warehouseId || null,
+                            Attributes: methods.collectDetailAttributes(item) ?? []
                         }));
 
                         response = await services.createMainData(
@@ -1818,7 +2078,8 @@ const App = {
                         // 🟥 DELETE GOODS RECEIVE NOTE
                         response = await services.deleteMainData(state.id, userId);
                     } else {
-                        // 🟦 UPDATE EXISTING GOODS RECEIVE NOTE
+                        // UPDATE EXISTING GOODS RECEIVE NOTE
+                        //const attribs = methods.collectDetailAttributes();
                         const itemsDto = validItems.map(item => ({
                             Id: item.id || null,
                             PurchaseOrderItemId: item.purchaseOrderItemId,
@@ -1828,7 +2089,8 @@ const App = {
                             FinalUnitPrice: parseFloat(item.FinalPrice || 0),
                             MRP: parseFloat(item.MRP || 0),
                             Notes: item.notes || '',
-                            WarehouseId: item.warehouseId || null
+                            WarehouseId: item.warehouseId || null,
+                            Attributes: methods.collectDetailAttributes(item) ?? []
                         }));
 
                         const filteredItemsDto = itemsDto.filter(item => item.ReceivedQuantity > 0);
@@ -2160,12 +2422,44 @@ const App = {
                         }
 
                         // ADD
+                        //if (args.item.id === 'AddCustom') {
+                        //    resetFormState();
+                        //    state.deleteMode = false;
+                        //    state.mainTitle = 'Add Attribute';
+                        //    numberText.refresh();
+                        //    mainModal.obj.show();
+                        //    return;
+                        //}
+                        // CREATE NEW GRN
                         if (args.item.id === 'AddCustom') {
                             resetFormState();
                             state.deleteMode = false;
-                            state.mainTitle = 'Add Attribute';
+                            state.mainTitle = 'Add Goods Receive Items';
+
+                            // CLEAR SECONDARY DATA
+                            state.secondaryData = [];
+
+                            // ALWAYS SHOW COMPLEX DIV (so grid is visible)
+                            state.showComplexDiv = true;
+
+                            // GRID INIT / REFRESH
+                            if (!secondaryGrid.obj) {
+                                await secondaryGrid.create([]);   // create empty grid
+                            } else {
+                                secondaryGrid.refresh([]);        // reset existing grid
+                            }
+
                             numberText.refresh();
+                            purchaseOrderListLookup.refresh();
+                            receiveDatePicker.refresh();
+
                             mainModal.obj.show();
+
+                            // SYNCFUSION FIX — FORCE RENDER
+                            setTimeout(() => {
+                                secondaryGrid.obj?.refresh();
+                            }, 100);
+
                             return;
                         }
 
@@ -2181,6 +2475,7 @@ const App = {
 
                         // EDIT
                         if (args.item.id === 'EditCustom') {
+                            debugger;
                             state.deleteMode = false;
 
                             Object.assign(state, {
@@ -2209,10 +2504,11 @@ const App = {
                             if (!secondaryGrid.obj) {
                                 await secondaryGrid.create(state.secondaryData);
                             } else {
-                                secondaryGrid.refresh();
+                                secondaryGrid.refresh(state.secondaryData);
                             }
 
                             mainModal.obj.show();
+                            state.showComplexDiv = true;
 
                             setTimeout(() => {
                                 if (secondaryGrid.obj) secondaryGrid.obj.refresh();
@@ -2353,6 +2649,26 @@ const App = {
                             editType: 'stringedit',
                             allowEditing: true
                         }
+                        ,
+                        {
+                            field: 'details',
+                            headerText: 'Details',
+                            width: 120,
+                            disableHtmlEncode: false,
+
+                            // LIKE product valueAccessor, but returning clickable link
+                            valueAccessor: (field, data) => {
+                                const product = state.productListLookupData.find(p => p.id === data.productId);
+                                if (!product) return '';
+
+                                return `<a href="#" class="view-details" data-id="${data.purchaseOrderItemId}">
+                    Add Other Attributes
+                </a>`;
+                            },
+
+                            // Needed to allow HTML inside cell
+                            allowEditing: false
+                        }
                     ],
 
                     // ✅ Handle live recalculation when user edits "Received Quantity"
@@ -2393,7 +2709,20 @@ const App = {
                             methods.recalculateFinalPrices();
                         }
                     },
-
+                    queryCellInfo: (args) => {
+                        if (args.column.field === 'details') {
+                            const link = args.cell.querySelector('.view-details');
+                            if (link) {
+                                link.addEventListener('click', (e) => {
+                                    debugger;
+                                    e.preventDefault();
+                                    //const rowData = args.data;
+                                    const poItemId = e.target.dataset.id;   // get ID directly
+                                    methods.openDetailModal(poItemId);
+                                });
+                            }
+                        }
+                    },
                     actionComplete: (args) => {
                         if (args.requestType === 'save' || args.requestType === 'batchSave') {
                             methods.refreshSummary();

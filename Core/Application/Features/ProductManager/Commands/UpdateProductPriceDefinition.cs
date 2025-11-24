@@ -16,7 +16,7 @@ public class UpdateProductPriceDefinitionRequest : IRequest<UpdateProductPriceDe
 {
     public string Id { get; init; } = default!;
     public string ProductId { get; init; } = default!;
-    public string ProductName { get; init; } 
+    public string? ProductName { get; init; } 
 
     public decimal CostPrice { get; init; }
     public decimal MarginPercentage { get; init; }

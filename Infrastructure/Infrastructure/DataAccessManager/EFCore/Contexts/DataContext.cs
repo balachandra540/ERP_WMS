@@ -65,6 +65,8 @@ public class DataContext : IdentityDbContext<ApplicationUser>, IEntityDbSet
     public DbSet<ProductPriceDefinition> ProductPriceDefinition { get; set; } //Add this 
     public DbSet<ProductVariant> ProductVariant { get; set; }
 
+    public DbSet<GoodsReceiveItemDetails> GoodsReceiveItemDetails { get; set; }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         foreach (var entityType in modelBuilder.Model.GetEntityTypes())
@@ -123,6 +125,7 @@ public class DataContext : IdentityDbContext<ApplicationUser>, IEntityDbSet
         modelBuilder.ApplyConfiguration(new ProductGroupAttributeValueConfiguration());
         modelBuilder.ApplyConfiguration(new PurchaseOrderItemAttributeCombinationConfiguration());
         modelBuilder.ApplyConfiguration(new ProductPriceDefinitionConfiguration());
+        modelBuilder.ApplyConfiguration(new GoodsReceiveItemDetailConfiguration());
 
     }
 

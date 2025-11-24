@@ -21,7 +21,7 @@ namespace Infrastructure.DataAccessManager.EFCore.Configurations
 
             builder.Property(x => x.ProductName)
                 .HasMaxLength(255)
-                .IsRequired();
+               .IsRequired(false);
 
 
             builder.Property(x => x.CostPrice)
