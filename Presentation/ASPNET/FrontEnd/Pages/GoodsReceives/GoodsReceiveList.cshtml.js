@@ -1424,6 +1424,20 @@ const App = {
                     throw error;
                 }
             },
+            getAttributeDetails: async (attributeId) => {
+                debugger
+                try {
+                    const requestBody = {
+                        attributeId: attributeId,
+                        isDeleted: false
+                    };
+                    return AxiosManager.post('/Attribute/GetAttributeDetails', requestBody);
+
+                } catch (error) {
+                    throw error;
+                }
+            },
+
         };
 
         const methods = {
@@ -1535,7 +1549,7 @@ const App = {
             populateSecondaryData: async () => {
                 try {
                     let secondary = [];
-
+                    debugger;
                     if (state.id) {
                         // ============================
                         // 🔹 EDIT MODE – Load from API
@@ -1543,33 +1557,73 @@ const App = {
                         const response = await services.getSecondaryData(state.id);
                         const goodsReceiveItems = response?.data?.content?.data || [];
 
-                        secondary = goodsReceiveItems.map(grItem => ({
-                            id: grItem.id,
-                            goodsReceiveId: state.id,
-                            warehouseId: grItem.warehouseId || (state.warehouseListLookupData[0]?.id || ''),
-                            purchaseOrderItemId: grItem.purchaseOrderItemId,
-                            productId: grItem.productId,
-                            actualQuantity: grItem.actualQuantity || 0,
-                            receivedQuantity: grItem.receivedQuantity || 0,
-                            remaingQuantity: grItem.remainingQuantity || 0,
-                            unitPrice: grItem.unitPrice ?? 0,
-                            taxAmount: grItem.taxAmount ?? 0,
-                            FinalPrice: grItem.finalUnitPrice ?? 0,
-                            MRP: grItem.mrp ?? 0,
+                        secondary = await Promise.all(
+                            goodsReceiveItems.map(async (grItem) => {
 
-                            notes: grItem.notes || '',
-                            createdAtUtc: grItem.createdAtUtc ? new Date(grItem.createdAtUtc) : new Date(),
+                                // 🔹 Load Attribute 1 List
+                                let attribute1List = [];
+                                if (grItem.attribute1Id) {
+                                    try {
+                                        const resp1 = await services.getAttributeDetails(grItem.attribute1Id);
+                                        attribute1List = resp1.data?.content?.data ?? [];
+                                    } catch {
+                                        attribute1List = [];
+                                    }
+                                }
 
-                            // ============================
-                            //  MAP ATTRIBUTES TO UI FIELD
-                            // ============================
-                            detailEntries: (grItem.attributes || []).map(a => ({
-                                IMEI1: a.imeI1 || '',
-                                IMEI2: a.imeI2 || '',
-                                ServiceNo: a.serviceNo || ''
-                            }))
-                        }));
+                                // 🔹 Load Attribute 2 List
+                                let attribute2List = [];
+                                if (grItem.attribute2Id) {
+                                    try {
+                                        const resp2 = await services.getAttributeDetails(grItem.attribute2Id);
+                                        attribute2List = resp2.data?.content?.data ?? [];
+                                    } catch {
+                                        attribute2List = [];
+                                    }
+                                }
+
+                                return {
+                                    id: grItem.id,
+                                    goodsReceiveId: state.id,
+                                    warehouseId: grItem.warehouseId || (state.warehouseListLookupData[0]?.id || ''),
+
+                                    purchaseOrderItemId: grItem.purchaseOrderItemId,
+                                    productId: grItem.productId,
+                                    actualQuantity: grItem.actualQuantity || 0,
+                                    receivedQuantity: grItem.receivedQuantity || 0,
+                                    remaingQuantity: grItem.remainingQuantity || 0,
+                                    unitPrice: grItem.unitPrice ?? 0,
+                                    taxAmount: grItem.taxAmount ?? 0,
+                                    FinalPrice: grItem.finalUnitPrice ?? 0,
+                                    MRP: grItem.mrp ?? 0,
+                                    notes: grItem.notes || '',
+                                    createdAtUtc: grItem.createdAtUtc ? new Date(grItem.createdAtUtc) : new Date(),
+
+                                    // ===================================
+                                    // 🔥 ADD THESE → attribute mapping
+                                    // ===================================
+                                    attribute1Id: grItem.attribute1Id,
+                                    attribute2Id: grItem.attribute2Id,
+
+                                    attribute1DetailId: grItem.attribute1DetailId,
+                                    attribute2DetailId: grItem.attribute2DetailId,
+
+                                    attribute1List,
+                                    attribute2List,
+
+                                    // ============================
+                                    // Attribute Detail Rows
+                                    // ============================
+                                    detailEntries: (grItem.attributes || []).map(a => ({
+                                        IMEI1: a.imeI1 || '',
+                                        IMEI2: a.imeI2 || '',
+                                        ServiceNo: a.serviceNo || ''
+                                    }))
+                                };
+                            })
+                        );
                     }
+
                     else {
                         // ============================
                         // 🔹 CREATE MODE – Load from PO
@@ -1583,27 +1637,67 @@ const App = {
                         const poItems = poResponse?.data?.content?.data || [];
                         const locationId = StorageManager.getLocation();
 
-                        secondary = poItems.map(item => ({
-                            id: '',
-                            goodsReceiveId: state.id,
-                            warehouseId: locationId || '',
-                            purchaseOrderItemId: item.id,
-                            productId: item.productId,
-                            receivedQuantity: 0,
-                            actualQuantity: item.quantity || 0,
-                            remaingQuantity: item.remainingQuantity || 0,
-                            notes: item.notes,
-                            unitPrice: item.unitPrice,
-                            taxAmount: item.taxAmount,
-                            createdAtUtc: new Date(),
+                        secondary = await Promise.all(
+                            poItems.map(async (item) => {
 
-                            // ============================
-                            // CREATE MODE = empty details
-                            // ============================
-                            detailEntries: []
-                        }));
+                                // 🔹 Load Attribute 1 List
+                                let attribute1List = [];
+                                if (item.attribute1Id) {
+                                    try {
+                                        const resp1 = await services.getAttributeDetails(item.attribute1Id);
+                                        attribute1List = resp1.data?.content?.data ?? [];
+                                    } catch {
+                                        attribute1List = [];
+                                    }
+                                }
+
+                                // 🔹 Load Attribute 2 List
+                                let attribute2List = [];
+                                if (item.attribute2Id) {
+                                    try {
+                                        const resp2 = await services.getAttributeDetails(item.attribute2Id);
+                                        attribute2List = resp2.data?.content?.data ?? [];
+                                    } catch {
+                                        attribute2List = [];
+                                    }
+                                }
+
+                                return {
+                                    id: '',
+                                    goodsReceiveId: state.id,
+                                    warehouseId: locationId || '',
+
+                                    purchaseOrderItemId: item.id,
+                                    productId: item.productId,
+
+                                    actualQuantity: item.quantity || 0,
+                                    remaingQuantity: item.remainingQuantity || 0,
+                                    receivedQuantity: 0,
+                                    unitPrice: item.unitPrice,
+                                    taxAmount: item.taxAmount,
+                                    notes: item.notes,
+                                    createdAtUtc: new Date(),
+
+                                    // ===================================
+                                    // 🔥 ADD THESE → for CREATE MODE
+                                    // ===================================
+                                    attribute1Id: item.attribute1Id,
+                                    attribute2Id: item.attribute2Id,
+
+                                    attribute1DetailId: null,
+                                    attribute2DetailId: null,
+
+                                    attribute1List,
+                                    attribute2List,
+
+                                    // No detail entries in create mode
+                                    detailEntries: []
+                                };
+                            })
+                        );
                     }
 
+                    // Apply to state
                     state.secondaryData = secondary;
                     state.deletedItems = [];
 
@@ -2606,6 +2700,31 @@ const App = {
                                 }, 'Received Qty cannot exceed Remaining Qty']
                             }
                         },
+                        // 🌟🌟 ADDED ATTRIBUTE 1 — READ ONLY
+                        {
+                            field: 'attribute1DetailId',
+                            headerText: 'Attribute 1',
+                            width: 150,
+                            allowEditing: false,
+                            valueAccessor: (field, data) => {
+                                const list = data.attribute1List || [];
+                                const item = list.find(x => x.id === data[field]);
+                                return item ? item.value : '';
+                            }
+                        },
+
+                        // 🌟🌟 ADDED ATTRIBUTE 2 — READ ONLY
+                        {
+                            field: 'attribute2DetailId',
+                            headerText: 'Attribute 2',
+                            width: 150,
+                            allowEditing: false,
+                            valueAccessor: (field, data) => {
+                                const list = data.attribute2List || [];
+                                const item = list.find(x => x.id === data[field]);
+                                return item ? item.value : '';
+                            }
+                        },
                         {
                             field: 'unitPrice',
                             headerText: 'Unit Price',
@@ -2739,7 +2858,7 @@ const App = {
         };
 
 
-        //// **UPDATED SECONDARY GRID FOR GOODS RECEIVE ITEMS**
+        // **UPDATED SECONDARY GRID FOR GOODS RECEIVE ITEMS**
         //const secondaryGrid = {
         //    obj: null,
         //    create: async (dataSource) => {
