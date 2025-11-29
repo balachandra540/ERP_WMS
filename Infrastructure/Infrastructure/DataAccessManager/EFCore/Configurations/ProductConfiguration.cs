@@ -71,11 +71,11 @@ public class ProductConfiguration : BaseEntityConfiguration<Product>
             .HasConstraintName("FK_Product_ProductPriceDefinition");
 
         // Product → ProductVariant (1:M)
-        builder.HasMany(p => p.Variants)
-            .WithOne()
-            .HasForeignKey(v => v.ProductId)
-            .OnDelete(DeleteBehavior.Cascade)
-            .HasConstraintName("FK_Product_ProductVariant");
+        builder.HasMany(p => p.PluCodes)
+     .WithOne()
+     .HasForeignKey(pc => pc.ProductId)
+     .OnDelete(DeleteBehavior.Cascade)
+     .HasConstraintName("FK_Product_ProductPluCodes");
 
     }
 }

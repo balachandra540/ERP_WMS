@@ -1,9 +1,8 @@
 ﻿using Domain.Common;
-using System.ComponentModel.DataAnnotations.Schema;
 
 namespace Domain.Entities;
 
-public class ProductVariant : BaseEntity
+public class ProductPluCodes : BaseEntity
 {
     public string? ProductId { get; set; }
     public virtual Product? Product { get; set; }
@@ -14,5 +13,6 @@ public class ProductVariant : BaseEntity
     public string? Attribute2DetailId { get; set; }
     public virtual AttributeDetail? Attribute2Detail { get; set; }
 
-    public string? PluCode { get; set; }
+    // PLU code as integer (will start from 10001 in DB)
+    public int PluCode { get; set; }
 }
