@@ -257,41 +257,41 @@ public class UpdateProductHandler : IRequestHandler<UpdateProductRequest, Update
 {
     private readonly ICommandRepository<Product> _productRepository;
     private readonly ICommandRepository<ProductPriceDefinition> _priceRepository;
-    private readonly ICommandRepository<ProductVariant> _variantRepository;
+    private readonly ICommandRepository<ProductPluCodes> _pluRepository;
     private readonly ICommandRepository<AttributeDetail> _attributeDetailRepository;
     private readonly IUnitOfWork _unitOfWork;
 
     public UpdateProductHandler(
         ICommandRepository<Product> productRepository,
         ICommandRepository<ProductPriceDefinition> priceRepository,
-        ICommandRepository<ProductVariant> variantRepository,
+        ICommandRepository<ProductPluCodes> pluRepository,
         ICommandRepository<AttributeDetail> attributeDetailRepository,
         IUnitOfWork unitOfWork)
     {
         _productRepository = productRepository;
         _priceRepository = priceRepository;
-        _variantRepository = variantRepository;
+        _pluRepository = pluRepository;
         _attributeDetailRepository = attributeDetailRepository;
         _unitOfWork = unitOfWork;
     }
 
     public async Task<UpdateProductResult> Handle(UpdateProductRequest request, CancellationToken cancellationToken)
     {
-        // Now safe to use Include() — all relationships are properly configured!
+        // Load product with existing PLU codes
         var product = await _productRepository.GetQuery()
-            .Include(p => p.Variants)
+            .Include(p => p.PluCodes)
             .Include(p => p.PriceDefinitions)
             .FirstOrDefaultAsync(p => p.Id == request.Id && !p.IsDeleted, cancellationToken)
             ?? throw new KeyNotFoundException("Product not found.");
 
-        // Track old attribute values
+        // Track old vs new attributes
         var oldAttr1Id = product.Attribute1Id;
         var oldAttr2Id = product.Attribute2Id;
         var newAttr1Id = request.Attribute1Id;
         var newAttr2Id = request.Attribute2Id;
-        var attributesChanged = oldAttr1Id != newAttr1Id || oldAttr2Id != newAttr2Id;
+        bool attributesChanged = oldAttr1Id != newAttr1Id || oldAttr2Id != newAttr2Id;
 
-        // Update main product fields
+        // Update base product
         product.Name = request.Name!.Trim();
         product.Description = request.Description;
         product.UnitPrice = request.UnitPrice ?? 0;
@@ -308,24 +308,24 @@ public class UpdateProductHandler : IRequestHandler<UpdateProductRequest, Update
 
         _productRepository.Update(product);
 
-        // Update latest active price definition
-        var latestPriceDef = product.PriceDefinitions
-            .Where(p => p.IsActive)
+        // Update price definition
+        var priceDef = product.PriceDefinitions
+            .Where(p => p.IsActive && !p.IsDeleted)
             .OrderByDescending(p => p.EffectiveFrom)
             .FirstOrDefault();
 
-        if (latestPriceDef != null)
+        if (priceDef != null)
         {
-            latestPriceDef.ProductName = product.Name;
-            latestPriceDef.CostPrice = Convert.ToDecimal(product.UnitPrice);
-            latestPriceDef.UpdatedById = request.UpdatedById;
-            _priceRepository.Update(latestPriceDef);
+            priceDef.ProductName = product.Name;
+            priceDef.CostPrice = Convert.ToDecimal(product.UnitPrice);
+            priceDef.UpdatedById = request.UpdatedById;
+            _priceRepository.Update(priceDef);
         }
 
-        // Helper: Load attribute details
+        // Helper to load attribute details
         async Task<List<AttributeDetail>> LoadDetails(string? attrId)
         {
-            if (string.IsNullOrEmpty(attrId))
+            if (string.IsNullOrWhiteSpace(attrId))
                 return new List<AttributeDetail>();
 
             return await _attributeDetailRepository.GetQuery()
@@ -333,65 +333,86 @@ public class UpdateProductHandler : IRequestHandler<UpdateProductRequest, Update
                 .ToListAsync(cancellationToken);
         }
 
-        // Helper: Generate variants
-        async Task GenerateVariantsAsync()
+        var attr1Details = await LoadDetails(newAttr1Id);
+        var attr2Details = await LoadDetails(newAttr2Id);
+
+        // ==============================
+        //   PLU CODE GENERATION LOGIC
+        // ==============================
+
+        // NEVER DELETE EXISTING PLUs  
+        var existingPluCodes = product.PluCodes.ToList();
+
+        // Helper: Check if combination already exists
+        bool Exists(string? a1, string? a2)
         {
-            var attr1Details = await LoadDetails(newAttr1Id);
-            var attr2Details = await LoadDetails(newAttr2Id);
+            return existingPluCodes.Any(p =>
+                p.Attribute1DetailId == a1 &&
+                p.Attribute2DetailId == a2);
+        }
 
-            if (!attr1Details.Any() || !attr2Details.Any())
-                return;
-
+        // CASE 1: BOTH attributes exist → A1 × A2 combinations
+        if (attr1Details.Any() && attr2Details.Any())
+        {
             foreach (var a1 in attr1Details)
             {
                 foreach (var a2 in attr2Details)
                 {
-                    var pluCode = $"{product.Name}_{a1.Value}_{a2.Value}".Trim();
+                    if (!Exists(a1.Id, a2.Id))
+                    {
+                        var newPlu = new ProductPluCodes
+                        {
+                            ProductId = product.Id,
+                            Attribute1DetailId = a1.Id,
+                            Attribute2DetailId = a2.Id,
+                            CreatedById = request.UpdatedById
+                            // PLU code auto-generated by database
+                        };
 
-                    var newVariant = new ProductVariant
+                        await _pluRepository.CreateAsync(newPlu, cancellationToken);
+                    }
+                }
+            }
+        }
+        // CASE 2: ONLY A1 exists
+        else if (attr1Details.Any() && !attr2Details.Any())
+        {
+            foreach (var a1 in attr1Details)
+            {
+                if (!Exists(a1.Id, null))
+                {
+                    var newPlu = new ProductPluCodes
                     {
                         ProductId = product.Id,
                         Attribute1DetailId = a1.Id,
-                        Attribute2DetailId = a2.Id,
-                        PluCode = pluCode,
-                        CreatedById = request.UpdatedById,
+                        Attribute2DetailId = null,
+                        CreatedById = request.UpdatedById
                     };
 
-                    await _variantRepository.CreateAsync(newVariant, cancellationToken);
+                    await _pluRepository.CreateAsync(newPlu, cancellationToken);
                 }
             }
         }
-
-        // === Variant Management Logic ===
-        if (attributesChanged)
+        // CASE 3: ONLY A2 exists
+        else if (!attr1Details.Any() && attr2Details.Any())
         {
-            // Attributes changed → delete all existing variants
-            if (product.Variants.Any())
+            foreach (var a2 in attr2Details)
             {
-                foreach (var variant in product.Variants.ToList())
+                if (!Exists(null, a2.Id))
                 {
-                    _variantRepository.Delete(variant);
+                    var newPlu = new ProductPluCodes
+                    {
+                        ProductId = product.Id,
+                        Attribute1DetailId = null,
+                        Attribute2DetailId = a2.Id,
+                        CreatedById = request.UpdatedById
+                    };
+
+                    await _pluRepository.CreateAsync(newPlu, cancellationToken);
                 }
-                product.Variants.Clear();
-            }
-
-            // Regenerate if both attributes are now set
-            if (!string.IsNullOrEmpty(newAttr1Id) && !string.IsNullOrEmpty(newAttr2Id))
-            {
-                await GenerateVariantsAsync();
             }
         }
-        else
-        {
-            // Attributes unchanged → generate only if missing and needed
-            bool shouldHaveVariants = !string.IsNullOrEmpty(newAttr1Id) && !string.IsNullOrEmpty(newAttr2Id);
-            bool hasNoVariants = !product.Variants.Any();
-
-            if (shouldHaveVariants && hasNoVariants)
-            {
-                await GenerateVariantsAsync();
-            }
-        }
+        // CASE 4: None exist → do nothing
 
         await _unitOfWork.SaveAsync(cancellationToken);
 

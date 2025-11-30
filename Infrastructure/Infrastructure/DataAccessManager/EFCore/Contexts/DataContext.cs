@@ -63,7 +63,7 @@ public class DataContext : IdentityDbContext<ApplicationUser>, IEntityDbSet
     public DbSet<PurchaseOrderItemAttributeCombination> PurchaseOrderItemAttributeCombination { get; set; } //Add this but not used
 
     public DbSet<ProductPriceDefinition> ProductPriceDefinition { get; set; } //Add this 
-    public DbSet<ProductVariant> ProductVariant { get; set; }
+    public DbSet<ProductPluCodes> ProductPluCodes { get; set; }
 
     public DbSet<GoodsReceiveItemDetails> GoodsReceiveItemDetails { get; set; }
     public DbSet<InventoryTransactionAttributesDetails> InventoryTransactionAttributesDetails { get; set; }
@@ -102,7 +102,7 @@ public class DataContext : IdentityDbContext<ApplicationUser>, IEntityDbSet
         modelBuilder.ApplyConfiguration(new UnitMeasureConfiguration());
         modelBuilder.ApplyConfiguration(new ProductGroupConfiguration());
         modelBuilder.ApplyConfiguration(new ProductConfiguration());
-        modelBuilder.ApplyConfiguration(new ProductVariantConfiguration());
+        modelBuilder.ApplyConfiguration(new ProductPluCodesConfiguration());
         modelBuilder.ApplyConfiguration(new CustomerContactConfiguration());
         modelBuilder.ApplyConfiguration(new VendorContactConfiguration());
         modelBuilder.ApplyConfiguration(new TaxConfiguration());

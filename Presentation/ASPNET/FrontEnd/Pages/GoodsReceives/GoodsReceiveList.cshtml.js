@@ -1472,6 +1472,7 @@ const App = {
                     throw error;
                 }
             },
+
         };
 
         const methods = {
@@ -1674,7 +1675,7 @@ const App = {
             populateSecondaryData: async () => {
                 try {
                     let secondary = [];
-
+                    debugger;
                     if (state.id) {
                         // -----------------------------
                         // 🟦 EDIT MODE – Load from API
@@ -1795,6 +1796,7 @@ const App = {
                             };
                         }));
                     }
+
                     else {
                         // -----------------------------
                         // 🟩 CREATE MODE – Load from PO
@@ -1858,6 +1860,7 @@ const App = {
                         }));
                     }
 
+                    // Apply to state
                     state.secondaryData = secondary;
                     state.deletedItems = [];
 
@@ -3288,6 +3291,31 @@ const App = {
                                 }, 'Received Qty cannot exceed Remaining Qty']
                             }
                         },
+                        // 🌟🌟 ADDED ATTRIBUTE 1 — READ ONLY
+                        {
+                            field: 'attribute1DetailId',
+                            headerText: 'Attribute 1',
+                            width: 150,
+                            allowEditing: false,
+                            valueAccessor: (field, data) => {
+                                const list = data.attribute1List || [];
+                                const item = list.find(x => x.id === data[field]);
+                                return item ? item.value : '';
+                            }
+                        },
+
+                        // 🌟🌟 ADDED ATTRIBUTE 2 — READ ONLY
+                        {
+                            field: 'attribute2DetailId',
+                            headerText: 'Attribute 2',
+                            width: 150,
+                            allowEditing: false,
+                            valueAccessor: (field, data) => {
+                                const list = data.attribute2List || [];
+                                const item = list.find(x => x.id === data[field]);
+                                return item ? item.value : '';
+                            }
+                        },
                         {
                             field: 'details',
                             headerText: 'Details',
@@ -3422,7 +3450,7 @@ const App = {
         };
 
 
-        //// **UPDATED SECONDARY GRID FOR GOODS RECEIVE ITEMS**
+        // **UPDATED SECONDARY GRID FOR GOODS RECEIVE ITEMS**
         //const secondaryGrid = {
         //    obj: null,
         //    create: async (dataSource) => {
