@@ -256,6 +256,7 @@ using Domain.Enums;
 using FluentValidation;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
+using System.Text.RegularExpressions;
 
 namespace Application.Features.GoodsReceiveManager.Commands
 {
@@ -269,6 +270,9 @@ namespace Application.Features.GoodsReceiveManager.Commands
         public double? MRP { get; init; }
         public string? Notes { get; init; }
         public string? WarehouseId { get; init; }
+        public string? Attribute1DetailId { get; init; }
+        public string? Attribute2DetailId { get; init; }
+
         public List<CreateGoodsReceiveItemDetailDto> Attributes { get; init; } = new();
 
     }
@@ -306,8 +310,12 @@ namespace Application.Features.GoodsReceiveManager.Commands
 
     public class CreateGoodsReceiveValidator : AbstractValidator<CreateGoodsReceiveRequest>
     {
-        public CreateGoodsReceiveValidator()
+        //private readonly ICommandRepository<Product> _productRepository;
+
+        public CreateGoodsReceiveValidator()//ICommandRepository<Product> productRepository
         {
+            //_productRepository = productRepository;
+
             RuleFor(x => x.ReceiveDate).NotEmpty().WithMessage("Receive date is required.");
             RuleFor(x => x.Status).NotEmpty().WithMessage("Status is required.");
             RuleFor(x => x.PurchaseOrderId).NotEmpty().WithMessage("Purchase Order ID is required.");
@@ -321,9 +329,56 @@ namespace Application.Features.GoodsReceiveManager.Commands
                     .GreaterThan(0).WithMessage("Received quantity must be greater than 0.");
                 item.RuleFor(i => i.MRP)
                     .NotNull().GreaterThan(0).WithMessage("MRP must be provided and greater than 0 for each item.");
+
+                // ⭐ Add backend validation for attributes
+                //item.RuleFor(i => i).CustomAsync(ValidateAttributesAsync);
             });
         }
+
+        //private async Task ValidateAttributesAsync(
+        //    CreateGoodsReceiveItemDto item,
+        //    ValidationContext<CreateGoodsReceiveItemDto> context,
+        //    CancellationToken cancellationToken)
+        //{
+        //    // Load product
+        //    var product = await _productRepository.GetQuery()
+        //        .FirstOrDefaultAsync(x => x.Id == item.PurchaseOrderItemId, cancellationToken);
+        //    if (product == null)
+        //    {
+        //        context.AddFailure("Product not found.");
+        //        return;
+        //    }
+
+        //    foreach (var attr in item.Attributes)
+        //    {
+        //        // SERVICE NO
+        //        if (product.ServiceNo)
+        //        {
+        //            if (string.IsNullOrWhiteSpace(attr.ServiceNo))
+        //                context.AddFailure("Service No is required.");
+        //        }
+
+        //        // IMEI1
+        //        if (product.Imei1)
+        //        {
+        //            if (string.IsNullOrWhiteSpace(attr.IMEI1))
+        //                context.AddFailure("IMEI1 is required.");
+        //            else if (!Regex.IsMatch(attr.IMEI1, @"^\d{15}$"))
+        //                context.AddFailure("IMEI1 must be 15 digits.");
+        //        }
+
+        //        // IMEI2
+        //        if (product.Imei2)
+        //        {
+        //            if (string.IsNullOrWhiteSpace(attr.IMEI2))
+        //                context.AddFailure("IMEI2 is required.");
+        //            else if (!Regex.IsMatch(attr.IMEI2, @"^\d{15}$"))
+        //                context.AddFailure("IMEI2 must be 15 digits.");
+        //        }
+        //    }
+        //}
     }
+
 
     public class CreateGoodsReceiveHandler : IRequestHandler<CreateGoodsReceiveRequest, CreateGoodsReceiveResult>
     {
@@ -337,6 +392,7 @@ namespace Application.Features.GoodsReceiveManager.Commands
         private readonly ICommandRepository<Warehouse> _warehouseRepository;
         private readonly ICommandRepository<ProductPriceDefinition> _productpriceDefRepository;
         private readonly ICommandRepository<Product> _productRepository;
+        private readonly ICommandRepository<InventoryTransactionAttributesDetails> _inventoryTransactionAttributesDetailsRepository;
 
         private readonly IUnitOfWork _unitOfWork;
         private readonly NumberSequenceService _numberSequenceService;
@@ -354,6 +410,8 @@ namespace Application.Features.GoodsReceiveManager.Commands
             ICommandRepository<Warehouse> warehouseRepository,
             ICommandRepository<ProductPriceDefinition> productpricedefinitionrepository,
              ICommandRepository<Product> productRepository,
+             ICommandRepository<InventoryTransactionAttributesDetails> inventoryTransactionAttributesDetailsRepository,
+
             IUnitOfWork unitOfWork,
             NumberSequenceService numberSequenceService,
             InventoryTransactionService inventoryTransactionService,
@@ -369,11 +427,13 @@ namespace Application.Features.GoodsReceiveManager.Commands
             _warehouseRepository = warehouseRepository;
             _productpriceDefRepository = productpricedefinitionrepository;
             _productRepository = productRepository;
+            _inventoryTransactionAttributesDetailsRepository = inventoryTransactionAttributesDetailsRepository;
             _unitOfWork = unitOfWork;
             _numberSequenceService = numberSequenceService;
             _inventoryTransactionService = inventoryTransactionService;
             _securityService = securityService;
             _queryContext = queryContext;
+
         }
 
         public async Task<CreateGoodsReceiveResult> Handle(CreateGoodsReceiveRequest request, CancellationToken cancellationToken)
@@ -460,7 +520,10 @@ namespace Application.Features.GoodsReceiveManager.Commands
                     Notes = reqItem.Notes,
                     CreatedById = request.CreatedById!,
                     CreatedAtUtc = DateTime.UtcNow,
-                    IsDeleted = false
+                    IsDeleted = false,
+                    Attribute1DetailId = reqItem.Attribute1DetailId,
+                    Attribute2DetailId = reqItem.Attribute2DetailId
+
                 };
 
                 await _goodsReceiveItemRepository.CreateAsync(grItem, cancellationToken);
@@ -470,50 +533,40 @@ namespace Application.Features.GoodsReceiveManager.Commands
                 // ===============================
                 // INSERT ITEM DETAILS (IMEI / Serial / Service)
                 // ===============================
-    //            var product = await _productRepository.GetQuery()
-    //.FirstOrDefaultAsync(x => x.Id == poItem.ProductId, cancellationToken);
+                //            var product = await _productRepository.GetQuery()
+                //.FirstOrDefaultAsync(x => x.Id == poItem.ProductId, cancellationToken);
 
-    //            if (product == null)
-    //                throw new InvalidOperationException($"Product not found: {poItem.ProductId}");
+                //            if (product == null)
+                //                throw new InvalidOperationException($"Product not found: {poItem.ProductId}");
 
 
+
+                List<GoodsReceiveItemDetails> createdDetails = new();
+
+                var product = await _productRepository.GetQuery()
+                .FirstOrDefaultAsync(x => x.Id == poItem.ProductId, cancellationToken);
+                if (product == null)
+                {
+                    throw new InvalidOperationException("Product not found.");
+                }
 
                 foreach (var d in reqItem.Attributes)
                 {
-                    // --------------------------
-                    // VALIDATION BASED ON PRODUCT CONFIG
-                    // --------------------------
+                    if (product.ServiceNo && string.IsNullOrWhiteSpace(d.ServiceNo))
+                        throw new InvalidOperationException("Service No is required.");
 
-                    //if (product.IsIMEI1Required && string.IsNullOrWhiteSpace(d.IMEI1))
-                    //    throw new InvalidOperationException($"IMEI1 is required for product '{product.Name}'.");
+                    if (product.Imei1 && string.IsNullOrWhiteSpace(d.IMEI1))
+                        throw new InvalidOperationException("IMEI1 is required.");
+                    if (product.Imei1 && !Regex.IsMatch(d.IMEI1, @"^\d{15}$"))
+                        throw new InvalidOperationException("IMEI1 must be 15 digits.");
 
-                    //if (product.IsIMEI2Required && string.IsNullOrWhiteSpace(d.IMEI2))
-                    //    throw new InvalidOperationException($"IMEI2 is required for product '{product.Name}'.");
-
-                    //if (product.IsServiceNoRequired && string.IsNullOrWhiteSpace(d.ServiceNo))
-                    //    throw new InvalidOperationException($"Service Number is required for product '{product.Name}'.");
-
-                    //// Optional: Check IMEI length rule
-                    //if (!string.IsNullOrEmpty(d.IMEI1) && d.IMEI1.Length != 15)
-                    //    throw new InvalidOperationException($"IMEI1 must be 15 digits for product '{product.Name}'.");
-
-                    //if (!string.IsNullOrEmpty(d.IMEI2) && d.IMEI2.Length != 15)
-                    //    throw new InvalidOperationException($"IMEI2 must be 15 digits for product '{product.Name}'.");
-
-                    //// Optional: IMEI should be unique across all stocks
-                    //bool imeiExists = await _goodsReceiveItemDetailsRepository.GetQuery()
-                    //    .AnyAsync(x => x.IMEI1 == d.IMEI1 || x.IMEI2 == d.IMEI1 ||
-                    //                   x.IMEI1 == d.IMEI2 || x.IMEI2 == d.IMEI2);
-
-                    //if (imeiExists)
-                    //    throw new InvalidOperationException($"Duplicate IMEI found for product '{product.Name}'.");
-
-                    // --------------------------
-                    // INSERT INTO DB
-                    // ------------------------
+                    if (product.Imei2 && string.IsNullOrWhiteSpace(d.IMEI2))
+                        throw new InvalidOperationException("IMEI2 is required.");
+                    if (product.Imei2 && !Regex.IsMatch(d.IMEI2, @"^\d{15}$"))
+                        throw new InvalidOperationException("IMEI2 must be 15 digits.");
                     var detail = new GoodsReceiveItemDetails
                     {
-                        GoodsReceiveItemId = grItem.Id,     // NEW GR item
+                        GoodsReceiveItemId = grItem.Id,
                         RowIndex = d.RowIndex,
                         IMEI1 = d.IMEI1,
                         IMEI2 = d.IMEI2,
@@ -523,6 +576,8 @@ namespace Application.Features.GoodsReceiveManager.Commands
                     };
 
                     await _goodsReceiveItemDetailsRepository.CreateAsync(detail, cancellationToken);
+
+                    createdDetails.Add(detail); //Capture ID here
                 }
 
 
@@ -643,6 +698,23 @@ namespace Application.Features.GoodsReceiveManager.Commands
 
                     if (inventoryTx != null)
                         createdInventoryTransactions.Add(inventoryTx.Id);
+
+                    // ------------------------------------------
+                    // STORE ONLY THE CREATED GOODSRECEIVEITEMDETAIL IDs
+                    // ------------------------------------------
+                    foreach (var det in createdDetails)
+                    {
+                        var invDetail = new InventoryTransactionAttributesDetails
+                        {
+                            InventoryTransactionId = inventoryTx.Id,   // FK to InventoryTransaction
+                            GoodsReceiveItemDetailsId = det.Id,        // FK to GoodsReceiveItemDetails
+                            CreatedById = request.CreatedById,
+                            CreatedAtUtc = DateTime.UtcNow
+                        };
+
+                        await _inventoryTransactionAttributesDetailsRepository.CreateAsync(invDetail, cancellationToken);
+                    }
+
                 }
             }
 

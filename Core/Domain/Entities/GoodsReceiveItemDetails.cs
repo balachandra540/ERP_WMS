@@ -16,8 +16,7 @@ namespace Domain.Entities
         //public string? SerialNo { get; set; }
         public string? ServiceNo { get; set; }
         public GoodsReceiveItem GoodsReceiveItem { get; set; } = null!;
-
-
+        
     }
 
 }

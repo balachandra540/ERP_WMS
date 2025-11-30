@@ -55,7 +55,7 @@ public interface IEntityDbSet
 
     public DbSet<ProductPriceDefinition> ProductPriceDefinition { get; set; }
 
-
+    public DbSet<GoodsReceiveItemDetails> GoodsReceiveItemDetails { get; }
 
 }
 

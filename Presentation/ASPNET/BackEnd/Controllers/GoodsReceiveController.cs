@@ -5,6 +5,7 @@ using ASPNET.BackEnd.Common.Models;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 
 namespace ASPNET.BackEnd.Controllers;
 
@@ -134,6 +135,54 @@ public class GoodsReceiveController : BaseApiController
             Content = response
         });
     }
+    [HttpGet("GetAllAttributeValues")]
+    [ProducesResponseType(typeof(ApiSuccessResult<GlobalAttributeValuesDto>), StatusCodes.Status200OK)]
+    public async Task<ActionResult<ApiSuccessResult<GlobalAttributeValuesDto>>> GetAllAttributeValuesAsync(CancellationToken cancellationToken)
+    {
+        var response = await _sender.Send(new GetAllAttributeValuesQuery(), cancellationToken);
+
+        return Ok(new ApiSuccessResult<GlobalAttributeValuesDto>
+        {
+            Code = StatusCodes.Status200OK,
+            Message = "Success fetching all attribute values",
+            Content = response
+        });
+    }
+
+
+    //var details = await _context.GoodsReceiveItemDetails
+    //    .AsNoTracking()
+    //    .Where(x => !x.IsDeleted)
+    //    .Select(x => new
+    //    {
+    //        x.IMEI1,
+    //        x.IMEI2,
+    //        x.ServiceNo
+    //    })
+    //    .ToListAsync(cancellationToken);
+
+    //return new GlobalAttributeValuesDto
+    //{
+    //    AllIMEI1 = details
+    //        .Where(x => !string.IsNullOrWhiteSpace(x.IMEI1))
+    //        .Select(x => x.IMEI1!)
+    //        .Distinct()
+    //        .ToList(),
+
+    //    AllIMEI2 = details
+    //        .Where(x => !string.IsNullOrWhiteSpace(x.IMEI2))
+    //        .Select(x => x.IMEI2!)
+    //        .Distinct()
+    //        .ToList(),
+
+    //    AllServiceNo = details
+    //        .Where(x => !string.IsNullOrWhiteSpace(x.ServiceNo))
+    //        .Select(x => x.ServiceNo!)
+    //        .Distinct()
+    //        .ToList(),
+    //};
+    //}
+
 
 }
 

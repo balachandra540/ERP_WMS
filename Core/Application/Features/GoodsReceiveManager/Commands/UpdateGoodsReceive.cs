@@ -306,12 +306,14 @@ using Application.Common.Extensions;
 using Application.Common.Repositories;
 using Application.Common.Services.SecurityManager;
 using Application.Features.InventoryTransactionManager;
+using Application.Features.NumberSequenceManager;
 using Domain.Entities;
 using Domain.Enums;
 using FluentValidation;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Query;
+using System.Text.RegularExpressions;
 using System.Threading;
 
 namespace Application.Features.GoodsReceiveManager.Commands;
@@ -326,6 +328,9 @@ public class UpdateGoodsReceiveItemDto
     public double? FinalUnitPrice { get; init; }
     public double? MRP { get; init; }
     public string? Notes { get; init; }
+    public string? Attribute1DetailId { get; init; }
+    public string? Attribute2DetailId { get; init; }
+
     public List<UpdateGoodsReceiveItemDetailDto> Attributes { get; init; } = new();
 
 }
@@ -357,327 +362,795 @@ public class UpdateGoodsReceiveRequest : IRequest<UpdateGoodsReceiveResult>
     public List<UpdateGoodsReceiveItemDto> Items { get; init; } = new();
 }
 
+//public class UpdateGoodsReceiveValidator : AbstractValidator<UpdateGoodsReceiveRequest>
+//{
+//    public UpdateGoodsReceiveValidator()
+//    {
+//        RuleFor(x => x.Id).NotEmpty().WithMessage("ID is required.");
+//        RuleForEach(x => x.Items).ChildRules(childValidator =>
+//        {
+//            childValidator.RuleFor(item => item.PurchaseOrderItemId).NotEmpty().WithMessage("Purchase Order Item ID is required.");
+//            childValidator.RuleFor(item => item.ReceivedQuantity)
+//                .GreaterThanOrEqualTo(0).WithMessage("Received quantity must be >= 0.");
+//        });
+//    }
+//}
 public class UpdateGoodsReceiveValidator : AbstractValidator<UpdateGoodsReceiveRequest>
 {
-    public UpdateGoodsReceiveValidator()
+    //private readonly ICommandRepository<Product> _productRepository;
+
+    public UpdateGoodsReceiveValidator()//ICommandRepository<Product> productRepository
     {
-        RuleFor(x => x.Id).NotEmpty().WithMessage("ID is required.");
-        RuleForEach(x => x.Items).ChildRules(childValidator =>
+        //_productRepository = productRepository;
+
+        RuleFor(x => x.ReceiveDate).NotEmpty().WithMessage("Receive date is required.");
+        RuleFor(x => x.Status).NotEmpty().WithMessage("Status is required.");
+        RuleFor(x => x.PurchaseOrderId).NotEmpty().WithMessage("Purchase Order ID is required.");
+       
+        RuleFor(x => x.Items).NotEmpty().WithMessage("At least one item must be provided for receipt.");
+
+        RuleForEach(x => x.Items).ChildRules(item =>
         {
-            childValidator.RuleFor(item => item.PurchaseOrderItemId).NotEmpty().WithMessage("Purchase Order Item ID is required.");
-            childValidator.RuleFor(item => item.ReceivedQuantity)
-                .GreaterThanOrEqualTo(0).WithMessage("Received quantity must be >= 0.");
+            item.RuleFor(i => i.PurchaseOrderItemId).NotEmpty();
+            item.RuleFor(i => i.ReceivedQuantity)
+                .GreaterThan(0).WithMessage("Received quantity must be greater than 0.");
+            item.RuleFor(i => i.MRP)
+                .NotNull().GreaterThan(0).WithMessage("MRP must be provided and greater than 0 for each item.");
+
+           
         });
     }
+
 }
-
-public class UpdateGoodsReceiveHandler : IRequestHandler<UpdateGoodsReceiveRequest, UpdateGoodsReceiveResult>
+public class UpdateGoodsReceiveHandler
+    : IRequestHandler<UpdateGoodsReceiveRequest, UpdateGoodsReceiveResult>
 {
-    private readonly ICommandRepository<GoodsReceive> _goodsReceiveRepository;
-    private readonly ICommandRepository<GoodsReceiveItem> _goodsReceiveItemRepository;
-    private readonly ICommandRepository<GoodsReceiveItemDetails> _goodsReceiveItemDetailsRepository;
-    private readonly ICommandRepository<PurchaseOrder> _purchaseOrderRepository;
-    private readonly ICommandRepository<Warehouse> _warehouseRepository;
-    private readonly ICommandRepository<InventoryTransaction> _inventoryTransactionRepository;
-    private readonly ICommandRepository<ProductPriceDefinition> _productpriceDefRepository;
+    private readonly ICommandRepository<GoodsReceive> _goodsReceiveRepo;
+    private readonly ICommandRepository<GoodsReceiveItem> _itemRepo;
+    private readonly ICommandRepository<GoodsReceiveItemDetails> _detailRepo;
+    private readonly ICommandRepository<PurchaseOrderItem> _poItemRepo;
+    private readonly ICommandRepository<PurchaseOrder> _poRepo;
+    private readonly ICommandRepository<ProductPriceDefinition> _priceRepo;
+    private readonly ICommandRepository<Product> _productRepo;
+    private readonly ICommandRepository<InventoryTransaction> _invTxRepo;
+    private readonly ICommandRepository<InventoryTransactionAttributesDetails> _invAttrRepo;
+    private readonly ICommandRepository<Warehouse> _warehouseRepo;
 
-    private readonly IUnitOfWork _unitOfWork;
-    private readonly InventoryTransactionService _inventoryTransactionService;
-    private readonly ISecurityService _securityService;
-    private readonly IQueryContext _queryContext;
+    private readonly InventoryTransactionService _invService;
+    private readonly ISecurityService _security;
+    private readonly IQueryContext _query;
+    private readonly IUnitOfWork _uow;
+
     public UpdateGoodsReceiveHandler(
-        ICommandRepository<GoodsReceive> goodsReceiveRepository,
-        ICommandRepository<GoodsReceiveItem> goodsReceiveItemRepository,
-        ICommandRepository<GoodsReceiveItemDetails> goodsReceiveItemDetailsRepository,
-        ICommandRepository<PurchaseOrder> purchaseOrderRepository,
-        ICommandRepository<Warehouse> warehouseRepository,
-        ICommandRepository<InventoryTransaction> inventoryTransactionRepository,
-        ICommandRepository<ProductPriceDefinition> productpricedefinitionrepository,
-        IUnitOfWork unitOfWork,
-        InventoryTransactionService inventoryTransactionService,
-        ISecurityService securityService,
-        IQueryContext queryContext)
+        ICommandRepository<GoodsReceive> goodsReceiveRepo,
+        ICommandRepository<GoodsReceiveItem> itemRepo,
+        ICommandRepository<GoodsReceiveItemDetails> detailRepo,
+        ICommandRepository<PurchaseOrderItem> poItemRepo,
+        ICommandRepository<PurchaseOrder> poRepo,
+        ICommandRepository<ProductPriceDefinition> priceRepo,
+        ICommandRepository<Product> productRepo,
+        ICommandRepository<InventoryTransaction> invTxRepo,
+        ICommandRepository<InventoryTransactionAttributesDetails> invAttrRepo,
+        ICommandRepository<Warehouse> warehouseRepo,
+        InventoryTransactionService invService,
+        ISecurityService security,
+        IQueryContext query,
+        IUnitOfWork uow)
     {
-        _goodsReceiveRepository = goodsReceiveRepository;
-        _goodsReceiveItemRepository = goodsReceiveItemRepository;
-        _goodsReceiveItemDetailsRepository = goodsReceiveItemDetailsRepository;
-        _purchaseOrderRepository = purchaseOrderRepository;
-        _warehouseRepository = warehouseRepository;
-        _inventoryTransactionRepository = inventoryTransactionRepository;
-        _productpriceDefRepository = productpricedefinitionrepository;
-        _unitOfWork = unitOfWork;
-        _inventoryTransactionService = inventoryTransactionService;
-        _securityService = securityService;
-        _queryContext = queryContext;
+        _goodsReceiveRepo = goodsReceiveRepo;
+        _itemRepo = itemRepo;
+        _detailRepo = detailRepo;
+        _poItemRepo = poItemRepo;
+        _poRepo = poRepo;
+        _priceRepo = priceRepo;
+        _productRepo = productRepo;
+        _invTxRepo = invTxRepo;
+        _invAttrRepo = invAttrRepo;
+        _warehouseRepo = warehouseRepo;
+
+        _invService = invService;
+        _security = security;
+        _query = query;
+        _uow = uow;
     }
 
-    public async Task<UpdateGoodsReceiveResult> Handle(UpdateGoodsReceiveRequest request, CancellationToken cancellationToken)
+    public async Task<UpdateGoodsReceiveResult> Handle(UpdateGoodsReceiveRequest req, CancellationToken ct)
     {
-        // ✅ Step 1: Load GR and related items
-        var entity = await _goodsReceiveRepository.GetQuery()
-            .ApplyIsDeletedFilter(false)
+        // --------------------------------------------------------------
+        // 1️⃣ Load GR + all related items/products
+        // --------------------------------------------------------------
+        var gr = await _goodsReceiveRepo.GetQuery()
             .Include(x => x.GoodsReceiveItems)
                 .ThenInclude(i => i.PurchaseOrderItem)
                     .ThenInclude(po => po.Product)
-            .FirstOrDefaultAsync(x => x.Id == request.Id, cancellationToken)
-            ?? throw new Exception($"Goods Receive not found: {request.Id}");
+            .FirstOrDefaultAsync(x => x.Id == req.Id, ct)
+            ?? throw new Exception($"Goods Receive not found: {req.Id}");
 
-        var oldStatus = entity.Status;
+        var oldStatus = gr.Status;
 
-        // ✅ Step 2: Parse and validate
-        if (!Enum.TryParse<GoodsReceiveStatus>(request.Status, out var receiveStatus))
-            throw new InvalidOperationException($"Invalid status: {request.Status}");
+        // --------------------------------------------------------------
+        // 2️⃣ Parse Status
+        // --------------------------------------------------------------
+        if (!Enum.TryParse<GoodsReceiveStatus>(req.Status, out var newStatus))
+            throw new InvalidOperationException($"Invalid status: {req.Status}");
 
-        Warehouse? defaultWarehouse = null;
-        if (!string.IsNullOrEmpty(request.DefaultWarehouseId))
-        {
-            defaultWarehouse = await _warehouseRepository.GetQuery()
-                .ApplyIsDeletedFilter(false)
-                .FirstOrDefaultAsync(x => x.Id == request.DefaultWarehouseId, cancellationToken)
-                ?? throw new InvalidOperationException($"Warehouse '{request.DefaultWarehouseId}' not found.");
-        }
-
-        // ✅ Step 3: Load Purchase Order (tracked)
-        var po = await _purchaseOrderRepository.GetQuery()
-            .ApplyIsDeletedFilter(false)
+        // --------------------------------------------------------------
+        // 3️⃣ Load PO (must be tracked)
+        // --------------------------------------------------------------
+        var po = await _poRepo.GetQuery()
             .Include(x => x.PurchaseOrderItemList)
-            .FirstOrDefaultAsync(x => x.Id == entity.PurchaseOrderId, cancellationToken)
-            ?? throw new InvalidOperationException($"Purchase Order '{entity.PurchaseOrderId}' not found.");
+            .FirstOrDefaultAsync(x => x.Id == gr.PurchaseOrderId, ct)
+            ?? throw new Exception($"PO not found: {gr.PurchaseOrderId}");
 
-        var poItemsById = po.PurchaseOrderItemList.ToDictionary(x => x.Id);
+        var poById = po.PurchaseOrderItemList.ToDictionary(x => x.Id);
 
-        // ✅ Step 4: Remove old inventory transactions if old status was Approved
-        if (oldStatus == GoodsReceiveStatus.Approved)
+        // --------------------------------------------------------------
+        // 4️⃣ Validate Warehouse (only if Approved)
+        // --------------------------------------------------------------
+        Warehouse? defaultWarehouse = null;
+
+        if (newStatus == GoodsReceiveStatus.Approved)
         {
-            var oldTx = await _inventoryTransactionRepository.GetQuery()
-                .Where(tx => tx.ModuleId == entity.Id)
-                .ToListAsync(cancellationToken);
+            if (string.IsNullOrEmpty(req.DefaultWarehouseId))
+                throw new InvalidOperationException("Default warehouse is required for Approved status.");
 
-            foreach (var tx in oldTx)
-                _inventoryTransactionRepository.Delete(tx);
+            defaultWarehouse = await _warehouseRepo.GetQuery()
+                .ApplyIsDeletedFilter(false)
+                .FirstOrDefaultAsync(x => x.Id == req.DefaultWarehouseId, ct)
+                ?? throw new InvalidOperationException($"Warehouse not found: {req.DefaultWarehouseId}");
         }
 
-        // ✅ Step 5: Update GR header
-        entity.ReceiveDate = _securityService.ConvertToIst(request.ReceiveDate ?? entity.ReceiveDate);
-        entity.Description = request.Description ?? entity.Description;
-        entity.UpdatedById = request.UpdatedById!;
-        entity.UpdatedAtUtc = DateTime.UtcNow;
-        entity.Status = receiveStatus;
-        entity.FreightCharges = request.FreightCharges ?? 0;
-        entity.OtherCharges = request.OtherCharges ?? 0;
-        _goodsReceiveRepository.Update(entity);
+        // --------------------------------------------------------------
+        // 5️⃣ Update GR header
+        // --------------------------------------------------------------
+        gr.ReceiveDate = _security.ConvertToIst(req.ReceiveDate) ?? gr.ReceiveDate;
+        gr.Description = req.Description ?? gr.Description;
+        gr.FreightCharges = req.FreightCharges ?? 0;
+        gr.OtherCharges = req.OtherCharges ?? 0;
+        gr.Status = newStatus;
+        gr.UpdatedById = req.UpdatedById;
+        gr.UpdatedAtUtc = DateTime.UtcNow;
 
-        // ✅ Step 6: Per-unit freight/other allocation
-        double totalReceivedQty = request.Items.Sum(i => i.ReceivedQuantity);
-        double freightPerUnit = totalReceivedQty > 0 ? (request.FreightCharges ?? 0) / totalReceivedQty : 0;
-        double otherPerUnit = totalReceivedQty > 0 ? (request.OtherCharges ?? 0) / totalReceivedQty : 0;
+        _goodsReceiveRepo.Update(gr);
 
-        // ✅ Step 7: Sync items (update, add, delete safely)
-        var existingItems = entity.GoodsReceiveItems.ToDictionary(x => x.Id, x => x);
-        var requestItemIds = request.Items.Where(i => !string.IsNullOrEmpty(i.Id)).Select(i => i.Id!).ToHashSet();
+        // --------------------------------------------------------------
+        // 6️⃣ Per unit calculation
+        // --------------------------------------------------------------
+        double totalQty = req.Items.Sum(x => x.ReceivedQuantity);
+        double freightPerUnit = totalQty == 0 ? 0 : (req.FreightCharges ?? 0) / totalQty;
+        double otherPerUnit = totalQty == 0 ? 0 : (req.OtherCharges ?? 0) / totalQty;
 
-        // Remove deleted items
-        foreach (var oldItem in entity.GoodsReceiveItems.Where(i => !requestItemIds.Contains(i.Id)).ToList())
+        // --------------------------------------------------------------
+        // 7️⃣ Sync items (Add / Update / Delete)
+        // --------------------------------------------------------------
+        var existingItems = gr.GoodsReceiveItems.ToDictionary(x => x.Id);
+        var incomingItemIds = req.Items.Where(i => i.Id != null).Select(i => i.Id).ToHashSet();
+
+        // DELETE removed items
+        foreach (var old in existingItems.Values.Where(x => !incomingItemIds.Contains(x.Id)).ToList())
+            _itemRepo.Delete(old);
+
+        // Map for storing detail IDs for inventoryTx later
+        var detailMap = new Dictionary<string, List<GoodsReceiveItemDetails>>();
+
+        // Process each incoming item
+        foreach (var dto in req.Items)
         {
-            entity.GoodsReceiveItems.Remove(oldItem);
-            _goodsReceiveItemRepository.Delete(oldItem);
-        }
+            if (!poById.TryGetValue(dto.PurchaseOrderItemId, out var poItem))
+                throw new Exception($"PO Item not found: {dto.PurchaseOrderItemId}");
 
-        // Update or Add
-        foreach (var dto in request.Items.Where(i => i.ReceivedQuantity > 0))
-        {
-            if (!poItemsById.TryGetValue(dto.PurchaseOrderItemId, out var poItem))
-                throw new InvalidOperationException($"PO Item '{dto.PurchaseOrderItemId}' not found.");
-            GoodsReceiveItem currentItem;
-            if (dto.Id != null && existingItems.TryGetValue(dto.Id, out var existing))
+            GoodsReceiveItem item;
+
+            // UPDATE
+            if (!string.IsNullOrWhiteSpace(dto.Id) && existingItems.TryGetValue(dto.Id, out var exist))
             {
-                // ✅ Update existing
-                existing.ReceivedQuantity = dto.ReceivedQuantity;
-                existing.UnitPrice = dto.UnitPrice ?? 0;
-                existing.TaxAmount = dto.TaxAmount ?? 0;
-                existing.FreightChargesPerUnit = Math.Round(freightPerUnit, 2);
-                existing.OtherChargesPerUnit = Math.Round(otherPerUnit, 2);
-                existing.FinalUnitPrice = Math.Round((dto.UnitPrice ?? 0) + (dto.TaxAmount ?? 0) + freightPerUnit + otherPerUnit, 2);
-                existing.MRP = dto.MRP ?? 0;
-                existing.Notes = dto.Notes;
-                existing.UpdatedById = request.UpdatedById;
-                existing.UpdatedAtUtc = DateTime.Now;
-                currentItem = existing;
+                exist.ReceivedQuantity = dto.ReceivedQuantity;
+                exist.UnitPrice = dto.UnitPrice ?? 0;
+                exist.TaxAmount = dto.TaxAmount ?? 0;
+                exist.FreightChargesPerUnit = freightPerUnit;
+                exist.OtherChargesPerUnit = otherPerUnit;
+                exist.FinalUnitPrice = (dto.UnitPrice ?? 0) + (dto.TaxAmount ?? 0) + freightPerUnit + otherPerUnit;
+                exist.MRP = dto.MRP ?? 0;
+                exist.Notes = dto.Notes;
+                exist.Attribute1DetailId = dto.Attribute1DetailId;
+                exist.Attribute2DetailId = dto.Attribute2DetailId;
+                exist.UpdatedById = req.UpdatedById;
+                exist.UpdatedAtUtc = DateTime.UtcNow;
+
+                _itemRepo.Update(exist);
+                item = exist;
             }
             else
             {
-                // ✅ Add new
-                var newItem = new GoodsReceiveItem
+                // CREATE
+                item = new GoodsReceiveItem
                 {
-                    GoodsReceiveId = entity.Id,
+                    GoodsReceiveId = gr.Id,
                     PurchaseOrderItemId = dto.PurchaseOrderItemId,
                     ReceivedQuantity = dto.ReceivedQuantity,
                     UnitPrice = dto.UnitPrice ?? 0,
                     TaxAmount = dto.TaxAmount ?? 0,
-                    FreightChargesPerUnit = Math.Round(freightPerUnit, 2),
-                    OtherChargesPerUnit = Math.Round(otherPerUnit, 2),
-                    FinalUnitPrice = Math.Round((dto.UnitPrice ?? 0) + (dto.TaxAmount ?? 0) + freightPerUnit + otherPerUnit, 2),
+                    FreightChargesPerUnit = freightPerUnit,
+                    OtherChargesPerUnit = otherPerUnit,
+                    FinalUnitPrice = (dto.UnitPrice ?? 0) + (dto.TaxAmount ?? 0) + freightPerUnit + otherPerUnit,
                     MRP = dto.MRP ?? 0,
                     Notes = dto.Notes,
-                    CreatedById = entity.CreatedById,
-                    CreatedAtUtc = DateTime.Now,
-                    IsDeleted = false
+                    Attribute1DetailId = dto.Attribute1DetailId,
+                    Attribute2DetailId = dto.Attribute2DetailId,
+                    CreatedById = gr.CreatedById,
+                    CreatedAtUtc = DateTime.UtcNow
                 };
-                entity.GoodsReceiveItems.Add(newItem);
-                await _goodsReceiveItemRepository.CreateAsync(newItem, cancellationToken);
-                currentItem = newItem;
+
+                await _itemRepo.CreateAsync(item, ct);
             }
 
+            // --------------------------------------------------------------
+            // Update PO received quantity
+            // --------------------------------------------------------------
             poItem.ReceivedQuantity += dto.ReceivedQuantity;
+            _poItemRepo.Update(poItem);
 
-            // =========================================
-            // ATTRIBUTE UPDATE (IMEI / Serial / Service)
-            // =========================================
+            // --------------------------------------------------------------
+            // Replace all details for this item
+            // --------------------------------------------------------------
+            var oldDetails = await _detailRepo.GetQuery()
+                .Where(d => d.GoodsReceiveItemId == item.Id)
+                .ToListAsync(ct);
 
-            // 1️⃣ Delete old records for this item id
-            var oldDetails = await _goodsReceiveItemDetailsRepository.GetQuery()
-                .Where(d => d.GoodsReceiveItemId == currentItem.Id)
-                .ToListAsync(cancellationToken);
+            foreach (var d in oldDetails)
+                _detailRepo.Delete(d);
 
-            foreach (var od in oldDetails)
-                _goodsReceiveItemDetailsRepository.Delete(od);
+            var newDetailList = new List<GoodsReceiveItemDetails>();
 
-            // 2️⃣ Insert new detail rows
             foreach (var d in dto.Attributes)
             {
-                var detail = new GoodsReceiveItemDetails
+                var nd = new GoodsReceiveItemDetails
                 {
-                    GoodsReceiveItemId = currentItem.Id,   // existing or newly created
+                    GoodsReceiveItemId = item.Id,
                     RowIndex = d.RowIndex,
                     IMEI1 = d.IMEI1,
                     IMEI2 = d.IMEI2,
                     ServiceNo = d.ServiceNo,
-                    CreatedById = request.UpdatedById,
+                    CreatedById = req.UpdatedById,
                     CreatedAtUtc = DateTime.UtcNow
                 };
 
-                await _goodsReceiveItemDetailsRepository.CreateAsync(detail, cancellationToken);
+                await _detailRepo.CreateAsync(nd, ct);
+                newDetailList.Add(nd);
             }
 
-            // ---------------------------------------------------------
-            // PRICE DEFINITION UPDATE LOGIC
-            // ---------------------------------------------------------
+            detailMap[item.Id] = newDetailList;
+
+            // --------------------------------------------------------------
+            // PRICE DEFINITION LOGIC (Weighted Average)
+            // --------------------------------------------------------------
             var productId = poItem.ProductId;
-            double newUnitPrice = dto.UnitPrice ?? currentItem.UnitPrice;
+            double newUnitPrice = dto.UnitPrice ?? item.UnitPrice;
 
+            var existingPrice = await _priceRepo.GetQuery()
+                .Where(p => p.ProductId == productId && p.IsActive && !p.IsDeleted)
+                .OrderByDescending(p => p.EffectiveFrom)
+                .FirstOrDefaultAsync(ct);
 
-            var existingPrice = await _productpriceDefRepository.GetQuery()
-            .Where(p => p.ProductId == productId && p.IsActive && !p.IsDeleted)
-            .OrderByDescending(p => p.EffectiveFrom)
-            .FirstOrDefaultAsync(cancellationToken);
-            // If NO price exists — create first one
+            // No price → create one
             if (existingPrice == null)
             {
-                var newPrice = new ProductPriceDefinition
+                var firstPrice = new ProductPriceDefinition
                 {
                     ProductId = productId,
                     ProductName = poItem.Product?.Name,
                     CostPrice = Convert.ToDecimal(newUnitPrice),
-                    EffectiveFrom = _securityService.ConvertToIst(DateTime.UtcNow),
+                    EffectiveFrom = _security.ConvertToIst(DateTime.UtcNow),
                     IsActive = true
                 };
 
-
-                await _productpriceDefRepository.CreateAsync(newPrice, cancellationToken);
-                await _unitOfWork.SaveAsync(cancellationToken);
-                continue;
+                await _priceRepo.CreateAsync(firstPrice, ct);
+                await _uow.SaveAsync(ct);
             }
-
-
-            double oldPrice = Convert.ToDouble(existingPrice.CostPrice);
-
-
-            // Skip if same price
-            if (Math.Round(oldPrice, 2) == Math.Round(newUnitPrice, 2))
-                continue;
-
-
-            // FETCH STOCK
-            var stockResult = await _queryContext.InventoryTransaction
-            .AsNoTracking()
-            .ApplyIsDeletedFilter(false)
-            .Where(x => x.Status == InventoryTransactionStatus.Confirmed &&
-            x.WarehouseId == request.DefaultWarehouseId &&
-            x.ProductId == productId)
-            .GroupBy(x => x.ProductId)
-            .Select(g => new
+            else
             {
-                ProductId = g.Key,
-                TotalStock = (double)(g.Sum(x => x.Stock) ?? 0)
-            })
-            .FirstOrDefaultAsync(cancellationToken);
+                double oldPrice = Convert.ToDouble(existingPrice.CostPrice);
 
+                if (Math.Round(oldPrice, 2) != Math.Round(newUnitPrice, 2))
+                {
+                    var stockResult = await _query.InventoryTransaction
+                        .AsNoTracking()
+                        .ApplyIsDeletedFilter(false)
+                        .Where(x => x.Status == InventoryTransactionStatus.Confirmed &&
+                                    x.WarehouseId == req.DefaultWarehouseId &&
+                                    x.ProductId == productId)
+                        .GroupBy(x => x.ProductId)
+                        .Select(g => new
+                        {
+                            ProductId = g.Key,
+                            TotalStock = (double)(g.Sum(x => x.Stock) ?? 0)
+                        })
+                        .FirstOrDefaultAsync(ct);
 
-            double stockQty = stockResult?.TotalStock ?? 0;
+                    double stockQty = stockResult?.TotalStock ?? 0;
 
+                    double existingValue = stockQty * oldPrice;
+                    double receivedValue = item.ReceivedQuantity * newUnitPrice;
 
-            // WEIGHTED AVERAGE
-            double existingValue = stockQty * oldPrice;
-            double receivedValue = dto.ReceivedQuantity * newUnitPrice;
-            double weightedAvg = (existingValue + receivedValue) / (stockQty + dto.ReceivedQuantity);
-            weightedAvg = Math.Round(weightedAvg, 2);
+                    double weightedAvg =
+                        (stockQty + item.ReceivedQuantity) == 0
+                        ? newUnitPrice
+                        : (existingValue + receivedValue) / (stockQty + item.ReceivedQuantity);
 
+                    weightedAvg = Math.Round(weightedAvg, 2);
 
-            // DEACTIVATE OLD
-            existingPrice.IsActive = false;
-            existingPrice.EffectiveTo = _securityService.ConvertToIst(DateTime.UtcNow);
-            _productpriceDefRepository.Update(existingPrice);
+                    existingPrice.IsActive = false;
+                    existingPrice.EffectiveTo = _security.ConvertToIst(DateTime.UtcNow);
+                    _priceRepo.Update(existingPrice);
 
+                    var newPrice = new ProductPriceDefinition
+                    {
+                        ProductId = productId,
+                        ProductName = existingPrice.ProductName,
+                        CostPrice = Convert.ToDecimal(weightedAvg),
+                        EffectiveFrom = _security.ConvertToIst(DateTime.UtcNow),
+                        IsActive = true,
+                        MarginPercentage = existingPrice.MarginPercentage,
+                        CurrencyCode = existingPrice.CurrencyCode
+                    };
 
-            // CREATE NEW PRICE
-            var newPriceDef = new ProductPriceDefinition
-            {
-                ProductId = productId,
-                ProductName = existingPrice.ProductName,
-                CostPrice = Convert.ToDecimal(weightedAvg),
-                EffectiveFrom = _securityService.ConvertToIst(DateTime.UtcNow),
-                IsActive = true,
-                MarginPercentage = existingPrice.MarginPercentage,
-                CurrencyCode = existingPrice.CurrencyCode
-            };
-
-
-            await _productpriceDefRepository.CreateAsync(newPriceDef, cancellationToken);
-            await _unitOfWork.SaveAsync(cancellationToken);
+                    await _priceRepo.CreateAsync(newPrice, ct);
+                    await _uow.SaveAsync(ct);
+                }
+            }
         }
 
+        // --------------------------------------------------------------
+        // 8️⃣ Save GR + Items + Details
+        // --------------------------------------------------------------
+        await _uow.SaveAsync(ct);
 
-        // UPDATE PO
-        _purchaseOrderRepository.Update(po);
-        await _unitOfWork.SaveAsync(cancellationToken);
-
-
-        // ✅ Step 8: Recreate inventory transactions if Approved
-        if (receiveStatus == GoodsReceiveStatus.Approved)
+        // --------------------------------------------------------------
+        // 9️⃣ Delete Old InventoryTx ONLY AFTER SUCCESSFUL GR UPDATE
+        // --------------------------------------------------------------
+        if (oldStatus == GoodsReceiveStatus.Approved)
         {
-            if (string.IsNullOrEmpty(request.DefaultWarehouseId))
-                throw new InvalidOperationException("Default warehouse required for Approved status.");
+            var oldTx = await _invTxRepo.GetQuery()
+                .Where(tx => tx.ModuleId == gr.Id)
+                .ToListAsync(ct);
 
-            foreach (var item in entity.GoodsReceiveItems)
+            foreach (var tx in oldTx)
+                _invTxRepo.Delete(tx);
+
+            await _uow.SaveAsync(ct);
+        }
+
+        // --------------------------------------------------------------
+        // 🔟 Re-create new inventory transactions (if Approved)
+        // --------------------------------------------------------------
+        if (newStatus == GoodsReceiveStatus.Approved)
+        {
+            foreach (var item in gr.GoodsReceiveItems)
             {
-                var poItem = poItemsById[item.PurchaseOrderItemId];
+                var poItem = poById[item.PurchaseOrderItemId];
+
                 if (poItem.Product?.Physical != true)
                     continue;
 
-                await _inventoryTransactionService.GoodsReceiveCreateInvenTrans(
-                    entity.Id,
-                    request.DefaultWarehouseId,
+                var inventoryTx = await _invService.GoodsReceiveCreateInvenTrans(
+                    gr.Id,
+                    req.DefaultWarehouseId,
                     poItem.ProductId,
                     item.ReceivedQuantity,
-                    request.UpdatedById!,
-                    cancellationToken);
+                    req.UpdatedById,
+                    ct);
+
+                if (inventoryTx != null &&
+                    detailMap.TryGetValue(item.Id, out var details))
+                {
+                    foreach (var det in details)
+                    {
+                        var map = new InventoryTransactionAttributesDetails
+                        {
+                            InventoryTransactionId = inventoryTx.Id,
+                            GoodsReceiveItemDetailsId = det.Id,
+                            CreatedById = req.UpdatedById,
+                            CreatedAtUtc = DateTime.UtcNow
+                        };
+
+                        await _invAttrRepo.CreateAsync(map, ct);
+                    }
+                }
             }
+
+            await _uow.SaveAsync(ct);
         }
 
-        // ✅ Step 9: Final save and propagate
-        await _unitOfWork.SaveAsync(cancellationToken);
-
-
-        return new UpdateGoodsReceiveResult { Data = entity };
+        return new UpdateGoodsReceiveResult { Data = gr };
     }
 }
+
+
+//public class UpdateGoodsReceiveHandler : IRequestHandler<UpdateGoodsReceiveRequest, UpdateGoodsReceiveResult>
+//{
+//    private readonly ICommandRepository<GoodsReceive> _goodsReceiveRepository;
+//    private readonly ICommandRepository<GoodsReceiveItem> _goodsReceiveItemRepository;
+//    private readonly ICommandRepository<GoodsReceiveItemDetails> _goodsReceiveItemDetailsRepository;
+//    private readonly ICommandRepository<PurchaseOrder> _purchaseOrderRepository;
+//    private readonly ICommandRepository<Warehouse> _warehouseRepository;
+//    private readonly ICommandRepository<InventoryTransaction> _inventoryTransactionRepository;
+//    private readonly ICommandRepository<ProductPriceDefinition> _productpriceDefRepository;
+//    private readonly ICommandRepository<InventoryTransactionAttributesDetails> _inventoryTransactionAttributesDetailsRepository;
+//    private readonly ICommandRepository<Product> _productRepository;
+
+//    private readonly IUnitOfWork _unitOfWork;
+//    private readonly InventoryTransactionService _inventoryTransactionService;
+//    private readonly ISecurityService _securityService;
+//    private readonly IQueryContext _queryContext;
+//    public UpdateGoodsReceiveHandler(
+//        ICommandRepository<GoodsReceive> goodsReceiveRepository,
+//        ICommandRepository<GoodsReceiveItem> goodsReceiveItemRepository,
+//        ICommandRepository<GoodsReceiveItemDetails> goodsReceiveItemDetailsRepository,
+//        ICommandRepository<PurchaseOrder> purchaseOrderRepository,
+//        ICommandRepository<Warehouse> warehouseRepository,
+//        ICommandRepository<InventoryTransaction> inventoryTransactionRepository,
+//        ICommandRepository<ProductPriceDefinition> productpricedefinitionrepository,
+//        ICommandRepository<InventoryTransactionAttributesDetails> inventoryTransactionAttributesDetailsRepository,
+//        ICommandRepository<Product> productRepository,
+
+//        IUnitOfWork unitOfWork,
+//        InventoryTransactionService inventoryTransactionService,
+//        ISecurityService securityService,
+//        IQueryContext queryContext)
+//    {
+//        _goodsReceiveRepository = goodsReceiveRepository;
+//        _goodsReceiveItemRepository = goodsReceiveItemRepository;
+//        _goodsReceiveItemDetailsRepository = goodsReceiveItemDetailsRepository;
+//        _purchaseOrderRepository = purchaseOrderRepository;
+//        _warehouseRepository = warehouseRepository;
+//        _inventoryTransactionRepository = inventoryTransactionRepository;
+//        _productpriceDefRepository = productpricedefinitionrepository;
+//        _inventoryTransactionAttributesDetailsRepository = inventoryTransactionAttributesDetailsRepository;
+//        _productRepository = productRepository;
+//        _unitOfWork = unitOfWork;
+//        _inventoryTransactionService = inventoryTransactionService;
+//        _securityService = securityService;
+//        _queryContext = queryContext;
+//    }
+
+//    public async Task<UpdateGoodsReceiveResult> Handle(UpdateGoodsReceiveRequest request, CancellationToken cancellationToken)
+//    {
+//        // ✅ Step 1: Load GR and related items
+//        var entity = await _goodsReceiveRepository.GetQuery()
+//            .ApplyIsDeletedFilter(false)
+//            .Include(x => x.GoodsReceiveItems)
+//                .ThenInclude(i => i.PurchaseOrderItem)
+//                    .ThenInclude(po => po.Product)
+//            .FirstOrDefaultAsync(x => x.Id == request.Id, cancellationToken)
+//            ?? throw new Exception($"Goods Receive not found: {request.Id}");
+
+//        var oldStatus = entity.Status;
+
+//        // ✅ Step 2: Parse and validate
+//        if (!Enum.TryParse<GoodsReceiveStatus>(request.Status, out var receiveStatus))
+//            throw new InvalidOperationException($"Invalid status: {request.Status}");
+
+//        Warehouse? defaultWarehouse = null;
+//        if (!string.IsNullOrEmpty(request.DefaultWarehouseId))
+//        {
+//            defaultWarehouse = await _warehouseRepository.GetQuery()
+//                .ApplyIsDeletedFilter(false)
+//                .FirstOrDefaultAsync(x => x.Id == request.DefaultWarehouseId, cancellationToken)
+//                ?? throw new InvalidOperationException($"Warehouse '{request.DefaultWarehouseId}' not found.");
+//        }
+
+//        // ✅ Step 3: Load Purchase Order (tracked)
+//        var po = await _purchaseOrderRepository.GetQuery()
+//            .ApplyIsDeletedFilter(false)
+//            .Include(x => x.PurchaseOrderItemList)
+//            .FirstOrDefaultAsync(x => x.Id == entity.PurchaseOrderId, cancellationToken)
+//            ?? throw new InvalidOperationException($"Purchase Order '{entity.PurchaseOrderId}' not found.");
+
+//        var poItemsById = po.PurchaseOrderItemList.ToDictionary(x => x.Id);
+
+//        // ✅ Step 4: Remove old inventory transactions if old status was Approved
+//        if (oldStatus == GoodsReceiveStatus.Approved)
+//        {
+//            var oldTx = await _inventoryTransactionRepository.GetQuery()
+//                .Where(tx => tx.ModuleId == entity.Id)
+//                .ToListAsync(cancellationToken);
+
+//            foreach (var tx in oldTx)
+//                _inventoryTransactionRepository.Delete(tx);
+//        }
+
+//        // ✅ Step 5: Update GR header
+//        entity.ReceiveDate = _securityService.ConvertToIst(request.ReceiveDate ?? entity.ReceiveDate);
+//        entity.Description = request.Description ?? entity.Description;
+//        entity.UpdatedById = request.UpdatedById!;
+//        entity.UpdatedAtUtc = DateTime.UtcNow;
+//        entity.Status = receiveStatus;
+//        entity.FreightCharges = request.FreightCharges ?? 0;
+//        entity.OtherCharges = request.OtherCharges ?? 0;
+//        _goodsReceiveRepository.Update(entity);
+
+//        // ✅ Step 6: Per-unit freight/other allocation
+//        double totalReceivedQty = request.Items.Sum(i => i.ReceivedQuantity);
+//        double freightPerUnit = totalReceivedQty > 0 ? (request.FreightCharges ?? 0) / totalReceivedQty : 0;
+//        double otherPerUnit = totalReceivedQty > 0 ? (request.OtherCharges ?? 0) / totalReceivedQty : 0;
+
+//        // ✅ Step 7: Sync items (update, add, delete safely)
+//        var existingItems = entity.GoodsReceiveItems.ToDictionary(x => x.Id, x => x);
+//        var requestItemIds = request.Items.Where(i => !string.IsNullOrEmpty(i.Id)).Select(i => i.Id!).ToHashSet();
+
+//        // Remove deleted items
+//        foreach (var oldItem in entity.GoodsReceiveItems.Where(i => !requestItemIds.Contains(i.Id)).ToList())
+//        {
+//            entity.GoodsReceiveItems.Remove(oldItem);
+//            _goodsReceiveItemRepository.Delete(oldItem);
+//        }
+//        var itemToDetailMap = new Dictionary<string, List<GoodsReceiveItemDetails>>();
+
+//        // Update or Add
+//        foreach (var dto in request.Items.Where(i => i.ReceivedQuantity > 0))
+//        {
+//            if (!poItemsById.TryGetValue(dto.PurchaseOrderItemId, out var poItem))
+//                throw new InvalidOperationException($"PO Item '{dto.PurchaseOrderItemId}' not found.");
+//            GoodsReceiveItem currentItem;
+//            if (dto.Id != null && existingItems.TryGetValue(dto.Id, out var existing))
+//            {
+//                // ✅ Update existing
+//                existing.ReceivedQuantity = dto.ReceivedQuantity;
+//                existing.UnitPrice = dto.UnitPrice ?? 0;
+//                existing.TaxAmount = dto.TaxAmount ?? 0;
+//                existing.FreightChargesPerUnit = Math.Round(freightPerUnit, 2);
+//                existing.OtherChargesPerUnit = Math.Round(otherPerUnit, 2);
+//                existing.FinalUnitPrice = Math.Round((dto.UnitPrice ?? 0) + (dto.TaxAmount ?? 0) + freightPerUnit + otherPerUnit, 2);
+//                existing.MRP = dto.MRP ?? 0;
+//                existing.Notes = dto.Notes;
+//                existing.UpdatedById = request.UpdatedById;
+//                existing.UpdatedAtUtc = DateTime.Now;
+//                existing.Attribute1DetailId = dto.Attribute1DetailId;
+//                existing.Attribute2DetailId = dto.Attribute2DetailId;
+
+//                currentItem = existing;
+//            }
+//            else
+//            {
+//                // ✅ Add new
+//                var newItem = new GoodsReceiveItem
+//                {
+//                    GoodsReceiveId = entity.Id,
+//                    PurchaseOrderItemId = dto.PurchaseOrderItemId,
+//                    ReceivedQuantity = dto.ReceivedQuantity,
+//                    UnitPrice = dto.UnitPrice ?? 0,
+//                    TaxAmount = dto.TaxAmount ?? 0,
+//                    FreightChargesPerUnit = Math.Round(freightPerUnit, 2),
+//                    OtherChargesPerUnit = Math.Round(otherPerUnit, 2),
+//                    FinalUnitPrice = Math.Round((dto.UnitPrice ?? 0) + (dto.TaxAmount ?? 0) + freightPerUnit + otherPerUnit, 2),
+//                    MRP = dto.MRP ?? 0,
+//                    Notes = dto.Notes,
+//                    CreatedById = entity.CreatedById,
+//                    CreatedAtUtc = DateTime.Now,
+//                    IsDeleted = false,
+//                    Attribute1DetailId = dto.Attribute1DetailId,
+//                    Attribute2DetailId = dto.Attribute2DetailId
+
+//                };
+//                entity.GoodsReceiveItems.Add(newItem);
+//                await _goodsReceiveItemRepository.CreateAsync(newItem, cancellationToken);
+//                currentItem = newItem;
+//            }
+
+//            poItem.ReceivedQuantity += dto.ReceivedQuantity;
+
+//            // =========================================
+//            // ATTRIBUTE UPDATE (IMEI / Serial / Service)
+//            // =========================================
+
+//            // 1️⃣ Delete old records for this item id
+//            var oldDetails = await _goodsReceiveItemDetailsRepository.GetQuery()
+//                .Where(d => d.GoodsReceiveItemId == currentItem.Id)
+//                .ToListAsync(cancellationToken);
+
+//            foreach (var od in oldDetails)
+//                _goodsReceiveItemDetailsRepository.Delete(od);
+
+//            // ------------------------------
+//            // INSERT NEW DETAILS + CAPTURE IDs
+//            // ------------------------------
+//            List<GoodsReceiveItemDetails> newDetails = new();
+//            var product = await _productRepository.GetQuery()
+//                .FirstOrDefaultAsync(x => x.Id == poItem.ProductId, cancellationToken);
+//            if (product == null)
+//            {
+//                throw new InvalidOperationException("Product not found.");
+//            }
+
+
+
+//            foreach (var d in dto.Attributes)
+//            {
+//                if (product.ServiceNo && string.IsNullOrWhiteSpace(d.ServiceNo))
+//                    throw new InvalidOperationException("Service No is required.");
+
+//                if (product.Imei1 && string.IsNullOrWhiteSpace(d.IMEI1))
+//                    throw new InvalidOperationException("IMEI1 is required.");
+//                if (product.Imei1 && !Regex.IsMatch(d.IMEI1, @"^\d{15}$"))
+//                    throw new InvalidOperationException("IMEI1 must be 15 digits.");
+
+//                if (product.Imei2 && string.IsNullOrWhiteSpace(d.IMEI2))
+//                    throw new InvalidOperationException("IMEI2 is required.");
+//                if (product.Imei2 && !Regex.IsMatch(d.IMEI2, @"^\d{15}$"))
+//                    throw new InvalidOperationException("IMEI2 must be 15 digits.");
+
+//                var detail = new GoodsReceiveItemDetails
+//                {
+
+//                    GoodsReceiveItemId = currentItem.Id,
+//                    RowIndex = d.RowIndex,
+//                    IMEI1 = d.IMEI1,
+//                    IMEI2 = d.IMEI2,
+//                    ServiceNo = d.ServiceNo,
+//                    UpdatedById = request.UpdatedById,
+//                    UpdatedAtUtc = DateTime.UtcNow
+//                };
+
+//                await _goodsReceiveItemDetailsRepository.CreateAsync(detail, cancellationToken);
+
+//                // ⭐ capture inserted detail (with ID)
+//                newDetails.Add(detail);
+//            }
+
+//            // ⭐ Store all new detail IDs into dictionary for later use
+//            itemToDetailMap[currentItem.Id] = newDetails;
+
+
+//            // ---------------------------------------------------------
+//            // PRICE DEFINITION UPDATE LOGIC
+//            // ---------------------------------------------------------
+
+//            var productId = poItem.ProductId;
+//            double newUnitPrice = dto.UnitPrice ?? currentItem.UnitPrice;
+
+
+//            var existingPrice = await _productpriceDefRepository.GetQuery()
+//            .Where(p => p.ProductId == productId && p.IsActive && !p.IsDeleted)
+//            .OrderByDescending(p => p.EffectiveFrom)
+//            .FirstOrDefaultAsync(cancellationToken);
+//            // If NO price exists — create first one
+//            if (existingPrice == null)
+//            {
+//                var newPrice = new ProductPriceDefinition
+//                {
+//                    ProductId = productId,
+//                    ProductName = poItem.Product?.Name,
+//                    CostPrice = Convert.ToDecimal(newUnitPrice),
+//                    EffectiveFrom = _securityService.ConvertToIst(DateTime.UtcNow),
+//                    IsActive = true
+//                };
+
+
+//                await _productpriceDefRepository.CreateAsync(newPrice, cancellationToken);
+//                await _unitOfWork.SaveAsync(cancellationToken);
+//                continue;
+//            }
+
+
+//            double oldPrice = Convert.ToDouble(existingPrice.CostPrice);
+
+
+//            // Skip if same price
+//            if (Math.Round(oldPrice, 2) == Math.Round(newUnitPrice, 2))
+//                continue;
+
+
+//            // FETCH STOCK
+//            var stockResult = await _queryContext.InventoryTransaction
+//            .AsNoTracking()
+//            .ApplyIsDeletedFilter(false)
+//            .Where(x => x.Status == InventoryTransactionStatus.Confirmed &&
+//            x.WarehouseId == request.DefaultWarehouseId &&
+//            x.ProductId == productId)
+//            .GroupBy(x => x.ProductId)
+//            .Select(g => new
+//            {
+//                ProductId = g.Key,
+//                TotalStock = (double)(g.Sum(x => x.Stock) ?? 0)
+//            })
+//            .FirstOrDefaultAsync(cancellationToken);
+
+
+//            double stockQty = stockResult?.TotalStock ?? 0;
+
+
+//            // WEIGHTED AVERAGE
+//            double existingValue = stockQty * oldPrice;
+//            double receivedValue = dto.ReceivedQuantity * newUnitPrice;
+//            double weightedAvg = (existingValue + receivedValue) / (stockQty + dto.ReceivedQuantity);
+//            weightedAvg = Math.Round(weightedAvg, 2);
+
+
+//            // DEACTIVATE OLD
+//            existingPrice.IsActive = false;
+//            existingPrice.EffectiveTo = _securityService.ConvertToIst(DateTime.UtcNow);
+//            _productpriceDefRepository.Update(existingPrice);
+
+
+//            // CREATE NEW PRICE
+//            var newPriceDef = new ProductPriceDefinition
+//            {
+//                ProductId = productId,
+//                ProductName = existingPrice.ProductName,
+//                CostPrice = Convert.ToDecimal(weightedAvg),
+//                EffectiveFrom = _securityService.ConvertToIst(DateTime.UtcNow),
+//                IsActive = true,
+//                MarginPercentage = existingPrice.MarginPercentage,
+//                CurrencyCode = existingPrice.CurrencyCode
+//            };
+
+
+//            await _productpriceDefRepository.CreateAsync(newPriceDef, cancellationToken);
+//            await _unitOfWork.SaveAsync(cancellationToken);
+//        }
+
+
+//        // UPDATE PO
+//        po.OrderDate = _securityService.ConvertToIst(po.OrderDate);
+//        _purchaseOrderRepository.Update(po);
+//        await _unitOfWork.SaveAsync(cancellationToken);
+
+
+//        // ✅ Step 8: Recreate inventory transactions if Approved
+//        if (receiveStatus == GoodsReceiveStatus.Approved)
+//        {
+//            if (string.IsNullOrEmpty(request.DefaultWarehouseId))
+//                throw new InvalidOperationException("Default warehouse required for Approved status.");
+
+//            foreach (var item in entity.GoodsReceiveItems)
+//            {
+//                var poItem = poItemsById[item.PurchaseOrderItemId];
+//                if (poItem.Product?.Physical != true)
+//                    continue;
+
+//                var inventoryTx = await _inventoryTransactionService.GoodsReceiveCreateInvenTrans(
+//                                    entity.Id,
+//                                    request.DefaultWarehouseId,
+//                                    poItem.ProductId,
+//                                    item.ReceivedQuantity,
+//                                    request.UpdatedById!,
+//                                    cancellationToken);
+
+//                // ⭐ After inventory transaction is created → insert detail FK rows
+//                if (inventoryTx != null)
+//                {
+//                    // Get newly created GoodsReceiveItemDetails for this item
+//                    if (itemToDetailMap.TryGetValue(item.Id, out var details))
+//                    {
+//                        foreach (var det in details)
+//                        {
+//                            var invDetail = new InventoryTransactionAttributesDetails
+//                            {
+//                                InventoryTransactionId = inventoryTx.Id,  // FK
+//                                GoodsReceiveItemDetailsId = det.Id,       // FK
+//                                UpdatedById = request.UpdatedById,
+//                                UpdatedAtUtc = DateTime.UtcNow
+//                            };
+
+//                            await _inventoryTransactionAttributesDetailsRepository.CreateAsync(invDetail, cancellationToken);
+//                        }
+//                    }
+//                }
+
+//                //await _inventoryTransactionService.GoodsReceiveCreateInvenTrans(
+//                //    entity.Id,
+//                //    request.DefaultWarehouseId,
+//                //    poItem.ProductId,
+//                //    item.ReceivedQuantity,
+//                //    request.UpdatedById!,
+//                //    cancellationToken);
+//            }
+//        }
+
+//        // ✅ Step 9: Final save and propagate
+//        await _unitOfWork.SaveAsync(cancellationToken);
+
+
+//        return new UpdateGoodsReceiveResult { Data = entity };
+//    }
+////}

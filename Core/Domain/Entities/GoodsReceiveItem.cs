@@ -24,6 +24,8 @@ using Domain.Entities; // For InventoryTransaction
 
         public string? Notes { get; set; }               // Optional notes for partial receives or QC remarks
         public ICollection<GoodsReceiveItemDetails> Attributes { get; set; } = new List<GoodsReceiveItemDetails>();
+        public string? Attribute1DetailId { get; set; }
+        public string? Attribute2DetailId { get; set; }
 
     }
 }

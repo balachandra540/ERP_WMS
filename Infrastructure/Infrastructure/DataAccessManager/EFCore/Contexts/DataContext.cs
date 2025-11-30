@@ -66,6 +66,7 @@ public class DataContext : IdentityDbContext<ApplicationUser>, IEntityDbSet
     public DbSet<ProductVariant> ProductVariant { get; set; }
 
     public DbSet<GoodsReceiveItemDetails> GoodsReceiveItemDetails { get; set; }
+    public DbSet<InventoryTransactionAttributesDetails> InventoryTransactionAttributesDetails { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -126,6 +127,7 @@ public class DataContext : IdentityDbContext<ApplicationUser>, IEntityDbSet
         modelBuilder.ApplyConfiguration(new PurchaseOrderItemAttributeCombinationConfiguration());
         modelBuilder.ApplyConfiguration(new ProductPriceDefinitionConfiguration());
         modelBuilder.ApplyConfiguration(new GoodsReceiveItemDetailConfiguration());
+        modelBuilder.ApplyConfiguration(new InventoryTransactionAttributesDetailsConfiguration());
 
     }
 
