@@ -3195,65 +3195,7 @@ const App = {
                             },
                             allowEditing: false
                         },
-                        {
-                            field: 'attribute1DetailId',
-                            headerText: 'Attribute 1',
-                            width: 180,
-                            editType: 'dropdownedit',
-                            // Use the row's own list (fall back to empty)
-                            valueAccessor: (field, data) => {
-                                const list = data.attribute1List || [];
-                                const item = list.find(x => x.id === data[field]);
-                                return item ? item.value : '';
-                            },
-                            edit: {
-                                create: () => document.createElement('input'),
-                                read: () => attribute1Obj?.value,
-                                destroy: () => attribute1Obj?.destroy(),
-                                write: async (args) => {
-                                    // Ensure the row has attribute list loaded (product change should already have set this)
-                                    const dataList = args.rowData.attribute1List || [];
-
-                                    attribute1Obj = new ej.dropdowns.DropDownList({
-                                        dataSource: dataList,
-                                        fields: { value: 'id', text: 'value' },
-                                        value: args.rowData.attribute1DetailId,
-                                        placeholder: 'Select Attribute 1'
-                                    });
-
-                                    attribute1Obj.appendTo(args.element);
-                                }
-                            }
-                        },
-                        {
-                            field: 'attribute2DetailId',
-                            headerText: 'Attribute 2',
-                            width: 180,
-                            editType: 'dropdownedit',
-                            valueAccessor: (field, data) => {
-                                const list = data.attribute2List || [];
-                                const item = list.find(x => x.id === data[field]);
-                                return item ? item.value : '';
-                            },
-                            edit: {
-                                create: () => document.createElement('input'),
-                                read: () => attribute2Obj?.value,
-                                destroy: () => attribute2Obj?.destroy(),
-                                write: async (args) => {
-                                    const dataList = args.rowData.attribute2List || [];
-
-                                    attribute2Obj = new ej.dropdowns.DropDownList({
-                                        dataSource: dataList,
-                                        fields: { value: 'id', text: 'value' },
-                                        value: args.rowData.attribute2DetailId,
-                                        placeholder: 'Select Attribute 2'
-                                    });
-
-                                    attribute2Obj.appendTo(args.element);
-                                }
-                            }
-                        },
-
+                        
 
                         {
                             field: 'actualQuantity',
