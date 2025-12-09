@@ -1025,25 +1025,22 @@
                 mainGrid.obj.setProperties({ dataSource: state.mainData });
             }
         };     
-                
+
         const secondaryGrid = {
             obj: null,
-            productObj: null,
-            totalStockObj: null,
+
+            // 🔥 BATCH TRACKING
+            manualBatchChanges: {
+                addedRecords: [],
+                changedRecords: [],
+                deletedRecords: []
+            },
 
             create: async (dataSource) => {
-                const allowAdd = !dataSource || dataSource.length === 0;
-
                 secondaryGrid.obj = new ej.grids.Grid({
                     height: 400,
-                    dataSource: dataSource || [],
-                    editSettings: {
-                        allowEditing: true,
-                        allowAdding: allowAdd,
-                        allowDeleting: true,
-                        showDeleteConfirmDialog: false,
-                        mode: 'Batch'
-                    },
+                    dataSource: dataSource,
+                    editSettings: { allowEditing: true, allowAdding: true, allowDeleting: true, showDeleteConfirmDialog: true, mode: 'Normal', allowEditOnDblClick: true },
                     allowFiltering: false,
                     allowSorting: true,
                     allowSelection: true,
@@ -1053,21 +1050,21 @@
                     allowPaging: false,
                     allowExcelExport: true,
                     filterSettings: { type: 'CheckBox' },
-                    sortSettings: { columns: [{ field: 'productId', direction: 'Ascending' }] },
-                    pageSettings: { currentPage: 1, pageSize: 50 },
-                    selectionSettings: { persistSelection: true, type: 'Single', mode: 'Row' },
-                    gridLines: 'Horizontal',
-                    showColumnMenu: false,
+                    sortSettings: { columns: [{ field: 'productName', direction: 'Descending' }] },
+                    pageSettings: { currentPage: 1, pageSize: 50, pageSizes: ["10", "20", "50", "100", "200", "All"] },
+                    selectionSettings: { persistSelection: true, type: 'Single' },
                     autoFit: false,
+                    showColumnMenu: false,
+                    gridLines: 'Horizontal',
                     columns: [
                         { type: 'checkbox', width: 60 },
-                        { field: 'id', headerText: 'Id', isPrimaryKey: true, visible: false },
-                        
+                        {
+                            field: 'id', isPrimaryKey: true, headerText: 'Id', visible: false
+                        },
                         {
                             field: 'productId',
                             headerText: 'Product',
                             width: 250,
-                            allowEditing: true,
                             validationRules: { required: true },
                             disableHtmlEncode: false,
                             valueAccessor: (field, data, column) => {
@@ -1081,301 +1078,543 @@
                                     return productElem;
                                 },
                                 read: () => {
-                                    return secondaryGrid.productObj?.value || null;
+                                    return productObj.value;
                                 },
                                 destroy: function () {
-                                    if (secondaryGrid.productObj) {
-                                        secondaryGrid.productObj.destroy();
-                                        secondaryGrid.productObj = null;
-                                    }
+                                    productObj.destroy();
                                 },
                                 write: function (args) {
-                                    const currentDataSource = secondaryGrid.obj?.dataSource || [];
-                                    const isAddMode = currentDataSource.length === 0;
-                                    const productDataSource = isAddMode && state.availableProducts?.length > 0
-                                        ? state.availableProducts
-                                        : state.productListLookupData || [];
-
-                                    console.log('Creating dropdown with data source:', productDataSource.length, 'items');
-
-                                    secondaryGrid.productObj = new ej.dropdowns.DropDownList({
-                                        dataSource: productDataSource,
+                                    productObj = new ej.dropdowns.DropDownList({
+                                        dataSource: state.productListLookupData,
                                         fields: { value: 'id', text: 'numberName' },
                                         value: args.rowData.productId,
                                         change: function (e) {
-                                            const productId = e.value;
-                                            console.log('Product changed:', productId);
-
-                                            if (productId) {
-                                                const stock = methods.getProductStock?.(productId) || 0;
-                                                console.log('Retrieved stock:', stock);
-
-                                                // Update rowData directly
-                                                args.rowData.productId = productId;
-                                                args.rowData.totalStock = stock;
-                                                args.rowData.requestStock = 0;
-
-                                                // Find the row element and update the NEXT td (totalStock column)
-                                                const rowElement = args.row;
-                                                const cellElements = rowElement.querySelectorAll('td');
-                                                const tr = e.element.closest('tr.e-row');
-                                                if (tr) {
-                                                    const rowInfo = secondaryGrid.obj.getRowInfo(tr);
-                                                    const rowIndex = rowInfo.rowIndex;
-                                                    const totalStock = methods.getProductStock(e.value);
-                                                    secondaryGrid.obj.updateCell(rowIndex, 'totalStock', totalStock);
-                                                }
-
-                                                // Update cellElements[3] which is the Total Stock column
-                                                if (cellElements.length > 3) {
-
-                                                    cellElements[3].innerText = parseFloat(stock).toFixed(2);
-                                                }
-
-                                                console.log('Updated total stock:', stock);
-                                            } else {
-                                                args.rowData.productId = null;
-                                                args.rowData.totalStock = 0;
-                                                args.rowData.requestStock = 0;
-
-                                                const rowElement = args.row;
-                                                const cellElements = rowElement.querySelectorAll('td');
-
-                                                if (cellElements.length > 3) {
-                                                    cellElements[3].innerText = '0.00';
-                                                }
+                                            if (movementObj) {
+                                                movementObj.value = 1;
                                             }
                                         },
                                         placeholder: 'Select a Product',
                                         floatLabelType: 'Never'
                                     });
-                                    secondaryGrid.productObj.appendTo(args.element);
-                                }
-                            }
-                        },
-
-                        {
-                            field: 'totalStock',
-                            headerText: 'Total Stock',
-                            width: 150,
-                            textAlign: 'Right',
-                            type: 'number',
-                            format: 'N2',
-                            allowEditing: false,
-                            valueAccessor: (field, data) => {
-                                const value = data[field];
-                                if (value === null || value === undefined) return '0.00';
-                                return parseFloat(value).toFixed(2);
-                            },
-                            editType: 'numericedit',
-                            edit: {
-                                create: () => {
-                                    const totalStockElem = document.createElement('input');
-                                    return totalStockElem;
-                                },
-                                read: () => {
-                                    return secondaryGrid.totalStockObj?.value || 0;
-                                },
-                                destroy: function () {
-                                    if (secondaryGrid.totalStockObj) {
-                                        secondaryGrid.totalStockObj.destroy();
-                                        secondaryGrid.totalStockObj = null;
-                                    }
-                                },
-                                write: function (args) {
-                                    secondaryGrid.totalStockObj = new ej.inputs.NumericTextBox({
-                                        value: args.rowData.totalStock || 0,
-                                        format: 'N2',
-                                        decimals: 2,
-                                        enabled: false, // Make it read-only since it's auto-calculated
-                                        placeholder: '0.00',
-                                        floatLabelType: 'Never'
-                                    });
-                                    secondaryGrid.totalStockObj.appendTo(args.element);
+                                    productObj.appendTo(args.element);
                                 }
                             }
                         },
                         {
-                            field: 'requestStock',
-                            headerText: 'Request Stock',
-                            width: 180,
-                            textAlign: 'Right',
-                            type: 'number',
-                            format: 'N2',
-                            editType: 'numericedit',
+                            field: 'movement',
+                            headerText: 'Movement',
+                            width: 200,
                             validationRules: {
                                 required: true,
-                                min: 0,
-                                custom: [
-                                    (args) => {
-                                        debugger
-                                        // Fix: Access row data dynamically in batch mode
-                                       const rowIndex = args.element.closest('.e-row').rowIndex;
-                                       const rowObject = secondaryGrid.obj.getRowsObject()[rowIndex];
-                                       const rowBatchData = rowObject.changes ?? rowObject.data;
-                                       return args['value'] <= (rowBatchData.totalStock || 0);                                                                   
-                                        
-                                    },
-                                    'Request Stock cannot be greater than Total Stock'
-                                ]
+                                custom: [(args) => {
+                                    return args['value'] > 0;
+                                }, 'Must be a positive number and not zero']
                             },
+                            type: 'number', format: 'N2', textAlign: 'Right',
                             edit: {
-                                params: {
-                                    decimals: 2,
-                                    min: 0,
-                                    step: 0.01,
-                                    validateDecimalOnType: true,
-                                    showSpinButton: true
+                                create: () => {
+                                    const movementElem = document.createElement('input');
+                                    return movementElem;
+                                },
+                                read: () => {
+                                    return movementObj.value;
+                                },
+                                destroy: function () {
+                                    movementObj.destroy();
+                                },
+                                write: function (args) {
+                                    movementObj = new ej.inputs.NumericTextBox({
+                                        value: args.rowData.movement ?? 0,
+                                    });
+                                    movementObj.appendTo(args.element);
                                 }
                             }
-                        }
+                        },
                     ],
-                    toolbar: allowAdd ? [
-                        'Add',
-                        { type: 'Separator' },
+                    toolbar: [
                         'ExcelExport',
                         { type: 'Separator' },
-                        { text: 'Delete', tooltipText: 'Delete', prefixIcon: 'e-delete', id: 'DeleteCustom' }
-                    ] : [
-                        'ExcelExport',
-                        { type: 'Separator' },
-                        { text: 'Delete', tooltipText: 'Delete', prefixIcon: 'e-delete', id: 'DeleteCustom' }
+                        'Add', 'Edit', 'Delete', 'Update', 'Cancel',
                     ],
-                    dataBound: () => {
-                        if (secondaryGrid.obj?.toolbarModule) {
-                            secondaryGrid.obj.toolbarModule.enableItems(['DeleteCustom'], false);
-                            if (allowAdd) {
-                                secondaryGrid.obj.toolbarModule.enableItems(['SecondaryGrid_add'], true);
-                            }
-                        }
-                    },
+                    beforeDataBound: () => { },
+                    dataBound: function () { },
+                    excelExportComplete: () => { },
                     rowSelected: () => {
-                        if (secondaryGrid.obj?.toolbarModule) {
-                            const hasSelection = secondaryGrid.obj.getSelectedRecords().length === 1;
-                            secondaryGrid.obj.toolbarModule.enableItems(['DeleteCustom'], hasSelection);
+                        if (secondaryGrid.obj.getSelectedRecords().length == 1) {
+                            secondaryGrid.obj.toolbarModule.enableItems(['Edit'], true);
+                        } else {
+                            secondaryGrid.obj.toolbarModule.enableItems(['Edit'], false);
                         }
                     },
                     rowDeselected: () => {
-                        if (secondaryGrid.obj?.toolbarModule) {
-                            secondaryGrid.obj.toolbarModule.enableItems(['DeleteCustom'], false);
+                        if (secondaryGrid.obj.getSelectedRecords().length == 1) {
+                            secondaryGrid.obj.toolbarModule.enableItems(['Edit'], true);
+                        } else {
+                            secondaryGrid.obj.toolbarModule.enableItems(['Edit'], false);
                         }
                     },
-                    rowSelecting: (args) => { },
+                    rowSelecting: () => {
+                        if (secondaryGrid.obj.getSelectedRecords().length) {
+                            secondaryGrid.obj.clearSelection();
+                        }
+                    },
                     toolbarClick: (args) => {
-                        if (!args?.item) return;
-
                         if (args.item.id === 'SecondaryGrid_excelexport') {
-                            secondaryGrid.obj?.excelExport();
-                        }
-                        if (args.item.id === 'DeleteCustom') {
-                            const selected = secondaryGrid.obj?.getSelectedRecords()[0];
-                            if (selected) {
-                                state.deletedItems = state.deletedItems || [];
-                                state.deletedItems.push(selected);
-                                secondaryGrid.obj?.deleteRecord();
-                                methods.refreshSummary?.();
-                            }
+                            secondaryGrid.obj.excelExport();
                         }
                     },
-                    actionBegin: (args) => {
-                        if (args.requestType === 'add') {
-                            args.rowData = {
-                                id: 'temp_' + Date.now(),
-                                productId: null,
-                                totalStock: 0,
-                                requestStock: 0
-                            };
-                        }
-                    },
-                    actionComplete: (args) => {
-                        if (args.requestType === 'save' || args.requestType === 'delete') {
-                            methods.refreshSummary?.();
+
+                    // 🔥 ONLY TRACK CHANGES - NO API CALLS
+                    actionComplete: async (args) => {
+
+                        // ============================================
+                        // 🔥 ROW ADDED
+                        // ============================================
+                        if (args.requestType === 'save' && args.action === 'add') {
+                            // Track in batch
+                            secondaryGrid.manualBatchChanges.addedRecords.push(args.data);
+                            console.log('✅ Row Added to Batch:', args.data);
+                            console.log('📋 Current Batch:', secondaryGrid.manualBatchChanges);
+
+                            //Swal.fire({
+                            //    icon: 'success',
+                            //    title: 'Row Added',
+                            //    text: 'Changes will be saved when you submit the form',
+                            //    timer: 2000,
+                            //    showConfirmButton: false
+                            //});
                         }
 
-                        if (args.requestType === 'save') {
-                            setTimeout(() => {
-                                secondaryGrid.obj?.refresh();
-                            }, 100);
-                        }
-                    },
-                    cellSave: (args) => {
-                        if (args.column.field === 'requestStock') {
-                            const rowData = args.rowData || {};
-                            const totalStock = parseFloat(rowData.totalStock) || 0;
-                            const requestStock = parseFloat(args.value) || 0;
-
-                            if (requestStock > totalStock) {
-                                args.cancel = true;
-                                alert('Request Stock cannot exceed Total Stock');
+                        // ============================================
+                        // 🔥 ROW EDITED
+                        // ============================================
+                        if (args.requestType === 'save' && args.action === 'edit') {
+                            // Track in batch (update if exists, else add)
+                            const index = secondaryGrid.manualBatchChanges.changedRecords.findIndex(
+                                r => r.id === args.data?.id
+                            );
+                            if (index > -1) {
+                                secondaryGrid.manualBatchChanges.changedRecords[index] = args.data;
+                            } else {
+                                secondaryGrid.manualBatchChanges.changedRecords.push(args.data);
                             }
+                            console.log('🔄 Row Modified in Batch:', args.data);
+                            console.log('📋 Current Batch:', secondaryGrid.manualBatchChanges);
+
+                            //Swal.fire({
+                            //    icon: 'success',
+                            //    title: 'Row Updated',
+                            //    text: 'Changes will be saved when you submit the form',
+                            //    timer: 2000,
+                            //    showConfirmButton: false
+                            //});
                         }
+
+                        // ============================================
+                        // 🔥 ROW DELETED
+                        // ============================================
+                        if (args.requestType === 'delete') {
+                            // Track in batch
+                            secondaryGrid.manualBatchChanges.deletedRecords.push(args.data[0]);
+                            console.log('❌ Row Deleted from Batch:', args.data[0]);
+                            console.log('📋 Current Batch:', secondaryGrid.manualBatchChanges);
+
+                            //Swal.fire({
+                            //    icon: 'success',
+                            //    title: 'Row Deleted',
+                            //    text: 'Changes will be saved when you submit the form',
+                            //    timer: 2000,
+                            //    showConfirmButton: false
+                            //});
+                        }
+
+                        methods.refreshSummary();
                     }
                 });
-
-                if (secondaryGridRef.value) {
-                    secondaryGrid.obj.appendTo(secondaryGridRef.value);
-                }
+                secondaryGrid.obj.appendTo(secondaryGridRef.value);
             },
 
-            refresh: (dataSource) => {
-                const allowAdd = !dataSource || dataSource.length === 0;
-
-                if (secondaryGrid.obj) {
-                    secondaryGrid.obj.setProperties({
-                        dataSource: dataSource || [],
-                        editSettings: {
-                            ...secondaryGrid.obj.editSettings,
-                            allowAdding: allowAdd
-                        }
-                    });
-
-                    secondaryGrid.obj.toolbar = allowAdd ? [
-                        'Add',
-                        { type: 'Separator' },
-                        'ExcelExport',
-                        { type: 'Separator' },
-                        { text: 'Delete', tooltipText: 'Delete', prefixIcon: 'e-delete', id: 'DeleteCustom' }
-                    ] : [
-                        'ExcelExport',
-                        { type: 'Separator' },
-                        { text: 'Delete', tooltipText: 'Delete', prefixIcon: 'e-delete', id: 'DeleteCustom' }
-                    ];
-
-                    secondaryGrid.obj.dataBind();
-                    secondaryGrid.obj.refresh();
-                }
+            // 🔥 GET ALL BATCH CHANGES
+            getBatchChanges: () => {
+                return secondaryGrid.manualBatchChanges;
             },
 
-            // Method to update total stock externally if needed
-            updateTotalStock: (productId, stock) => {
-                if (secondaryGrid.totalStockObj) {
-                    secondaryGrid.totalStockObj.value = stock;
-                }
-
-                // Also update any selected row data
-                const selectedRecords = secondaryGrid.obj?.getSelectedRecords();
-                if (selectedRecords && selectedRecords.length > 0) {
-                    const selectedRecord = selectedRecords[0];
-                    selectedRecord.totalStock = stock;
-                    secondaryGrid.obj?.refresh();
-                }
+            // 🔥 CLEAR BATCH CHANGES (after form submit)
+            clearBatchChanges: () => {
+                secondaryGrid.manualBatchChanges = {
+                    addedRecords: [],
+                    changedRecords: [],
+                    deletedRecords: []
+                };
+                console.log('✅ Batch changes cleared');
             },
 
-            destroy: () => {
-                if (secondaryGrid.productObj) {
-                    secondaryGrid.productObj.destroy();
-                    secondaryGrid.productObj = null;
-                }
-                if (secondaryGrid.totalStockObj) {
-                    secondaryGrid.totalStockObj.destroy();
-                    secondaryGrid.totalStockObj = null;
-                }
-                if (secondaryGrid.obj && !secondaryGrid.obj.isDestroyed) {
-                    secondaryGrid.obj.destroy();
-                    secondaryGrid.obj = null;
-                }
+            // 🔥 GET BATCH SUMMARY
+            getBatchSummary: () => {
+                return {
+                    totalAdded: secondaryGrid.manualBatchChanges.addedRecords.length,
+                    totalChanged: secondaryGrid.manualBatchChanges.changedRecords.length,
+                    totalDeleted: secondaryGrid.manualBatchChanges.deletedRecords.length,
+                    grandTotal: secondaryGrid.manualBatchChanges.addedRecords.length +
+                        secondaryGrid.manualBatchChanges.changedRecords.length +
+                        secondaryGrid.manualBatchChanges.deletedRecords.length
+                };
+            },
+
+            refresh: () => {
+                secondaryGrid.obj.setProperties({ dataSource: state.secondaryData });
             }
         };
+        //const secondaryGrid = {
+        //    obj: null,
+        //    productObj: null,
+        //    totalStockObj: null,
+
+        //    create: async (dataSource) => {
+        //        const allowAdd = !dataSource || dataSource.length === 0;
+
+        //        secondaryGrid.obj = new ej.grids.Grid({
+        //            height: 400,
+        //            dataSource: dataSource || [],
+        //            editSettings: {
+        //                allowEditing: true,
+        //                allowAdding: allowAdd,
+        //                allowDeleting: true,
+        //                showDeleteConfirmDialog: false,
+        //                mode: 'Batch'
+        //            },
+        //            allowFiltering: false,
+        //            allowSorting: true,
+        //            allowSelection: true,
+        //            allowGrouping: false,
+        //            allowTextWrap: true,
+        //            allowResizing: true,
+        //            allowPaging: false,
+        //            allowExcelExport: true,
+        //            filterSettings: { type: 'CheckBox' },
+        //            sortSettings: { columns: [{ field: 'productId', direction: 'Ascending' }] },
+        //            pageSettings: { currentPage: 1, pageSize: 50 },
+        //            selectionSettings: { persistSelection: true, type: 'Single', mode: 'Row' },
+        //            gridLines: 'Horizontal',
+        //            showColumnMenu: false,
+        //            autoFit: false,
+        //            columns: [
+        //                { type: 'checkbox', width: 60 },
+        //                { field: 'id', headerText: 'Id', isPrimaryKey: true, visible: false },
+                        
+        //                {
+        //                    field: 'productId',
+        //                    headerText: 'Product',
+        //                    width: 250,
+        //                    allowEditing: true,
+        //                    validationRules: { required: true },
+        //                    disableHtmlEncode: false,
+        //                    valueAccessor: (field, data, column) => {
+        //                        const product = state.productListLookupData.find(item => item.id === data[field]);
+        //                        return product ? `${product.numberName}` : '';
+        //                    },
+        //                    editType: 'dropdownedit',
+        //                    edit: {
+        //                        create: () => {
+        //                            const productElem = document.createElement('input');
+        //                            return productElem;
+        //                        },
+        //                        read: () => {
+        //                            return secondaryGrid.productObj?.value || null;
+        //                        },
+        //                        destroy: function () {
+        //                            if (secondaryGrid.productObj) {
+        //                                secondaryGrid.productObj.destroy();
+        //                                secondaryGrid.productObj = null;
+        //                            }
+        //                        },
+        //                        write: function (args) {
+        //                            const currentDataSource = secondaryGrid.obj?.dataSource || [];
+        //                            const isAddMode = currentDataSource.length === 0;
+        //                            const productDataSource = isAddMode && state.availableProducts?.length > 0
+        //                                ? state.availableProducts
+        //                                : state.productListLookupData || [];
+
+        //                            console.log('Creating dropdown with data source:', productDataSource.length, 'items');
+
+        //                            secondaryGrid.productObj = new ej.dropdowns.DropDownList({
+        //                                dataSource: productDataSource,
+        //                                fields: { value: 'id', text: 'numberName' },
+        //                                value: args.rowData.productId,
+        //                                change: function (e) {
+        //                                    const productId = e.value;
+        //                                    console.log('Product changed:', productId);
+
+        //                                    if (productId) {
+        //                                        const stock = methods.getProductStock?.(productId) || 0;
+        //                                        console.log('Retrieved stock:', stock);
+
+        //                                        // Update rowData directly
+        //                                        args.rowData.productId = productId;
+        //                                        args.rowData.totalStock = stock;
+        //                                        args.rowData.requestStock = 0;
+
+        //                                        // Find the row element and update the NEXT td (totalStock column)
+        //                                        const rowElement = args.row;
+        //                                        const cellElements = rowElement.querySelectorAll('td');
+        //                                        const tr = e.element.closest('tr.e-row');
+        //                                        if (tr) {
+        //                                            const rowInfo = secondaryGrid.obj.getRowInfo(tr);
+        //                                            const rowIndex = rowInfo.rowIndex;
+        //                                            const totalStock = methods.getProductStock(e.value);
+        //                                            secondaryGrid.obj.updateCell(rowIndex, 'totalStock', totalStock);
+        //                                        }
+
+        //                                        // Update cellElements[3] which is the Total Stock column
+        //                                        if (cellElements.length > 3) {
+
+        //                                            cellElements[3].innerText = parseFloat(stock).toFixed(2);
+        //                                        }
+
+        //                                        console.log('Updated total stock:', stock);
+        //                                    } else {
+        //                                        args.rowData.productId = null;
+        //                                        args.rowData.totalStock = 0;
+        //                                        args.rowData.requestStock = 0;
+
+        //                                        const rowElement = args.row;
+        //                                        const cellElements = rowElement.querySelectorAll('td');
+
+        //                                        if (cellElements.length > 3) {
+        //                                            cellElements[3].innerText = '0.00';
+        //                                        }
+        //                                    }
+        //                                },
+        //                                placeholder: 'Select a Product',
+        //                                floatLabelType: 'Never'
+        //                            });
+        //                            secondaryGrid.productObj.appendTo(args.element);
+        //                        }
+        //                    }
+        //                },
+
+        //                {
+        //                    field: 'totalStock',
+        //                    headerText: 'Total Stock',
+        //                    width: 150,
+        //                    textAlign: 'Right',
+        //                    type: 'number',
+        //                    format: 'N2',
+        //                    allowEditing: false,
+        //                    valueAccessor: (field, data) => {
+        //                        const value = data[field];
+        //                        if (value === null || value === undefined) return '0.00';
+        //                        return parseFloat(value).toFixed(2);
+        //                    },
+        //                    editType: 'numericedit',
+        //                    edit: {
+        //                        create: () => {
+        //                            const totalStockElem = document.createElement('input');
+        //                            return totalStockElem;
+        //                        },
+        //                        read: () => {
+        //                            return secondaryGrid.totalStockObj?.value || 0;
+        //                        },
+        //                        destroy: function () {
+        //                            if (secondaryGrid.totalStockObj) {
+        //                                secondaryGrid.totalStockObj.destroy();
+        //                                secondaryGrid.totalStockObj = null;
+        //                            }
+        //                        },
+        //                        write: function (args) {
+        //                            secondaryGrid.totalStockObj = new ej.inputs.NumericTextBox({
+        //                                value: args.rowData.totalStock || 0,
+        //                                format: 'N2',
+        //                                decimals: 2,
+        //                                enabled: false, // Make it read-only since it's auto-calculated
+        //                                placeholder: '0.00',
+        //                                floatLabelType: 'Never'
+        //                            });
+        //                            secondaryGrid.totalStockObj.appendTo(args.element);
+        //                        }
+        //                    }
+        //                },
+        //                {
+        //                    field: 'requestStock',
+        //                    headerText: 'Request Stock',
+        //                    width: 180,
+        //                    textAlign: 'Right',
+        //                    type: 'number',
+        //                    format: 'N2',
+        //                    editType: 'numericedit',
+        //                    validationRules: {
+        //                        required: true,
+        //                        min: 0,
+        //                        custom: [
+        //                            (args) => {
+        //                                debugger
+        //                                // Fix: Access row data dynamically in batch mode
+        //                               const rowIndex = args.element.closest('.e-row').rowIndex;
+        //                               const rowObject = secondaryGrid.obj.getRowsObject()[rowIndex];
+        //                               const rowBatchData = rowObject.changes ?? rowObject.data;
+        //                               return args['value'] <= (rowBatchData.totalStock || 0);                                                                   
+                                        
+        //                            },
+        //                            'Request Stock cannot be greater than Total Stock'
+        //                        ]
+        //                    },
+        //                    edit: {
+        //                        params: {
+        //                            decimals: 2,
+        //                            min: 0,
+        //                            step: 0.01,
+        //                            validateDecimalOnType: true,
+        //                            showSpinButton: true
+        //                        }
+        //                    }
+        //                }
+        //            ],
+        //            toolbar: allowAdd ? [
+        //                'Add',
+        //                { type: 'Separator' },
+        //                'ExcelExport',
+        //                { type: 'Separator' },
+        //                { text: 'Delete', tooltipText: 'Delete', prefixIcon: 'e-delete', id: 'DeleteCustom' }
+        //            ] : [
+        //                'ExcelExport',
+        //                { type: 'Separator' },
+        //                { text: 'Delete', tooltipText: 'Delete', prefixIcon: 'e-delete', id: 'DeleteCustom' }
+        //            ],
+        //            dataBound: () => {
+        //                if (secondaryGrid.obj?.toolbarModule) {
+        //                    secondaryGrid.obj.toolbarModule.enableItems(['DeleteCustom'], false);
+        //                    if (allowAdd) {
+        //                        secondaryGrid.obj.toolbarModule.enableItems(['SecondaryGrid_add'], true);
+        //                    }
+        //                }
+        //            },
+        //            rowSelected: () => {
+        //                if (secondaryGrid.obj?.toolbarModule) {
+        //                    const hasSelection = secondaryGrid.obj.getSelectedRecords().length === 1;
+        //                    secondaryGrid.obj.toolbarModule.enableItems(['DeleteCustom'], hasSelection);
+        //                }
+        //            },
+        //            rowDeselected: () => {
+        //                if (secondaryGrid.obj?.toolbarModule) {
+        //                    secondaryGrid.obj.toolbarModule.enableItems(['DeleteCustom'], false);
+        //                }
+        //            },
+        //            rowSelecting: (args) => { },
+        //            toolbarClick: (args) => {
+        //                if (!args?.item) return;
+
+        //                if (args.item.id === 'SecondaryGrid_excelexport') {
+        //                    secondaryGrid.obj?.excelExport();
+        //                }
+        //                if (args.item.id === 'DeleteCustom') {
+        //                    const selected = secondaryGrid.obj?.getSelectedRecords()[0];
+        //                    if (selected) {
+        //                        state.deletedItems = state.deletedItems || [];
+        //                        state.deletedItems.push(selected);
+        //                        secondaryGrid.obj?.deleteRecord();
+        //                        methods.refreshSummary?.();
+        //                    }
+        //                }
+        //            },
+        //            actionBegin: (args) => {
+        //                if (args.requestType === 'add') {
+        //                    args.rowData = {
+        //                        id: 'temp_' + Date.now(),
+        //                        productId: null,
+        //                        totalStock: 0,
+        //                        requestStock: 0
+        //                    };
+        //                }
+        //            },
+        //            actionComplete: (args) => {
+        //                if (args.requestType === 'save' || args.requestType === 'delete') {
+        //                    methods.refreshSummary?.();
+        //                }
+
+        //                if (args.requestType === 'save') {
+        //                    setTimeout(() => {
+        //                        secondaryGrid.obj?.refresh();
+        //                    }, 100);
+        //                }
+        //            },
+        //            cellSave: (args) => {
+        //                if (args.column.field === 'requestStock') {
+        //                    const rowData = args.rowData || {};
+        //                    const totalStock = parseFloat(rowData.totalStock) || 0;
+        //                    const requestStock = parseFloat(args.value) || 0;
+
+        //                    if (requestStock > totalStock) {
+        //                        args.cancel = true;
+        //                        alert('Request Stock cannot exceed Total Stock');
+        //                    }
+        //                }
+        //            }
+        //        });
+
+        //        if (secondaryGridRef.value) {
+        //            secondaryGrid.obj.appendTo(secondaryGridRef.value);
+        //        }
+        //    },
+
+        //    refresh: (dataSource) => {
+        //        const allowAdd = !dataSource || dataSource.length === 0;
+
+        //        if (secondaryGrid.obj) {
+        //            secondaryGrid.obj.setProperties({
+        //                dataSource: dataSource || [],
+        //                editSettings: {
+        //                    ...secondaryGrid.obj.editSettings,
+        //                    allowAdding: allowAdd
+        //                }
+        //            });
+
+        //            secondaryGrid.obj.toolbar = allowAdd ? [
+        //                'Add',
+        //                { type: 'Separator' },
+        //                'ExcelExport',
+        //                { type: 'Separator' },
+        //                { text: 'Delete', tooltipText: 'Delete', prefixIcon: 'e-delete', id: 'DeleteCustom' }
+        //            ] : [
+        //                'ExcelExport',
+        //                { type: 'Separator' },
+        //                { text: 'Delete', tooltipText: 'Delete', prefixIcon: 'e-delete', id: 'DeleteCustom' }
+        //            ];
+
+        //            secondaryGrid.obj.dataBind();
+        //            secondaryGrid.obj.refresh();
+        //        }
+        //    },
+
+        //    // Method to update total stock externally if needed
+        //    updateTotalStock: (productId, stock) => {
+        //        if (secondaryGrid.totalStockObj) {
+        //            secondaryGrid.totalStockObj.value = stock;
+        //        }
+
+        //        // Also update any selected row data
+        //        const selectedRecords = secondaryGrid.obj?.getSelectedRecords();
+        //        if (selectedRecords && selectedRecords.length > 0) {
+        //            const selectedRecord = selectedRecords[0];
+        //            selectedRecord.totalStock = stock;
+        //            secondaryGrid.obj?.refresh();
+        //        }
+        //    },
+
+        //    destroy: () => {
+        //        if (secondaryGrid.productObj) {
+        //            secondaryGrid.productObj.destroy();
+        //            secondaryGrid.productObj = null;
+        //        }
+        //        if (secondaryGrid.totalStockObj) {
+        //            secondaryGrid.totalStockObj.destroy();
+        //            secondaryGrid.totalStockObj = null;
+        //        }
+        //        if (secondaryGrid.obj && !secondaryGrid.obj.isDestroyed) {
+        //            secondaryGrid.obj.destroy();
+        //            secondaryGrid.obj = null;
+        //        }
+        //    }
+        //};
         const mainModal = {
             obj: null,
             create: () => {

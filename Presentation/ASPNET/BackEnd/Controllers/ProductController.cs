@@ -186,6 +186,23 @@ public class ProductController : BaseApiController
         });
     }
 
+    [Authorize]
+    [HttpGet("GetProductIdByPLU")]
+    public async Task<ActionResult<ApiSuccessResult<GetProductIdByPLUResult>>> GetProductIdByPLUAsync(
+    [FromQuery] int plu,
+    CancellationToken cancellationToken)
+    {
+        var request = new GetProductIdByPLURequest(plu);
+
+        var response = await _sender.Send(request, cancellationToken);
+
+        return Ok(new ApiSuccessResult<GetProductIdByPLUResult>
+        {
+            Code = StatusCodes.Status200OK,
+            Message = $"Success executing {nameof(GetProductIdByPLUAsync)}",
+            Content = response
+        });
+    }
 
 }
 

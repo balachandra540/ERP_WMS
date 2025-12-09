@@ -41,7 +41,7 @@ public class GetSalesDashboardHandler : IRequestHandler<GetSalesDashboardRequest
             .ApplyIsDeletedFilter(false)
             .Include(x => x.SalesOrder)
             .Include(x => x.Product)
-            .Where(x => x.SalesOrder!.OrderStatus == SalesOrderStatus.Confirmed)
+            .Where(x => x.SalesOrder!.OrderStatus == SalesOrderStatus.Approved)
             .OrderByDescending(x => x.SalesOrder!.OrderDate)
             .Take(30)
             .ToListAsync(cancellationToken);

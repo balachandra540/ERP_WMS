@@ -46,7 +46,7 @@ public class DeliveryOrderSeeder
 
         var salesOrders = await _salesOrderRepository
             .GetQuery()
-            .Where(x => x.OrderStatus >= SalesOrderStatus.Confirmed)
+            .Where(x => x.OrderStatus >= SalesOrderStatus.Approved)
             .ToListAsync();
 
         var warehouses = await _warehouseRepository

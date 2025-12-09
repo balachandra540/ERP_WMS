@@ -17,6 +17,10 @@ public class SalesOrderItemConfiguration : BaseEntityConfiguration<SalesOrderIte
         builder.Property(x => x.UnitPrice).IsRequired(false);
         builder.Property(x => x.Quantity).IsRequired(false);
         builder.Property(x => x.Total).IsRequired(false);
+        // ⭐ NEW: PLU Code field mapping
+        builder.Property(x => x.PluCode)
+       .IsRequired(false);
+
 
     }
 }

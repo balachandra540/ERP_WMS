@@ -1096,29 +1096,106 @@ const App = {
 
         // Validation Functions
         const validateForm = function () {
+            // Reset errors
             state.errors.orderDate = '';
-            state.errors.customerId = '';
-            state.errors.taxId = '';
+            state.errors.vendorId = '';
             state.errors.orderStatus = '';
+            state.errors.gridItems = [];
 
             let isValid = true;
 
+            // --- FORM FIELD VALIDATION ---
             if (!state.orderDate) {
                 state.errors.orderDate = 'Order date is required.';
                 isValid = false;
             }
             if (!state.customerId) {
-                state.errors.customerId = 'Customer is required.';
-                isValid = false;
-            }
-            if (!state.taxId) {
-                state.errors.taxId = 'Tax is required.';
+                state.errors.customerId = 'customer is required.';
                 isValid = false;
             }
             if (!state.orderStatus) {
                 state.errors.orderStatus = 'Order status is required.';
                 isValid = false;
             }
+
+            // --- READ GRID CHANGES ---
+            const batchChanges = secondaryGrid.getBatchChanges();
+
+            console.log('Validation - Batch Changes:', batchChanges);
+
+            // Build working dataset
+            let currentSecondaryData = state.id !== ""
+                ? [...state.secondaryData]
+                : [];
+
+            const addedRecords = batchChanges.addedRecords || [];
+            const changedRecords = batchChanges.changedRecords || [];
+            const deletedRecords = batchChanges.deletedRecords || [];
+
+            // Match function for row identification
+            const matchRecord = (a, b) => {
+                if (a.id && b.id) return a.id === b.id;
+                if (a.purchaseOrderItemId && b.purchaseOrderItemId)
+                    return a.purchaseOrderItemId === b.purchaseOrderItemId;
+                return false;
+            };
+
+            // --- APPLY CHANGED RECORDS ---
+            for (let changed of changedRecords) {
+                const index = currentSecondaryData.findIndex(item => matchRecord(item, changed));
+                if (index !== -1) {
+                    currentSecondaryData[index] = { ...currentSecondaryData[index], ...changed };
+                } else {
+                    currentSecondaryData.push(changed); // edited but wasn't in initial → add
+                }
+            }
+
+            // --- APPLY DELETED RECORDS ---
+            if (deletedRecords.length > 0) {
+                currentSecondaryData = currentSecondaryData.filter(item =>
+                    !deletedRecords.some(del => matchRecord(item, del))
+                );
+            }
+
+            // --- APPLY ADDED RECORDS ---
+            currentSecondaryData.push(...addedRecords);
+
+            console.log("Final data for validation:", currentSecondaryData);
+
+            // --- NO ITEMS IN GRID ---
+            if (currentSecondaryData.length === 0) {
+                state.errors.gridItems.push('At least one item must be added to the order.');
+                isValid = false;
+            }
+
+            // --- ROW VALIDATION (only your allowed fields) ---
+            currentSecondaryData.forEach((record, index) => {
+
+                if (!record.pluCode || record.pluCode.length < 5) {
+                    state.errors.gridItems.push(`Row ${index + 1}: PLU code must be at least 5 characters.`);
+                    isValid = false;
+                }
+
+                if (!record.productId) {
+                    state.errors.gridItems.push(`Row ${index + 1}: Product is required.`);
+                    isValid = false;
+                }
+
+                if (!record.quantity || record.quantity <= 0) {
+                    state.errors.gridItems.push(`Row ${index + 1}: Quantity must be greater than 0.`);
+                    isValid = false;
+                }
+
+                if (!record.unitPrice || record.unitPrice <= 0) {
+                    state.errors.gridItems.push(`Row ${index + 1}: Unit price must be greater than 0.`);
+                    isValid = false;
+                }
+
+                if (!record.total || record.total <= 0) {
+                    state.errors.gridItems.push(`Row ${index + 1}: Total must be greater than 0.`);
+                    isValid = false;
+                }
+            });
 
             return isValid;
         };
@@ -1279,23 +1356,61 @@ const App = {
                     throw error;
                 }
             },
-            createMainData: async (orderDate, description, orderStatus, taxId, customerId, createdById) => {
+            createMainData: async (
+                orderDate,
+                description,
+                orderStatus,
+                taxId,
+                customerId,
+                createdById,
+                items
+            ) => {
                 try {
                     const locationId = StorageManager.getLocation();
+
                     const response = await AxiosManager.post('/SalesOrder/CreateSalesOrder', {
-                        orderDate, description, orderStatus, taxId, customerId, createdById, locationId
+                        orderDate,
+                        description,
+                        orderStatus,
+                        taxId,
+                        customerId,
+                        createdById,
+                        locationId,
+                        items
                     });
+
                     return response;
                 } catch (error) {
                     throw error;
                 }
             },
-            updateMainData: async (id, orderDate, description, orderStatus, taxId, customerId, updatedById) => {
+            updateMainData: async (
+                id,
+                orderDate,
+                description,
+                orderStatus,
+                taxId,
+                customerId,
+                updatedById,
+                items,
+                deletedItems
+            ) => {
                 try {
                     const locationId = StorageManager.getLocation();
+
                     const response = await AxiosManager.post('/SalesOrder/UpdateSalesOrder', {
-                        id, orderDate, description, orderStatus, taxId, customerId, updatedById, locationId
+                        id,
+                        orderDate,
+                        description,
+                        orderStatus,
+                        taxId,
+                        customerId,
+                        updatedById,
+                        locationId,
+                        items,
+                        deletedItems
                     });
+
                     return response;
                 } catch (error) {
                     throw error;
@@ -1416,6 +1531,18 @@ const App = {
                     throw error;
                 }
             },
+            getProductIdByPLU: async (pluCode) => {
+                try {
+                    const response = await AxiosManager.get(
+                        `/Product/GetProductIdByPLU?plu=${pluCode}`,
+                        {}
+                    );
+                    return response;
+                } catch (error) {
+                    throw error;
+                }
+            }
+
             };
 
         //// Customer Text Inputs
@@ -1646,58 +1773,203 @@ const App = {
                     state.totalAmount = NumberFormatManager.formatToLocale(record.afterTaxAmount ?? 0);
                 }
             },
-            handleFormSubmit: async () => {
-                state.isSubmitting = true;
-                await new Promise(resolve => setTimeout(resolve, 200));
+            prepareSecondaryDataForSubmission: function () {
+                const batchChanges = secondaryGrid.getBatchChanges();
 
-                if (!validateForm()) {
-                    state.isSubmitting = false;
-                    return;
+                console.log('Batch Changes:', batchChanges);
+
+                // Base data if editing an existing document
+                let currentSecondaryData = state.id !== ""
+                    ? [...state.secondaryData]
+                    : [];
+
+                const addedRecords = batchChanges.addedRecords || [];
+                const changedRecords = batchChanges.changedRecords || [];
+
+                // --- Helper: Match by id (or purchaseOrderItemId if exists) ---
+                const matchRecord = (a, b) => {
+                    if (a.id && b.id) return a.id === b.id;
+                    if (a.purchaseOrderItemId && b.purchaseOrderItemId)
+                        return a.purchaseOrderItemId === b.purchaseOrderItemId;
+                    return false;
+                };
+
+                // Allowed fields only
+                const filterFields = (item) => {
+                    return {
+                        id: item.id ?? null,
+                        pluCode: item.pluCode ?? null,
+                        productId: item.productId ?? null,
+                        unitPrice: item.unitPrice ?? 0,
+                        quantity: item.quantity ?? 0,
+                        total: item.total ?? 0,
+                        summary: item.summary ?? ""
+                    };
+                };
+
+                // --- 1️⃣ PROCESS CHANGED RECORDS ---
+                for (let changed of changedRecords) {
+                    const index = currentSecondaryData.findIndex(item => matchRecord(item, changed));
+
+                    if (index !== -1) {
+                        currentSecondaryData[index] = {
+                            ...currentSecondaryData[index],
+                            ...filterFields(changed)
+                        };
+                    } else {
+                        currentSecondaryData.push(filterFields(changed));
+                    }
                 }
 
-                try {
-                    const response = state.id === ''
-                        ? await services.createMainData(state.orderDate, state.description, state.orderStatus, state.taxId, state.customerId, StorageManager.getUserId())
-                        : state.deleteMode
-                            ? await services.deleteMainData(state.id, StorageManager.getUserId())
-                            : await services.updateMainData(state.id, state.orderDate, state.description, state.orderStatus, state.taxId, state.customerId, StorageManager.getUserId());
+                // --- 2️⃣ PROCESS ADDED RECORDS ---
+                for (let added of addedRecords) {
+                    currentSecondaryData.push(filterFields(added));
+                }
 
+                // --- 3️⃣ PROCESS DELETED RECORDS ---
+                let deletedRecords = (batchChanges.deletedRecords || []).flat(Infinity);
+
+                if (deletedRecords.length > 0) {
+                    currentSecondaryData = currentSecondaryData.filter(item =>
+                        !deletedRecords.some(del => matchRecord(item, del))
+                    );
+                }
+
+                // --- 4️⃣ VALID ITEMS (clean final list) ---
+                const validItems = currentSecondaryData.filter(item => {
+                    if (!item.productId) return false;
+                    if (!item.pluCode || item.pluCode.length < 5) return false;
+                    if (item.quantity <= 0) return false;
+                    if (item.unitPrice === null || item.unitPrice === undefined) return false;
+                    return true;
+                });
+
+                console.log("📌 Final Valid Items:", validItems);
+                console.log("❌ Final Deleted Items:", deletedRecords);
+
+                return {
+                    validItems,
+                    deletedRecords,
+                    summary: {
+                        total: validItems.length,
+                        added: addedRecords.length,
+                        changed: changedRecords.length,
+                        deleted: deletedRecords.length
+                    }
+                };
+            },
+            handleFormSubmit: async () => {
+                try {
+                    state.isSubmitting = true;
+                    await new Promise(resolve => setTimeout(resolve, 200));
+
+                    if (!validateForm()) {
+                        state.isSubmitting = false;
+                        return;
+                    }
+
+                    const userId = StorageManager.getUserId();
+                    const { validItems, deletedRecords } = methods.prepareSecondaryDataForSubmission();
+
+                    let response;
+
+                    // ----------------------------------------------------
+                    // Build Items DTO (Always convert PLU to integer)
+                    // ----------------------------------------------------
+                    const itemsDto = validItems.map(item => ({
+                        Id: item.id || null,
+                        pluCode: Number(item.pluCode),   // ✔ FORCE INTEGER
+                        productId: item.productId,
+                        unitPrice: item.unitPrice,
+                        quantity: item.quantity,
+                        total: item.total,
+                        summary: item.summary
+                    }));
+
+                    // -----------------------------
+                    // CREATE NEW SALES ORDER
+                    // -----------------------------
+                    if (state.id === '') {
+
+                        response = await services.createMainData(
+                            state.orderDate,
+                            state.description,
+                            state.orderStatus,
+                            state.taxId,        // REQUIRED
+                            state.customerId,   // REQUIRED FOR SALES ORDER
+                            userId,
+                            itemsDto            // ✔ Contains numeric PLU
+                        );
+
+                        if (response.data.code === 200) {
+                            state.id = response.data.content.data.id;
+                            state.number = response.data.content.data.number;
+                        }
+                    }
+
+                    // -----------------------------
+                    // DELETE SALES ORDER
+                    // -----------------------------
+                    else if (state.deleteMode) {
+                        response = await services.deleteMainData(state.id, userId);
+                    }
+
+                    // -----------------------------
+                    // UPDATE SALES ORDER
+                    // -----------------------------
+                    else {
+
+                        const deletedItemsDto = deletedRecords.flat(Infinity).map(x => ({
+                            Id: x.id || null
+                        }));
+
+                        response = await services.updateMainData(
+                            state.id,
+                            state.orderDate,
+                            state.description,
+                            state.orderStatus,
+                            state.taxId,
+                            state.customerId,
+                            userId,
+                            itemsDto,          // ✔ Has numeric PLU
+                            deletedItemsDto
+                        );
+                    }
+
+                    // -----------------------------
+                    // HANDLE SUCCESS RESPONSE
+                    // -----------------------------
                     if (response.data.code === 200) {
+
                         await methods.populateMainData();
                         mainGrid.refresh();
 
                         if (!state.deleteMode) {
-                            state.mainTitle = 'Edit Sales Order';
-                            state.id = response?.data?.content?.data.id ?? '';
-                            state.number = response?.data?.content?.data.number ?? '';
-                            state.orderDate = response?.data?.content?.data.orderDate ? new Date(response.data.content.data.orderDate) : null;
-                            state.description = response?.data?.content?.data.description ?? '';
-                            state.customerId = response?.data?.content?.data.customerId ?? '';
-                            state.taxId = response?.data?.content?.data.taxId ?? '';
-                            taxListLookup.trackingChange = true;
-                            state.orderStatus = String(response?.data?.content?.data.orderStatus ?? '');
-                            state.showComplexDiv = true;
+                            await methods.populateSecondaryData();
+                            secondaryGrid.refresh();
 
-                            await methods.refreshPaymentSummary(state.id);
+                            state.mainTitle = 'Edit Sales Order';
+                            state.showComplexDiv = true;
 
                             Swal.fire({
                                 icon: 'success',
                                 title: 'Save Successful',
-                                timer: 1000,
+                                timer: 1200,
                                 showConfirmButton: false
                             });
-                        } else {
+                        }
+                        else {
                             Swal.fire({
                                 icon: 'success',
                                 title: 'Delete Successful',
-                                text: 'Form will be closed...',
-                                timer: 2000,
+                                timer: 1500,
                                 showConfirmButton: false
                             });
+
                             setTimeout(() => {
                                 mainModal.obj.hide();
                                 resetFormState();
-                            }, 2000);
+                            }, 1500);
                         }
 
                     } else {
@@ -1708,6 +1980,7 @@ const App = {
                             confirmButtonText: 'Try Again'
                         });
                     }
+
                 } catch (error) {
                     Swal.fire({
                         icon: 'error',
@@ -1716,6 +1989,7 @@ const App = {
                         confirmButtonText: 'OK'
                     });
                 } finally {
+                    secondaryGrid.clearBatchChanges();
                     state.isSubmitting = false;
                 }
             },
@@ -2020,7 +2294,7 @@ const App = {
                                 secondaryGrid.refresh();
                             }
 
-                            state.showComplexDiv = false;
+                            state.showComplexDiv = true;
                             mainModal.obj.show();
                         }
 
@@ -2083,8 +2357,506 @@ const App = {
             }
         };
 
+        //const secondaryGrid = {
+        //    obj: null,
+        //    create: async (dataSource) => {
+        //        secondaryGrid.obj = new ej.grids.Grid({
+        //            height: 400,
+        //            dataSource: dataSource,
+        //            editSettings: { allowEditing: true, allowAdding: true, allowDeleting: true, showDeleteConfirmDialog: true, mode: 'Normal', allowEditOnDblClick: true },
+        //            allowFiltering: false,
+        //            allowSorting: true,
+        //            allowSelection: true,
+        //            allowGrouping: false,
+        //            allowTextWrap: true,
+        //            allowResizing: true,
+        //            allowPaging: false,
+        //            allowSearching: false,        // << enable grid search
+        //            allowExcelExport: true,
+        //            filterSettings: { type: 'CheckBox' },
+        //            sortSettings: { columns: [{ field: 'productName', direction: 'Descending' }] },
+        //            pageSettings: { currentPage: 1, pageSize: 50, pageSizes: ["10", "20", "50", "100", "200", "All"] },
+        //            selectionSettings: { persistSelection: true, type: 'Single' },
+        //            autoFit: false,
+        //            showColumnMenu: false,
+        //            gridLines: 'Horizontal',
+        //            columns: [
+        //                { type: 'checkbox', width: 60 },
+        //                {
+        //                    field: 'id', isPrimaryKey: true, headerText: 'Id', visible: false
+        //                },
+        //                {
+        //                    field: "pluCode",
+        //                    headerText: "PLU Code",
+        //                    width: 140,
+        //                    editType: "stringedit",
+        //                    validationRules: { required: true },
+
+        //                    edit: {
+        //                        create: () => {
+        //                            let pluElem = document.createElement("input");
+        //                            return pluElem;
+        //                        },
+        //                        read: () => pluObj?.value,
+        //                        destroy: () => pluObj?.destroy(),
+
+        //                        write: (args) => {
+        //                            pluObj = new ej.inputs.TextBox({
+        //                                value: args.rowData.pluCode ?? "",
+        //                                placeholder: "Enter 5+ characters"
+        //                            });
+
+        //                            pluObj.appendTo(args.element);
+
+        //                            // ============================================
+        //                            // 🔥 GET THE ACTUAL INPUT ELEMENT
+        //                            // ============================================
+        //                            const inputElement = pluObj.element;
+
+        //                            // ============================================
+        //                            // 🔥 KEYDOWN EVENT - Attached to input element
+        //                            // ============================================
+        //                            inputElement.addEventListener('keydown', (e) => {
+        //                                const key = e.key;
+
+        //                                // Allow: alphanumeric, backspace, delete, arrows, tab, enter
+        //                                const isValidKey = /^[a-zA-Z0-9]$/.test(key) ||
+        //                                    ['Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'Tab', 'Enter'].includes(key);
+
+        //                                if (!isValidKey) {
+        //                                    e.preventDefault();
+        //                                    console.log('❌ Invalid character blocked:', key);
+        //                                }
+        //                            });
+
+        //                            // ============================================
+        //                            // 🔥 KEYUP EVENT - Attached to input element (MAIN)
+        //                            // ============================================
+        //                            inputElement.addEventListener('keyup', async (e) => {
+        //                                const enteredPLU = inputElement.value?.trim() ?? "";
+
+        //                                console.log('⬆️ KEYUP Event - PLU:', enteredPLU, 'Length:', enteredPLU.length);
+
+        //                                // Only proceed if 5+ characters
+        //                                if (enteredPLU.length < 5) {
+        //                                    console.log('⏳ Waiting for more characters... (' + enteredPLU.length + '/5)');
+        //                                    return;
+        //                                }
+
+        //                                try {
+        //                                    // 🔥 CALL API TO GET PRODUCT ID
+        //                                    console.log('📡 Calling API for PLU:', enteredPLU);
+        //                                    const result = await services.getProductIdByPLU(enteredPLU);
+        //                                    const productId = result?.data?.content?.productId;
+
+        //                                    if (!productId) {
+        //                                        Swal.fire({
+        //                                            icon: 'warning',
+        //                                            title: 'Invalid PLU',
+        //                                            text: 'No product found for this PLU code',
+        //                                            timer: 2000,
+        //                                            showConfirmButton: false
+        //                                        });
+        //                                        console.log('❌ No product found for PLU:', enteredPLU);
+        //                                        return;
+        //                                    }
+
+        //                                    console.log('✅ Product found - ID:', productId);
+
+        //                                    // SET PRODUCT ID IN ROW DATA
+        //                                    args.rowData.productId = productId;
+
+        //                                    // 🔥 UPDATE PRODUCT DROPDOWN
+        //                                    if (productObj) {
+        //                                        productObj.value = productId;
+        //                                        productObj.dataBind();
+        //                                        productObj.change({ value: productId });
+        //                                        console.log('✅ Product dropdown updated with ID:', productId);
+        //                                    }
+
+        //                                } catch (error) {
+        //                                    console.error('❌ KEYUP Error:', error);
+        //                                    Swal.fire({
+        //                                        icon: 'error',
+        //                                        title: 'Error',
+        //                                        text: 'Failed to fetch product details',
+        //                                        timer: 2000
+        //                                    });
+        //                                }
+        //                            });
+
+        //                            // ============================================
+        //                            // 🔥 CHANGE EVENT - Fallback for blur/paste
+        //                            // ============================================
+        //                            inputElement.addEventListener('change', async (e) => {
+        //                                const enteredPLU = inputElement.value?.trim() ?? "";
+
+        //                                console.log('📝 CHANGE Event - PLU:', enteredPLU, 'Length:', enteredPLU.length);
+
+        //                                if (!enteredPLU || enteredPLU.length < 5) {
+        //                                    console.log('❌ PLU too short, skipping API call');
+        //                                    return;
+        //                                }
+
+        //                                try {
+        //                                    // 🔥 CALL API TO GET PRODUCT ID
+        //                                    console.log('📡 Calling API for PLU:', enteredPLU);
+        //                                    const result = await services.getProductIdByPLU(enteredPLU);
+        //                                    const productId = result?.data?.content?.productId;
+
+        //                                    if (!productId) {
+        //                                        Swal.fire({
+        //                                            icon: 'warning',
+        //                                            title: 'Invalid PLU',
+        //                                            text: 'No product found for this PLU code',
+        //                                            timer: 2000,
+        //                                            showConfirmButton: false
+        //                                        });
+        //                                        console.log('❌ No product found for PLU:', enteredPLU);
+        //                                        return;
+        //                                    }
+
+        //                                    console.log('✅ Product found - ID:', productId);
+
+        //                                    // SET PRODUCT ID IN ROW DATA
+        //                                    args.rowData.productId = productId;
+
+        //                                    // 🔥 UPDATE PRODUCT DROPDOWN
+        //                                    if (productObj) {
+        //                                        productObj.value = productId;
+        //                                        productObj.dataBind();
+        //                                        productObj.change({ value: productId });
+        //                                        console.log('✅ Product dropdown updated with ID:', productId);
+        //                                    }
+
+        //                                } catch (error) {
+        //                                    console.error('❌ CHANGE Error:', error);
+        //                                    Swal.fire({
+        //                                        icon: 'error',
+        //                                        title: 'Error',
+        //                                        text: 'Failed to fetch product details',
+        //                                        timer: 2000
+        //                                    });
+        //                                }
+        //                            });
+        //                        }
+        //                    }
+        //                },
+        //                {
+        //                    field: 'productId',
+        //                    headerText: 'Product',
+        //                    width: 250,
+        //                    validationRules: { required: true },
+        //                    allowEditing: false,   // ❌ user cannot edit
+        //                    disableHtmlEncode: false,
+
+        //                    valueAccessor: (field, data) => {
+        //                        const product = state.productListLookupData.find(x => x.id === data[field]);
+        //                        return product ? product.name : "";
+        //                    },
+
+        //                    editType: 'dropdownedit',
+        //                    edit: {
+        //                        create: () => {
+        //                            let productElem = document.createElement("input");
+        //                            return productElem;
+        //                        },
+        //                        read: () => productObj?.value,
+        //                        destroy: () => productObj?.destroy(),
+
+        //                        write: (args) => {
+        //                            productObj = new ej.dropdowns.DropDownList({
+        //                                dataSource: state.productListLookupData,
+        //                                fields: { value: 'id', text: 'name' },
+        //                                value: args.rowData.productId,
+
+        //                                enabled: false,   // ❌ disable dropdown UI completely
+
+        //                                change: (e) => {
+        //                                    // ⏭ THIS LOGIC STILL RUNS WHEN PROGRAMMATICALLY TRIGGERED
+        //                                    const selectedProduct = state.productListLookupData.find(item => item.id === e.value);
+        //                                    if (!selectedProduct) return;
+
+        //                                    args.rowData.productId = selectedProduct.id;
+
+        //                                    // Set product number
+        //                                    if (numberObj) numberObj.value = selectedProduct.number;
+
+        //                                    // GET PRICE
+        //                                    const priceDef = state.priceDefinitionListLookupData
+        //                                        ?.find(x => x.productId === selectedProduct.id && x.isActive);
+
+        //                                    const finalPrice = priceDef ? priceDef.salePrice : selectedProduct.unitPrice;
+
+        //                                    if (priceObj) priceObj.value = finalPrice;
+
+        //                                    // Summary
+        //                                    if (summaryObj) summaryObj.value = selectedProduct.description;
+
+        //                                    // Quantity + Total
+        //                                    if (quantityObj) {
+        //                                        quantityObj.value = 1;
+        //                                        if (totalObj) totalObj.value = finalPrice * quantityObj.value;
+        //                                    }
+        //                                }
+        //                            });
+
+        //                            productObj.appendTo(args.element);
+        //                        }
+        //                    }
+        //                },
+        //                {
+        //                    field: 'unitPrice',
+        //                    headerText: 'Unit Price',
+        //                    width: 200, validationRules: { required: true }, type: 'number', format: 'N2', textAlign: 'Right',
+        //                    edit: {
+        //                        create: () => {
+        //                            let priceElem = document.createElement('input');
+        //                            return priceElem;
+        //                        },
+        //                        read: () => {
+        //                            return priceObj.value;
+        //                        },
+        //                        destroy: () => {
+        //                            priceObj.destroy();
+        //                        },
+        //                        write: (args) => {
+        //                            priceObj = new ej.inputs.NumericTextBox({
+        //                                value: args.rowData.unitPrice ?? 0,
+        //                                change: (e) => {
+        //                                    if (quantityObj && totalObj) {
+        //                                        const total = e.value * quantityObj.value;
+        //                                        totalObj.value = total;
+        //                                    }
+        //                                }
+        //                            });
+        //                            priceObj.appendTo(args.element);
+        //                        }
+        //                    }
+        //                },
+        //                {
+        //                    field: 'quantity',
+        //                    headerText: 'Quantity',
+        //                    width: 200,
+        //                    validationRules: {
+        //                        required: true,
+        //                        custom: [(args) => {
+        //                            return args['value'] > 0;
+        //                        }, 'Must be a positive number and not zero']
+        //                    },
+        //                    type: 'number', format: 'N2', textAlign: 'Right',
+        //                    edit: {
+        //                        create: () => {
+        //                            let quantityElem = document.createElement('input');
+        //                            return quantityElem;
+        //                        },
+        //                        read: () => {
+        //                            return quantityObj.value;
+        //                        },
+        //                        destroy: () => {
+        //                            quantityObj.destroy();
+        //                        },
+        //                        write: (args) => {
+        //                            quantityObj = new ej.inputs.NumericTextBox({
+        //                                value: args.rowData.quantity ?? 0,
+        //                                change: (e) => {
+        //                                    if (priceObj && totalObj) {
+        //                                        const total = e.value * priceObj.value;
+        //                                        totalObj.value = total;
+        //                                    }
+        //                                }
+        //                            });
+        //                            quantityObj.appendTo(args.element);
+        //                        }
+        //                    }
+        //                },
+        //                {
+        //                    field: 'total',
+        //                    headerText: 'Total',
+        //                    width: 200, validationRules: { required: false }, type: 'number', format: 'N2', textAlign: 'Right',
+        //                    edit: {
+        //                        create: () => {
+        //                            let totalElem = document.createElement('input');
+        //                            return totalElem;
+        //                        },
+        //                        read: () => {
+        //                            return totalObj.value;
+        //                        },
+        //                        destroy: () => {
+        //                            totalObj.destroy();
+        //                        },
+        //                        write: (args) => {
+        //                            totalObj = new ej.inputs.NumericTextBox({
+        //                                value: args.rowData.total ?? 0,
+        //                                readonly: true
+        //                            });
+        //                            totalObj.appendTo(args.element);
+        //                        }
+        //                    }
+        //                },
+        //                {
+        //                    field: 'productNumber',
+        //                    headerText: 'Product Number',
+        //                    allowEditing: false,
+        //                    width: 180,
+        //                    edit: {
+        //                        create: () => {
+        //                            let numberElem = document.createElement('input');
+        //                            return numberElem;
+        //                        },
+        //                        read: () => {
+        //                            return numberObj.value;
+        //                        },
+        //                        destroy: () => {
+        //                            numberObj.destroy();
+        //                        },
+        //                        write: (args) => {
+        //                            numberObj = new ej.inputs.TextBox();
+        //                            numberObj.value = args.rowData.productNumber;
+        //                            numberObj.readonly = true;
+        //                            numberObj.appendTo(args.element);
+        //                        }
+        //                    }
+        //                },
+        //                {
+        //                    field: 'summary',
+        //                    headerText: 'Summary',
+        //                    width: 200,
+        //                    edit: {
+        //                        create: () => {
+        //                            let summaryElem = document.createElement('input');
+        //                            return summaryElem;
+        //                        },
+        //                        read: () => {
+        //                            return summaryObj.value;
+        //                        },
+        //                        destroy: () => {
+        //                            summaryObj.destroy();
+        //                        },
+        //                        write: (args) => {
+        //                            summaryObj = new ej.inputs.TextBox();
+        //                            summaryObj.value = args.rowData.summary;
+        //                            summaryObj.appendTo(args.element);
+        //                        }
+        //                    }
+        //                },
+        //            ],
+        //            toolbar: [
+        //                'ExcelExport',
+        //                { type: 'Separator' },
+        //                'Add', 'Edit', 'Delete', 'Update', 'Cancel',
+        //            ],
+        //            beforeDataBound: () => { },
+        //            dataBound: function () { },
+        //            excelExportComplete: () => { },
+        //            rowSelected: () => {
+        //                if (secondaryGrid.obj.getSelectedRecords().length == 1) {
+        //                    secondaryGrid.obj.toolbarModule.enableItems(['Edit'], true);
+        //                } else {
+        //                    secondaryGrid.obj.toolbarModule.enableItems(['Edit'], false);
+        //                }
+        //            },
+        //            rowDeselected: () => {
+        //                if (secondaryGrid.obj.getSelectedRecords().length == 1) {
+        //                    secondaryGrid.obj.toolbarModule.enableItems(['Edit'], true);
+        //                } else {
+        //                    secondaryGrid.obj.toolbarModule.enableItems(['Edit'], false);
+        //                }
+        //            },
+        //            rowSelecting: () => {
+        //                if (secondaryGrid.obj.getSelectedRecords().length) {
+        //                    secondaryGrid.obj.clearSelection();
+        //                }
+        //            },
+        //            toolbarClick: (args) => {
+        //                if (args.item.id === 'SecondaryGrid_excelexport') {
+        //                    secondaryGrid.obj.excelExport();
+        //                }
+        //            },
+        //            actionBegin: async function (args) {
+        //                if (args.requestType === 'searching') {
+
+        //                    const searchText = args.searchString ?? "";
+
+        //                    //// 🔥 CALL YOUR API SERVICE
+        //                    //const response = await services.searchSecondaryGridData(searchText, state.id);
+
+        //                    //// response should be array of rows
+        //                    //secondaryGrid.obj.setProperties({ dataSource: response });
+        //                }
+        //            },
+        //        //    actionComplete: async (args) => {
+        //        //        if (args.requestType === 'save' && args.action === 'add') {
+        //        //            const salesOrderId = state.id;
+        //        //            const userId = StorageManager.getUserId();
+        //        //            const data = args.data;
+
+        //        //            //await services.createSecondaryData(data?.unitPrice, data?.quantity, data?.summary, data?.productId, salesOrderId, userId);
+        //        //            //await methods.populateSecondaryData(salesOrderId);
+        //        //            secondaryGrid.refresh();
+
+        //        //            Swal.fire({
+        //        //                icon: 'success',
+        //        //                title: 'Save Successful',
+        //        //                timer: 2000,
+        //        //                showConfirmButton: false
+        //        //            });
+        //        //        }
+        //        //        if (args.requestType === 'save' && args.action === 'edit') {
+        //        //            const salesOrderId = state.id;
+        //        //            const userId = StorageManager.getUserId();
+        //        //            const data = args.data;
+
+        //        //            //await services.updateSecondaryData(data?.id, data?.unitPrice, data?.quantity, data?.summary, data?.productId, salesOrderId, userId);
+        //        //            //await methods.populateSecondaryData(salesOrderId);
+        //        //            secondaryGrid.refresh();
+
+        //        //            Swal.fire({
+        //        //                icon: 'success',
+        //        //                title: 'Save Successful',
+        //        //                timer: 2000,
+        //        //                showConfirmButton: false
+        //        //            });
+        //        //        }
+        //        //        if (args.requestType === 'delete') {
+        //        //            const salesOrderId = state.id;
+        //        //            const userId = StorageManager.getUserId();
+        //        //            const data = args.data[0];
+
+        //        //            await services.deleteSecondaryData(data?.id, userId);
+        //        //            await methods.populateSecondaryData(salesOrderId);
+        //        //            secondaryGrid.refresh();
+
+        //        //            Swal.fire({
+        //        //                icon: 'success',
+        //        //                title: 'Delete Successful',
+        //        //                timer: 2000,
+        //        //                showConfirmButton: false
+        //        //            });
+        //        //        }
+
+        //        //        await methods.populateMainData();
+        //        //        mainGrid.refresh();
+        //        //        await methods.refreshPaymentSummary(state.id);
+        //        //    }
+        //        });
+        //        secondaryGrid.obj.appendTo(secondaryGridRef.value);
+        //    },
+        //    refresh: () => {
+        //        if (!secondaryGrid.obj) return;   // <-- prevent crash
+        //        secondaryGrid.obj.setProperties({ dataSource: state.secondaryData });
+        //    }
+        //};
         const secondaryGrid = {
             obj: null,
+
+            // 🔥 ADD BATCH TRACKING
+            manualBatchChanges: {
+                addedRecords: [],
+                changedRecords: [],
+                deletedRecords: []
+            },
+
             create: async (dataSource) => {
                 secondaryGrid.obj = new ej.grids.Grid({
                     height: 400,
@@ -2097,6 +2869,7 @@ const App = {
                     allowTextWrap: true,
                     allowResizing: true,
                     allowPaging: false,
+                    allowSearching: false,
                     allowExcelExport: true,
                     filterSettings: { type: 'CheckBox' },
                     sortSettings: { columns: [{ field: 'productName', direction: 'Descending' }] },
@@ -2111,62 +2884,195 @@ const App = {
                             field: 'id', isPrimaryKey: true, headerText: 'Id', visible: false
                         },
                         {
+                            field: "pluCode",
+                            headerText: "PLU Code",
+                            width: 140,
+                            editType: "stringedit",
+                            validationRules: { required: true },
+
+                            edit: {
+                                create: () => {
+                                    let pluElem = document.createElement("input");
+                                    return pluElem;
+                                },
+                                read: () => pluObj?.value,
+                                destroy: () => pluObj?.destroy(),
+
+                                write: (args) => {
+                                    pluObj = new ej.inputs.TextBox({
+                                        value: args.rowData.pluCode ?? "",
+                                        placeholder: "Enter 5+ characters"
+                                    });
+
+                                    pluObj.appendTo(args.element);
+
+                                    const inputElement = pluObj.element;
+
+                                    inputElement.addEventListener('keydown', (e) => {
+                                        const key = e.key;
+                                        const isValidKey = /^[a-zA-Z0-9]$/.test(key) ||
+                                            ['Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'Tab', 'Enter'].includes(key);
+
+                                        if (!isValidKey) {
+                                            e.preventDefault();
+                                            console.log('❌ Invalid character blocked:', key);
+                                        }
+                                    });
+
+                                    inputElement.addEventListener('keyup', async (e) => {
+                                        const enteredPLU = inputElement.value?.trim() ?? "";
+
+                                        console.log('⬆️ KEYUP Event - PLU:', enteredPLU, 'Length:', enteredPLU.length);
+
+                                        if (enteredPLU.length < 5) {
+                                            console.log('⏳ Waiting for more characters... (' + enteredPLU.length + '/5)');
+                                            return;
+                                        }
+
+                                        try {
+                                            console.log('📡 Calling API for PLU:', enteredPLU);
+                                            const result = await services.getProductIdByPLU(enteredPLU);
+                                            const productId = result?.data?.content?.productId;
+
+                                            if (!productId) {
+                                                Swal.fire({
+                                                    icon: 'warning',
+                                                    title: 'Invalid PLU',
+                                                    text: 'No product found for this PLU code',
+                                                    timer: 2000,
+                                                    showConfirmButton: false
+                                                });
+                                                console.log('❌ No product found for PLU:', enteredPLU);
+                                                return;
+                                            }
+
+                                            console.log('✅ Product found - ID:', productId);
+
+                                            args.rowData.productId = productId;
+
+                                            if (productObj) {
+                                                productObj.value = productId;
+                                                productObj.dataBind();
+                                                productObj.change({ value: productId });
+                                                console.log('✅ Product dropdown updated with ID:', productId);
+                                            }
+
+                                        } catch (error) {
+                                            console.error('❌ KEYUP Error:', error);
+                                            Swal.fire({
+                                                icon: 'error',
+                                                title: 'Error',
+                                                text: 'Failed to fetch product details',
+                                                timer: 2000
+                                            });
+                                        }
+                                    });
+
+                                    inputElement.addEventListener('change', async (e) => {
+                                        const enteredPLU = inputElement.value?.trim() ?? "";
+
+                                        console.log('📝 CHANGE Event - PLU:', enteredPLU, 'Length:', enteredPLU.length);
+
+                                        if (!enteredPLU || enteredPLU.length < 5) {
+                                            console.log('❌ PLU too short, skipping API call');
+                                            return;
+                                        }
+
+                                        try {
+                                            console.log('📡 Calling API for PLU:', enteredPLU);
+                                            const result = await services.getProductIdByPLU(enteredPLU);
+                                            const productId = result?.data?.content?.productId;
+
+                                            if (!productId) {
+                                                Swal.fire({
+                                                    icon: 'warning',
+                                                    title: 'Invalid PLU',
+                                                    text: 'No product found for this PLU code',
+                                                    timer: 2000,
+                                                    showConfirmButton: false
+                                                });
+                                                console.log('❌ No product found for PLU:', enteredPLU);
+                                                return;
+                                            }
+
+                                            console.log('✅ Product found - ID:', productId);
+
+                                            args.rowData.productId = productId;
+
+                                            if (productObj) {
+                                                productObj.value = productId;
+                                                productObj.dataBind();
+                                                productObj.change({ value: productId });
+                                                console.log('✅ Product dropdown updated with ID:', productId);
+                                            }
+
+                                        } catch (error) {
+                                            console.error('❌ CHANGE Error:', error);
+                                            Swal.fire({
+                                                icon: 'error',
+                                                title: 'Error',
+                                                text: 'Failed to fetch product details',
+                                                timer: 2000
+                                            });
+                                        }
+                                    });
+                                }
+                            }
+                        },
+                        {
                             field: 'productId',
                             headerText: 'Product',
                             width: 250,
                             validationRules: { required: true },
+                            allowEditing: false,
                             disableHtmlEncode: false,
-                            valueAccessor: (field, data, column) => {
-                                const product = state.productListLookupData.find(item => item.id === data[field]);
-                                return product ? `${product.name}` : '';
+
+                            valueAccessor: (field, data) => {
+                                const product = state.productListLookupData.find(x => x.id === data[field]);
+                                return product ? product.name : "";
                             },
+
                             editType: 'dropdownedit',
                             edit: {
                                 create: () => {
-                                    let productElem = document.createElement('input');
+                                    let productElem = document.createElement("input");
                                     return productElem;
                                 },
-                                read: () => {
-                                    return productObj.value;
-                                },
-                                destroy: () => {
-                                    productObj.destroy();
-                                },
+                                read: () => productObj?.value,
+                                destroy: () => productObj?.destroy(),
+
                                 write: (args) => {
                                     productObj = new ej.dropdowns.DropDownList({
                                         dataSource: state.productListLookupData,
                                         fields: { value: 'id', text: 'name' },
                                         value: args.rowData.productId,
+
+                                        enabled: false,
+
                                         change: (e) => {
                                             const selectedProduct = state.productListLookupData.find(item => item.id === e.value);
                                             if (!selectedProduct) return;
+
                                             args.rowData.productId = selectedProduct.id;
 
-                                            // Set product number
                                             if (numberObj) numberObj.value = selectedProduct.number;
 
-                                            // 🔥 GET PRICE FROM PRICE DEFINITION TABLE
                                             const priceDef = state.priceDefinitionListLookupData
                                                 ?.find(x => x.productId === selectedProduct.id && x.isActive);
 
-                                            const finalPrice = priceDef ? priceDef.costPrice : selectedProduct.unitPrice;   // fallback if missing
+                                            const finalPrice = priceDef ? priceDef.salePrice : selectedProduct.unitPrice;
 
-                                            // Set price into grid textbox
                                             if (priceObj) priceObj.value = finalPrice;
 
-                                            // Set description/summary
                                             if (summaryObj) summaryObj.value = selectedProduct.description;
 
-                                            // Update quantity and total
                                             if (quantityObj) {
                                                 quantityObj.value = 1;
-
                                                 if (totalObj) totalObj.value = finalPrice * quantityObj.value;
                                             }
-                                        },
-                                        placeholder: 'Select a Product',
-                                        floatLabelType: 'Never'
+                                        }
                                     });
+
                                     productObj.appendTo(args.element);
                                 }
                             }
@@ -2339,65 +3245,64 @@ const App = {
                             secondaryGrid.obj.excelExport();
                         }
                     },
+                    actionBegin: async function (args) {
+                        if (args.requestType === 'searching') {
+                            const searchText = args.searchString ?? "";
+                            // Search logic here
+                        }
+                    },
+
+                    // 🔥 UNCOMMENTED AND IMPLEMENTED actionComplete
                     actionComplete: async (args) => {
                         if (args.requestType === 'save' && args.action === 'add') {
-                            const salesOrderId = state.id;
-                            const userId = StorageManager.getUserId();
-                            const data = args.data;
-
-                            await services.createSecondaryData(data?.unitPrice, data?.quantity, data?.summary, data?.productId, salesOrderId, userId);
-                            await methods.populateSecondaryData(salesOrderId);
-                            secondaryGrid.refresh();
-
-                            Swal.fire({
-                                icon: 'success',
-                                title: 'Save Successful',
-                                timer: 2000,
-                                showConfirmButton: false
-                            });
+                            // 🔥 TRACK ADDED ROW
+                            secondaryGrid.manualBatchChanges.addedRecords.push(args.data);
+                            console.log('✅ Row Added:', args.data);
+                            console.log('📋 Current Batch Changes:', secondaryGrid.manualBatchChanges);
                         }
+
                         if (args.requestType === 'save' && args.action === 'edit') {
-                            const salesOrderId = state.id;
-                            const userId = StorageManager.getUserId();
-                            const data = args.data;
-
-                            await services.updateSecondaryData(data?.id, data?.unitPrice, data?.quantity, data?.summary, data?.productId, salesOrderId, userId);
-                            await methods.populateSecondaryData(salesOrderId);
-                            secondaryGrid.refresh();
-
-                            Swal.fire({
-                                icon: 'success',
-                                title: 'Save Successful',
-                                timer: 2000,
-                                showConfirmButton: false
-                            });
+                            // 🔥 TRACK MODIFIED ROW (update if exists, else add)
+                            const index = secondaryGrid.manualBatchChanges.changedRecords.findIndex(
+                                r => r.id === args.data?.id
+                            );
+                            if (index > -1) {
+                                secondaryGrid.manualBatchChanges.changedRecords[index] = args.data;
+                            } else {
+                                secondaryGrid.manualBatchChanges.changedRecords.push(args.data);
+                            }
+                            console.log('🔄 Row Modified:', args.data);
+                            console.log('📋 Current Batch Changes:', secondaryGrid.manualBatchChanges);
                         }
+
                         if (args.requestType === 'delete') {
-                            const salesOrderId = state.id;
-                            const userId = StorageManager.getUserId();
-                            const data = args.data[0];
-
-                            await services.deleteSecondaryData(data?.id, userId);
-                            await methods.populateSecondaryData(salesOrderId);
-                            secondaryGrid.refresh();
-
-                            Swal.fire({
-                                icon: 'success',
-                                title: 'Delete Successful',
-                                timer: 2000,
-                                showConfirmButton: false
-                            });
+                            // 🔥 TRACK DELETED ROW
+                            secondaryGrid.manualBatchChanges.deletedRecords.push(args.data[0]);
+                            console.log('❌ Row Deleted:', args.data[0]);
+                            console.log('📋 Current Batch Changes:', secondaryGrid.manualBatchChanges);
                         }
-
-                        await methods.populateMainData();
-                        mainGrid.refresh();
-                        await methods.refreshPaymentSummary(state.id);
                     }
                 });
                 secondaryGrid.obj.appendTo(secondaryGridRef.value);
             },
+
+            // 🔥 GET ALL BATCH CHANGES
+            getBatchChanges: () => {
+                return secondaryGrid.manualBatchChanges;
+            },
+
+            // 🔥 CLEAR BATCH CHANGES (after successful save)
+            clearBatchChanges: () => {
+                secondaryGrid.manualBatchChanges = {
+                    addedRecords: [],
+                    changedRecords: [],
+                    deletedRecords: []
+                };
+                console.log('✅ Batch changes cleared');
+            },
+
             refresh: () => {
-                if (!secondaryGrid.obj) return;   // <-- prevent crash
+                if (!secondaryGrid.obj) return;
                 secondaryGrid.obj.setProperties({ dataSource: state.secondaryData });
             }
         };

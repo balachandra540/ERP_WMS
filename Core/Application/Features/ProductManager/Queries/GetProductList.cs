@@ -23,13 +23,11 @@ public record GetProductListDto
     public string? WarehouseId { get; init; }
     public string? TaxId { get; init; }
     public string? TaxName { get; init; }
-
     // ────────────────────── NEW FIELDS ──────────────────────
     public string? Attribute1Id { get; init; }
-    public string? Attribute1Name { get; init; }   // Optional: display name
+    public string? Attribute1Name { get; init; } // Optional: display name
     public string? Attribute2Id { get; init; }
-    public string? Attribute2Name { get; init; }   // Optional: display name
-
+    public string? Attribute2Name { get; init; } // Optional: display name
     public bool ServiceNo { get; init; }
     public bool Imei1 { get; init; }
     public bool Imei2 { get; init; }
@@ -47,7 +45,6 @@ public class GetProductListProfile : Profile
                 opt => opt.MapFrom(src => src.Tax != null ? src.Tax.Name : string.Empty))
             .ForMember(dest => dest.ProductGroupName,
                 opt => opt.MapFrom(src => src.ProductGroup != null ? src.ProductGroup.Name : string.Empty))
-
             // NEW MAPPINGS
             .ForMember(dest => dest.Attribute1Id,
                 opt => opt.MapFrom(src => src.Attribute1Id))
@@ -57,7 +54,6 @@ public class GetProductListProfile : Profile
                 opt => opt.MapFrom(src => src.Attribute2Id))
             .ForMember(dest => dest.Attribute2Name,
                 opt => opt.MapFrom(src => src.Attribute2 != null ? src.Attribute2.Name : string.Empty))
-
             .ForMember(dest => dest.ServiceNo,
                 opt => opt.MapFrom(src => src.ServiceNo))
             .ForMember(dest => dest.Imei1,
@@ -109,7 +105,6 @@ public class GetProductListHandler : IRequestHandler<GetProductListRequest, GetP
 
         var entities = await query.ToListAsync(cancellationToken);
         var dtos = _mapper.Map<List<GetProductListDto>>(entities);
-
         return new GetProductListResult { Data = dtos };
     }
 }
@@ -151,7 +146,6 @@ public class GetInventoryProductListHandler : IRequestHandler<GetInventoryProduc
 
         var entities = await query.ToListAsync(cancellationToken);
         var dtos = _mapper.Map<List<GetProductListDto>>(entities);
-
         return new GetProductListResult { Data = dtos };
     }
 }
@@ -161,3 +155,54 @@ public class GetInventoryProductListRequest : IRequest<GetProductListResult>
     public string? WarehouseId { get; init; }
     public bool IsDeleted { get; init; } = false;
 }
+
+// ────────────────────── PLU CODE HANDLER ──────────────────────
+public record GetProductIdByPLUResult
+{
+    public string? ProductId { get; init; }
+    // Simplified: Only ProductId returned
+}
+
+public class GetProductIdByPLURequest : IRequest<GetProductIdByPLUResult>
+{
+    public int Plu { get; init; }
+
+    public GetProductIdByPLURequest()
+    {
+        // Parameterless constructor for DI validation
+    }
+
+    public GetProductIdByPLURequest(int plu)
+    {
+        Plu = plu;
+    }
+}
+public class GetProductIdByPLUHandler : IRequestHandler<GetProductIdByPLURequest, GetProductIdByPLUResult>
+{
+    private readonly IQueryContext _context;
+
+    public GetProductIdByPLUHandler(IQueryContext context)
+    {
+        _context = context;
+    }
+
+    public async Task<GetProductIdByPLUResult> Handle(GetProductIdByPLURequest request, CancellationToken cancellationToken)
+    {
+        // Query ProductPluCodes for the PLU (assuming PluCode is int and unique)
+        var pluRecord = await _context.ProductPluCodes
+            .AsNoTracking()
+            .ApplyIsDeletedFilter(false)
+            .FirstOrDefaultAsync(x => x.PluCode == request.Plu, cancellationToken);
+
+        if (pluRecord == null)
+        {
+            return new GetProductIdByPLUResult(); // Null ProductId indicates not found
+        }
+
+        return new GetProductIdByPLUResult
+        {
+            ProductId = pluRecord.ProductId
+        };
+    }
+}
+// ────────────────────────────────────────────────────────────────

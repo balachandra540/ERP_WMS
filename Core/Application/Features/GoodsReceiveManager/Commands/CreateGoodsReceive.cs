@@ -676,7 +676,7 @@ namespace Application.Features.GoodsReceiveManager.Commands
 
                 // ✅ Inventory update
                 if (poItem.Product.Physical == true &&
-                    receiveStatus != GoodsReceiveStatus.Draft &&
+                    receiveStatus != GoodsReceiveStatus.Pending &&
                     receiveStatus != GoodsReceiveStatus.Cancelled)
                 {
                     var warehouseId = reqItem.WarehouseId ?? request.DefaultWarehouseId;

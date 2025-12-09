@@ -7,6 +7,7 @@ public class SalesOrderItem : BaseEntity
     public string? SalesOrderId { get; set; }
     public SalesOrder? SalesOrder { get; set; }
     public string? ProductId { get; set; }
+    public int? PluCode { get; set; }   // ⭐ NEW FIELD
     public Product? Product { get; set; }
     public string? Summary { get; set; }
     public double? UnitPrice { get; set; } = 0;

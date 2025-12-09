@@ -12,6 +12,7 @@ public record GetSalesOrderItemBySalesOrderIdListDto
     public string? Id { get; init; }
     public string? SalesOrderId { get; init; }
     public string? SalesOrderNumber { get; init; }
+    public int? PluCode { get; init; }           // ⭐ ADDED
     public string? ProductId { get; init; }
     public string? ProductName { get; init; }
     public string? ProductNumber { get; init; }
@@ -38,7 +39,11 @@ public class GetSalesOrderItemBySalesOrderIdListProfile : Profile
             .ForMember(
                 dest => dest.ProductNumber,
                 opt => opt.MapFrom(src => src.Product != null ? src.Product.Number : string.Empty)
-            );
+            )
+            .ForMember(
+                dest => dest.PluCode,              // ⭐ MAP PluCode
+                opt => opt.MapFrom(src => src.PluCode)
+            );        
 
     }
 }
