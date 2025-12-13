@@ -922,70 +922,44 @@ const App = {
         // **ENHANCED VALIDATION FUNCTION - SUBMIT TIME ONLY**
         const validateForm = function () {
             debugger;
-            // Reset all errors
-            state.errors.receiveDate = '';
-            state.errors.purchaseOrderId = '';
-            state.errors.status = '';
-            state.errors.description = '';
-            state.errors.transportCharges = '';
-            state.errors.otherCharges = '';
+            // Reset errors...
             let isValid = true;
             let hasValidReceivedQuantity = false;
 
-            // ✅ Header validation
-            if (!state.receiveDate) {
-                state.errors.receiveDate = 'Receive date is required.';
-                isValid = false;
-            }
-            if (!state.purchaseOrderId) {
-                state.errors.purchaseOrderId = 'Purchase Order is required.';
-                isValid = false;
-            }
-            if (!state.status) {
-                state.errors.status = 'Status is required.';
-                isValid = false;
-            }
-
-            // ✅ Secondary grid data validation
             if (!state.deleteMode && state.secondaryData.length > 0) {
                 debugger;
+
+                // ✅ End edit mode to commit pending changes
                 if (secondaryGrid.obj.isEdit) {
                     secondaryGrid.obj.endEdit();
                 }
+
+                // Get only EDITS made in grid (not additions)
                 const batchChanges = secondaryGrid.obj ? secondaryGrid.obj.getBatchChanges() : {
-                    changed: [],
-                    deleted: [],
-                    added: []
+                    changedRecords: [],
+                    deletedRecords: [],
+                    addedRecords: []
                 };
 
-                // Merge current state + batch changes
-                let currentSecondaryData = state.id !== ""
-                    ? [...state.secondaryData]
-                    : [...batchChanges.changedRecords];
+                // ✅ SIMPLIFIED: Use state as primary source (has all auto-added records)
+                let currentSecondaryData = [...state.secondaryData];
 
-                // Apply batch edits
-                for (let changed of (batchChanges.changed || [])) {
+                // Apply edits made in grid
+                for (let changed of (batchChanges.changedRecords || [])) {
                     const index = currentSecondaryData.findIndex(item =>
                         (item.purchaseOrderItemId === changed.purchaseOrderItemId) ||
                         (item.id && item.id === changed.id)
                     );
                     if (index !== -1) {
-
                         currentSecondaryData[index] = {
                             ...currentSecondaryData[index],
                             ...changed,
-
-                            // Preserve key numeric fields if undefined
                             unitPrice: changed.unitPrice ?? currentSecondaryData[index].unitPrice,
                             taxAmount: changed.taxAmount ?? currentSecondaryData[index].taxAmount,
                             FinalPrice: changed.FinalPrice ?? currentSecondaryData[index].FinalPrice,
                             MRP: changed.MRP ?? currentSecondaryData[index].MRP,
-
-                            // Attribute dropdowns
                             attribute1DetailId: changed.attribute1DetailId ?? currentSecondaryData[index].attribute1DetailId,
                             attribute2DetailId: changed.attribute2DetailId ?? currentSecondaryData[index].attribute2DetailId,
-
-                            // Detail entries (IMEI / Service)
                             detailEntries: changed.detailEntries ?? currentSecondaryData[index].detailEntries
                         };
                     }
@@ -1002,10 +976,10 @@ const App = {
                     }
                 }
 
-                // Add newly added rows
-                currentSecondaryData.push(...(batchChanges.addedRecords || []));
+                // ✅ NO need to push addedRecords (grid UI doesn't add records)
+                // All records are already in state.secondaryData
 
-                // ✅ Validate each item
+                // ✅ Validate all items
                 for (let item of currentSecondaryData) {
                     const rcvQty = parseFloat(item.receivedQuantity || 0);
                     const mrpVal = parseFloat(item.MRP || 0);
@@ -1013,17 +987,6 @@ const App = {
                     if (rcvQty > 0) {
                         hasValidReceivedQuantity = true;
 
-                        // 🔹 Check for missing or invalid MRP
-                        if (!item.MRP || isNaN(mrpVal) || mrpVal <= 0) {
-                            Swal.fire({
-                                icon: 'error',
-                                title: 'Validation Error',
-                                text: `MRP is required for product "${item.productName || ''}" having received quantity greater than 0.`,
-                                confirmButtonText: 'OK'
-                            });
-                            isValid = false;
-                            break;
-                        }
                     } else if (rcvQty < 0) {
                         Swal.fire({
                             icon: 'error',
@@ -1036,7 +999,6 @@ const App = {
                     }
                 }
 
-                // ✅ At least one item must have received quantity > 0
                 if (isValid && !hasValidReceivedQuantity) {
                     Swal.fire({
                         icon: 'error',
@@ -1914,19 +1876,30 @@ const App = {
                     ? secondaryGrid.obj.getBatchChanges()
                     : { addedRecords: [], changedRecords: [], deletedRecords: [] };
 
-                let currentSecondaryData = state.id !== ""
-                    ? [...state.secondaryData]
-                    : [...batchChanges.changedRecords];
+                // 🔥 FIX: Always use state.secondaryData as base (includes programmatic adds)
+                // No ternary — this handles both new and existing forms correctly
+                let currentSecondaryData = [...state.secondaryData];
 
                 const matchRecord = (a, b) =>
                     (a.purchaseOrderItemId && b.purchaseOrderItemId && a.purchaseOrderItemId === b.purchaseOrderItemId) ||
                     (a.id && b.id && a.id === b.id);
 
-                // ✅ Apply changed records
-                for (let changed of (batchChanges.changed || [])) {
+                // ✅ Apply changed records (FIX: Use changedRecords, not 'changed')
+                for (let changed of (batchChanges.changedRecords || [])) {
                     const index = currentSecondaryData.findIndex(item => matchRecord(item, changed));
                     if (index !== -1) {
-                        currentSecondaryData[index] = { ...currentSecondaryData[index], ...changed };
+                        currentSecondaryData[index] = {
+                            ...currentSecondaryData[index],
+                            ...changed,
+                            // Preserve/apply specific fields if needed (from validateForm)
+                            unitPrice: changed.unitPrice ?? currentSecondaryData[index].unitPrice,
+                            taxAmount: changed.taxAmount ?? currentSecondaryData[index].taxAmount,
+                            FinalPrice: changed.FinalPrice ?? currentSecondaryData[index].FinalPrice,
+                            MRP: changed.MRP ?? currentSecondaryData[index].MRP,
+                            attribute1DetailId: changed.attribute1DetailId ?? currentSecondaryData[index].attribute1DetailId,
+                            attribute2DetailId: changed.attribute2DetailId ?? currentSecondaryData[index].attribute2DetailId,
+                            detailEntries: changed.detailEntries ?? currentSecondaryData[index].detailEntries
+                        };
                     }
                 }
 
@@ -1938,45 +1911,67 @@ const App = {
                     );
                 }
 
-                // ✅ Add new records
-                if (batchChanges.addedRecords?.length) {
-                    currentSecondaryData = [...currentSecondaryData, ...batchChanges.addedRecords];
-                }
+                // REMOVED: Add new records — empty due to allowAdding: false, and programmatic adds are already in base
 
-                // ✅ Final clean list with validation
-                const validItems = currentSecondaryData.filter(item => {
+                // ✅ Validate all items first (before filtering/formatting)
+                // Collect errors to show all at once, or throw if any fail
+                const validationErrors = [];
+                for (let item of currentSecondaryData) {
                     const rcvQty = parseFloat(item.receivedQuantity || 0);
                     const mrpVal = parseFloat(item.MRP || 0);
-
-                    // 🔸 Only include rows with received qty > 0
-                    if (rcvQty <= 0) return false;
-
-                    // 🔸 MRP must be valid & greater than 0
-                    if (isNaN(mrpVal) || mrpVal <= 0) {
-                        Swal.fire({
-                            icon: 'error',
-                            title: 'Validation Error',
-                            text: `MRP is required for product "${item.productName || ''}" having received quantity greater than 0.`,
-                            confirmButtonText: 'OK'
-                        });
-
-                        // ❌ Stop further processing by returning empty validItems list
-                        throw new Error('Invalid MRP found. Stopping submission.');
+                    if (rcvQty > 0) {
+                        
+                    } else if (rcvQty < 0) {
+                        validationErrors.push('Received quantity cannot be negative.');
                     }
+                }
 
-                    // ✅ Ensure numeric formatting before submission
-                    item.receivedQuantity = parseFloat(rcvQty.toFixed(2));
-                    item.unitPrice = parseFloat((item.unitPrice || 0).toFixed(2));
-                    item.taxAmount = parseFloat((item.taxAmount || 0).toFixed(2));
-                    item.FinalPrice = parseFloat((item.FinalPrice || 0).toFixed(2));
-                    item.MRP = parseFloat(mrpVal.toFixed(2));
+                if (validationErrors.length > 0) {
+                    // Show all errors in one dialog
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Validation Error',
+                        html: validationErrors.map(err => `<p>${err}</p>`).join(''),
+                        confirmButtonText: 'OK'
+                    });
+                    // ❌ Stop submission by returning empty
+                    return { validItems: [], deletedItems };
+                }
 
-                    return true;
-                });
+                // ✅ No errors: Filter to only valid items (rcvQty > 0) and format numerics
+                const validItems = currentSecondaryData
+                    .filter(item => {
+                        const rcvQty = parseFloat(item.receivedQuantity || 0);
+                        return rcvQty > 0;
+                    })
+                    .map(item => {
+                        const rcvQty = parseFloat(item.receivedQuantity || 0);
+                        const mrpVal = parseFloat(item.MRP || 0);
+                        // ✅ Ensure numeric formatting before submission
+                        return {
+                            ...item,
+                            receivedQuantity: parseFloat(rcvQty.toFixed(2)),
+                            unitPrice: parseFloat((item.unitPrice || 0).toFixed(2)),
+                            taxAmount: parseFloat((item.taxAmount || 0).toFixed(2)),
+                            FinalPrice: parseFloat((item.FinalPrice || 0).toFixed(2)),
+                            MRP: parseFloat(mrpVal.toFixed(2))
+                        };
+                    });
+
+                // Optional: Check if any valid items exist
+                if (validItems.length === 0) {
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Validation Error',
+                        text: 'At least one item must have received quantity greater than 0.',
+                        confirmButtonText: 'OK'
+                    });
+                    return { validItems: [], deletedItems };
+                }
 
                 return { validItems, deletedItems };
             },
- // 🔹 2️⃣ CALCULATION METHODS (SYNCHRONOUS)
+            // 🔹 2️⃣ CALCULATION METHODS (SYNCHRONOUS)
             // 🔹 Final price calculator
             recalculateFinalPrices: async () => {
                 const totalReceivedQty = state.secondaryData.reduce(
@@ -3390,6 +3385,7 @@ const App = {
                 secondaryGrid.obj.setProperties({ dataSource: state.secondaryData });
             }
         };
+
 
 
         // **UPDATED SECONDARY GRID FOR GOODS RECEIVE ITEMS**

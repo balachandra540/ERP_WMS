@@ -613,7 +613,7 @@
                             itemsDto // Pass items as an additional parameter
                         );
 
-                        if (response.code === 200) {
+                        if (response.data.code === 200) {
                             state.id = response?.data?.content?.data.id ?? '';
                             state.number = response?.data?.content?.data.number ?? '';
                             // No need for separate item creation calls; items are created in the single request
@@ -652,7 +652,7 @@
                     }
 
                     // **HANDLE RESPONSE**
-                    if (response.code === 200) {
+                    if (response.data.code === 200) {
                         await methods.populateMainData();
                         mainGrid.refresh();
 

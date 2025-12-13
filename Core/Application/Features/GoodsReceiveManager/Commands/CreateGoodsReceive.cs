@@ -327,9 +327,7 @@ namespace Application.Features.GoodsReceiveManager.Commands
                 item.RuleFor(i => i.PurchaseOrderItemId).NotEmpty();
                 item.RuleFor(i => i.ReceivedQuantity)
                     .GreaterThan(0).WithMessage("Received quantity must be greater than 0.");
-                item.RuleFor(i => i.MRP)
-                    .NotNull().GreaterThan(0).WithMessage("MRP must be provided and greater than 0 for each item.");
-
+                
                 // ⭐ Add backend validation for attributes
                 //item.RuleFor(i => i).CustomAsync(ValidateAttributesAsync);
             });
