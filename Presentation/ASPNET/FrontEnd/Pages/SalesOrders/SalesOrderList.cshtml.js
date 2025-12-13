@@ -1606,10 +1606,10 @@ const App = {
                 try {
                     await methods.populateCustomerGroupListLookupData();
                     await methods.populateCustomerCategoryListLookupData();
+
                     resetCustomerFormState();
                     customerState.mainTitle = 'Add Customer';
 
-                    // Initialize lookups
                     if (!customerGroupListLookup.obj) {
                         customerGroupListLookup.create();
                     } else {
@@ -1622,29 +1622,12 @@ const App = {
                         customerCategoryListLookup.refresh();
                     }
 
-                    // Initialize text inputs
-                    const textInputs = [
-                        nameText, CustomernumberText, streetText, cityText, stateText,
-                        zipCodeText, countryText, phoneNumberText, faxNumberText,
-                        emailAddressText, websiteText, whatsAppText, linkedInText,
-                        facebookText, instagramText, twitterXText, tikTokText
-                    ];
-
-                    textInputs.forEach(input => {
-                        if (!input.obj) {
-                            input.obj = input.create();
-                        }
-                    });
-
-                    // Show modal
                     if (!customerModal.obj) {
                         customerModal.create();
                     }
-                    if (customerModal.obj) {
-                        customerModal.obj.show();
-                    } else {
-                        console.error('Failed to initialize CustomerModal');
-                    }
+
+                    customerModal.obj.show();
+
                 } catch (error) {
                     console.error('Error opening customer modal:', error);
                     Swal.fire({
