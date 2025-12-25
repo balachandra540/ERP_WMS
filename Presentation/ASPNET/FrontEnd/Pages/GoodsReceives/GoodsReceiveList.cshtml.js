@@ -1276,7 +1276,7 @@ const App = {
                 otherCharges = 0
             ) => {
                 try {
-                    const locationId = StorageManager.getLocation();
+                    const locationId = defaultWarehouseId = StorageManager.getLocation();
 
                     const payload = {
                         Id: id,

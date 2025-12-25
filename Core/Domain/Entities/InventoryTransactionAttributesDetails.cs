@@ -10,14 +10,15 @@ namespace Domain.Entities
     public class InventoryTransactionAttributesDetails :BaseEntity
     {
 
-        public string InventoryTransactionId { get; set; } = null!;
-        public string GoodsReceiveItemDetailsId { get; set; } = null!;
+        public string InventoryTransactionId { get; set; }
+        public InventoryTransaction InventoryTransaction { get; set; } = default!;
 
-        // Optional Navigation
-        public InventoryTransaction? InventoryTransaction { get; set; }
+        public string? GoodsReceiveItemDetailsId { get; set; }
         public GoodsReceiveItemDetails? GoodsReceiveItemDetails { get; set; }
 
-       
+        public string? SalesOrderItemDetailsId { get; set; }
+        public SalesOrderItemDetails? SalesOrderItemDetails { get; set; }
+
 
     }
 

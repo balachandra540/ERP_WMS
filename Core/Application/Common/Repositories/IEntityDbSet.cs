@@ -56,6 +56,9 @@ public interface IEntityDbSet
     public DbSet<ProductPriceDefinition> ProductPriceDefinition { get; set; }
 
     public DbSet<GoodsReceiveItemDetails> GoodsReceiveItemDetails { get; }
+    public DbSet<InventoryTransactionAttributesDetails> InventoryTransactionAttributesDetails { get; set; }
+
+    public DbSet<SalesOrderItemDetails> SalesOrderItemDetails { get; }
 
 }
 

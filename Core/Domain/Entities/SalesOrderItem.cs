@@ -13,5 +13,6 @@ public class SalesOrderItem : BaseEntity
     public double? UnitPrice { get; set; } = 0;
     public double? Quantity { get; set; } = 1;
     public double? Total { get; set; } = 0;
+    public ICollection<SalesOrderItemDetails> Attributes { get; set; } = new List<SalesOrderItemDetails>();
 
 }

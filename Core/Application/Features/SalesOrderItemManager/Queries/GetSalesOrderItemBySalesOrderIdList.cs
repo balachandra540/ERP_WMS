@@ -1,5 +1,6 @@
 ﻿using Application.Common.CQS.Queries;
 using Application.Common.Extensions;
+using Application.Features.SalesOrderManager.Commands;
 using AutoMapper;
 using Domain.Entities;
 using MediatR;
@@ -21,6 +22,8 @@ public record GetSalesOrderItemBySalesOrderIdListDto
     public double? Quantity { get; init; }
     public double? Total { get; init; }
     public DateTime? CreatedAtUtc { get; init; }
+    public List<SalesOrderItemDetails> Attributes { get; init; } = new();
+
 }
 
 public class GetSalesOrderItemBySalesOrderIdListProfile : Profile
@@ -43,7 +46,10 @@ public class GetSalesOrderItemBySalesOrderIdListProfile : Profile
             .ForMember(
                 dest => dest.PluCode,              // ⭐ MAP PluCode
                 opt => opt.MapFrom(src => src.PluCode)
-            );        
+            )
+            .ForMember(dest => dest.Attributes,
+               opt => opt.MapFrom(src => src.Attributes));
+
 
     }
 }
@@ -78,6 +84,7 @@ public class GetSalesOrderItemBySalesOrderIdListHandler : IRequestHandler<GetSal
             .ApplyIsDeletedFilter(false)
             .Include(x => x.SalesOrder)
             .Include(x => x.Product)
+            .Include(x => x.Attributes) // ✅ THIS LINE
             .Where(x => x.SalesOrderId == request.SalesOrderId)
             .AsQueryable();
 

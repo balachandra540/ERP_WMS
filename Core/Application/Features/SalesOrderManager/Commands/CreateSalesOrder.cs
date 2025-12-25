@@ -7,6 +7,7 @@ using Domain.Enums;
 using FluentValidation;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
+using Application.Common.CQS.Queries;
 
 namespace Application.Features.SalesOrderManager.Commands;
 
@@ -24,8 +25,17 @@ public class SalesOrderItemDto
     public double Quantity { get; init; }
     public double Total { get; init; }
     public string? Summary { get; init; }
-}
+    public List<CreateSalesOrderItemDetailDto> Attributes { get; init; } = new();
 
+}
+public class CreateSalesOrderItemDetailDto
+{
+    public string SalesOrderItemId { get; init; } = string.Empty;
+    public int RowIndex { get; init; }
+    public string? IMEI1 { get; init; }
+    public string? IMEI2 { get; init; }
+    public string? ServiceNo { get; init; }
+}
 public class CreateSalesOrderRequest : IRequest<CreateSalesOrderResult>
 {
     public DateTime? OrderDate { get; init; }
@@ -78,6 +88,10 @@ public class CreateSalesOrderHandler
     private readonly InventoryTransactionService _inventoryTransactionService;
     private readonly SalesOrderService _salesOrderService;
     private readonly ISecurityService _securityService;
+    private readonly ICommandRepository<SalesOrderItemDetails> _itemDetailsRepository;
+    private readonly ICommandRepository<InventoryTransactionAttributesDetails> _inventoryTransactionAttributesDetailsRepository;
+    private readonly IQueryContext _queryContext;
+
 
     public CreateSalesOrderHandler(
         ICommandRepository<SalesOrder> repository,
@@ -85,22 +99,28 @@ public class CreateSalesOrderHandler
         ICommandRepository<DeliveryOrder> deliveryOrderRepository,
         ICommandRepository<Warehouse> warehouseRepository,
         ICommandRepository<Product> productRepository,
+        ICommandRepository<SalesOrderItemDetails> itemDetailsRepository, // 👈 ADD
         InventoryTransactionService inventoryTransactionService,
         IUnitOfWork unitOfWork,
         NumberSequenceService numberSequenceService,
         SalesOrderService salesOrderService,
-        ISecurityService securityService)
+        ISecurityService securityService,
+        ICommandRepository<InventoryTransactionAttributesDetails> inventoryTransactionAttributesDetailsRepository ,
+        IQueryContext queryContext)
     {
         _repository = repository;
         _itemRepository = itemRepository;
         _deliveryOrderRepository = deliveryOrderRepository;
         _warehouseRepository = warehouseRepository;
         _productRepository = productRepository;
+        _itemDetailsRepository = itemDetailsRepository; // 👈 ADD
         _inventoryTransactionService = inventoryTransactionService;
         _unitOfWork = unitOfWork;
         _numberSequenceService = numberSequenceService;
         _salesOrderService = salesOrderService;
         _securityService = securityService;
+        _inventoryTransactionAttributesDetailsRepository = inventoryTransactionAttributesDetailsRepository;
+        _queryContext = queryContext;
     }
 
     public async Task<CreateSalesOrderResult> Handle(CreateSalesOrderRequest request, CancellationToken cancellationToken = default)
@@ -126,6 +146,7 @@ public class CreateSalesOrderHandler
         // ---------------------------------------------------------
         // CREATE SALES ORDER ITEMS
         // ---------------------------------------------------------
+        List<SalesOrderItemDetails> saledItemDetails = new();
         foreach (var dto in request.Items)
         {
             var item = new SalesOrderItem
@@ -140,6 +161,30 @@ public class CreateSalesOrderHandler
             };
 
             await _itemRepository.CreateAsync(item, cancellationToken);
+            await _unitOfWork.SaveAsync(cancellationToken); // REQUIRED to get item.Id
+
+            // -------------------------------------------------
+            // 🔥 INSERT SALES ORDER ITEM DETAILS (IMEI / SERVICE)
+            // -------------------------------------------------
+            
+
+            foreach (var d in dto.Attributes)
+            {
+                var detail = new SalesOrderItemDetails
+                {
+                    SalesOrderItemId = item.Id,
+                    RowIndex = d.RowIndex,
+                    IMEI1 = d.IMEI1,
+                    IMEI2 = d.IMEI2,
+                    ServiceNo = d.ServiceNo,
+                    CreatedById = request.CreatedById!,
+                    CreatedAtUtc = DateTime.UtcNow,
+                };
+
+                await _itemDetailsRepository.CreateAsync(detail, cancellationToken);
+                saledItemDetails.Add(detail);
+            }
+
         }
 
         await _unitOfWork.SaveAsync(cancellationToken);
@@ -167,20 +212,52 @@ public class CreateSalesOrderHandler
             await _unitOfWork.SaveAsync(cancellationToken);
 
             // ---------------------------------------------------------
-            // ⭐ CREATE INVENTORY TRANSACTIONS ONLY WHEN INVOICE CREATED
+            // INVENTORY + ATTRIBUTE LEDGER (CORRECT)
             // ---------------------------------------------------------
             foreach (var dto in request.Items)
             {
-                await _inventoryTransactionService.DeliveryOrderCreateInvenTrans(
-                    invoice.Id,
-                    order.LocationId!,
-                    dto.ProductId!,
-                    dto.Quantity,
-                    request.CreatedById!,
-                    cancellationToken
-                );
+                // 1️⃣ Find SalesOrderItem
+                var salesItem = await _queryContext.SalesOrderItem
+                    .FirstAsync(x =>
+                        x.SalesOrderId == order.Id &&
+                        x.ProductId == dto.ProductId,
+                        cancellationToken);
+
+                // 2️⃣ Load ONLY this item’s details
+                var itemDetails = await _queryContext.SalesOrderItemDetails
+                    .Where(x => x.SalesOrderItemId == salesItem.Id)
+                    .ToListAsync(cancellationToken);
+
+                // 3️⃣ Create inventory transaction (NO attributes inside)
+                var inventoryTx = await _inventoryTransactionService
+                    .DeliveryOrderCreateInvenTrans(
+                        invoice.Id,
+                        order.LocationId!,
+                        salesItem.ProductId!,
+                        salesItem.Quantity,
+                        request.CreatedById!,
+                        cancellationToken
+                    );
+
+                // 4️⃣ Create attribute ledger HERE (ONLY ONCE)
+                foreach (var detail in itemDetails)
+                {
+                    await _inventoryTransactionAttributesDetailsRepository.CreateAsync(
+                        new InventoryTransactionAttributesDetails
+                        {
+                            InventoryTransactionId = inventoryTx.Id,
+                            SalesOrderItemDetailsId = detail.Id,
+                            CreatedById = request.CreatedById,
+                            CreatedAtUtc = DateTime.UtcNow
+                        },
+                        cancellationToken
+                    );
+                }
             }
+
+            await _unitOfWork.SaveAsync(cancellationToken);
         }
+
 
         return new CreateSalesOrderResult
         {
