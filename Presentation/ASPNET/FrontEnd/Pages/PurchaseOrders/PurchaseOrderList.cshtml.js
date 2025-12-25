@@ -66,6 +66,13 @@
                 state.errors.orderStatus = 'Order status is required.';
                 isValid = false;
             }
+            debugger;
+
+            // 🔥 FORCE grid to commit the current edit
+            if (secondaryGrid.obj && secondaryGrid.obj.isEdit) {
+                console.log("Ending edit mode before validation...");
+                 secondaryGrid.obj.endEdit();
+            }
 
             // GET BATCH CHANGES HERE
             const batchChanges = secondaryGrid.getBatchChanges();

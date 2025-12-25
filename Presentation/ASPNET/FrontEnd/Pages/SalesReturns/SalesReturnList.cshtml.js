@@ -531,7 +531,7 @@
                             state.deleteMode = false;
                             state.mainTitle = 'Add Sales Return';
                             resetFormState();
-                            state.showComplexDiv = false;
+                            state.showComplexDiv = true;
                             mainModal.obj.show();
                         }
 
@@ -751,93 +751,93 @@
                         }
                     },
                     actionComplete: async (args) => {
-                        if (args.requestType === 'save' && args.action === 'add') {
-                            try {
-                                const response = await services.createSecondaryData(state.id, args.data.warehouseId, args.data.productId, args.data.movement, StorageManager.getUserId());
-                                await methods.populateSecondaryData(state.id);
-                                secondaryGrid.refresh();
-                                if (response.data.code === 200) {
-                                    Swal.fire({
-                                        icon: 'success',
-                                        title: 'Save Successful',
-                                        timer: 2000,
-                                        showConfirmButton: false
-                                    });
-                                } else {
-                                    Swal.fire({
-                                        icon: 'error',
-                                        title: 'Save Failed',
-                                        text: response.data.message ?? 'Please check your data.',
-                                        confirmButtonText: 'Try Again'
-                                    });
-                                }
-                            } catch (error) {
-                                Swal.fire({
-                                    icon: 'error',
-                                    title: 'An Error Occurred',
-                                    text: error.response?.data?.message ?? 'Please try again.',
-                                    confirmButtonText: 'OK'
-                                });
-                            }
-                        }
-                        if (args.requestType === 'save' && args.action === 'edit') {
-                            try {
-                                const response = await services.updateSecondaryData(args.data.id, args.data.warehouseId, args.data.productId, args.data.movement, StorageManager.getUserId());
-                                await methods.populateSecondaryData(state.id);
-                                secondaryGrid.refresh();
-                                if (response.data.code === 200) {
-                                    Swal.fire({
-                                        icon: 'success',
-                                        title: 'Update Successful',
-                                        timer: 2000,
-                                        showConfirmButton: false
-                                    });
-                                } else {
-                                    Swal.fire({
-                                        icon: 'error',
-                                        title: 'Update Failed',
-                                        text: response.data.message ?? 'Please check your data.',
-                                        confirmButtonText: 'Try Again'
-                                    });
-                                }
-                            } catch (error) {
-                                Swal.fire({
-                                    icon: 'error',
-                                    title: 'An Error Occurred',
-                                    text: error.response?.data?.message ?? 'Please try again.',
-                                    confirmButtonText: 'OK'
-                                });
-                            }
-                        }
-                        if (args.requestType === 'delete') {
-                            try {
-                                const response = await services.deleteSecondaryData(args.data[0].id, StorageManager.getUserId());
-                                await methods.populateSecondaryData(state.id);
-                                secondaryGrid.refresh();
-                                if (response.data.code === 200) {
-                                    Swal.fire({
-                                        icon: 'success',
-                                        title: 'Delete Successful',
-                                        timer: 2000,
-                                        showConfirmButton: false
-                                    });
-                                } else {
-                                    Swal.fire({
-                                        icon: 'error',
-                                        title: 'Delete Failed',
-                                        text: response.data.message ?? 'Please check your data.',
-                                        confirmButtonText: 'Try Again'
-                                    });
-                                }
-                            } catch (error) {
-                                Swal.fire({
-                                    icon: 'error',
-                                    title: 'An Error Occurred',
-                                    text: error.response?.data?.message ?? 'Please try again.',
-                                    confirmButtonText: 'OK'
-                                });
-                            }
-                        }
+                        //if (args.requestType === 'save' && args.action === 'add') {
+                        //    try {
+                        //        const response = await services.createSecondaryData(state.id, args.data.warehouseId, args.data.productId, args.data.movement, StorageManager.getUserId());
+                        //        await methods.populateSecondaryData(state.id);
+                        //        secondaryGrid.refresh();
+                        //        if (response.data.code === 200) {
+                        //            Swal.fire({
+                        //                icon: 'success',
+                        //                title: 'Save Successful',
+                        //                timer: 2000,
+                        //                showConfirmButton: false
+                        //            });
+                        //        } else {
+                        //            Swal.fire({
+                        //                icon: 'error',
+                        //                title: 'Save Failed',
+                        //                text: response.data.message ?? 'Please check your data.',
+                        //                confirmButtonText: 'Try Again'
+                        //            });
+                        //        }
+                        //    } catch (error) {
+                        //        Swal.fire({
+                        //            icon: 'error',
+                        //            title: 'An Error Occurred',
+                        //            text: error.response?.data?.message ?? 'Please try again.',
+                        //            confirmButtonText: 'OK'
+                        //        });
+                        //    }
+                        //}
+                        //if (args.requestType === 'save' && args.action === 'edit') {
+                        //    try {
+                        //        const response = await services.updateSecondaryData(args.data.id, args.data.warehouseId, args.data.productId, args.data.movement, StorageManager.getUserId());
+                        //        await methods.populateSecondaryData(state.id);
+                        //        secondaryGrid.refresh();
+                        //        if (response.data.code === 200) {
+                        //            Swal.fire({
+                        //                icon: 'success',
+                        //                title: 'Update Successful',
+                        //                timer: 2000,
+                        //                showConfirmButton: false
+                        //            });
+                        //        } else {
+                        //            Swal.fire({
+                        //                icon: 'error',
+                        //                title: 'Update Failed',
+                        //                text: response.data.message ?? 'Please check your data.',
+                        //                confirmButtonText: 'Try Again'
+                        //            });
+                        //        }
+                        //    } catch (error) {
+                        //        Swal.fire({
+                        //            icon: 'error',
+                        //            title: 'An Error Occurred',
+                        //            text: error.response?.data?.message ?? 'Please try again.',
+                        //            confirmButtonText: 'OK'
+                        //        });
+                        //    }
+                        //}
+                        //if (args.requestType === 'delete') {
+                        //    try {
+                        //        const response = await services.deleteSecondaryData(args.data[0].id, StorageManager.getUserId());
+                        //        await methods.populateSecondaryData(state.id);
+                        //        secondaryGrid.refresh();
+                        //        if (response.data.code === 200) {
+                        //            Swal.fire({
+                        //                icon: 'success',
+                        //                title: 'Delete Successful',
+                        //                timer: 2000,
+                        //                showConfirmButton: false
+                        //            });
+                        //        } else {
+                        //            Swal.fire({
+                        //                icon: 'error',
+                        //                title: 'Delete Failed',
+                        //                text: response.data.message ?? 'Please check your data.',
+                        //                confirmButtonText: 'Try Again'
+                        //            });
+                        //        }
+                        //    } catch (error) {
+                        //        Swal.fire({
+                        //            icon: 'error',
+                        //            title: 'An Error Occurred',
+                        //            text: error.response?.data?.message ?? 'Please try again.',
+                        //            confirmButtonText: 'OK'
+                        //        });
+                        //    }
+                        //}
                         methods.refreshSummary();
                     }
                 });

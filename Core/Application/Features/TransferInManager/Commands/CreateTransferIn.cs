@@ -107,7 +107,7 @@ public class CreateTransferInHandler : IRequestHandler<CreateTransferInRequest, 
             {
                 // Check if the product is physical
                     var inventoryTransaction = await _inventoryTransactionService.TransferInCreateInvenTrans(
-                        item.Id,
+                        transferIn.Id,
                         item.ProductId,
                         item.Movement,
                         request.CreatedById,
