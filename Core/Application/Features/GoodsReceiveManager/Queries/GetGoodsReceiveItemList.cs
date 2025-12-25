@@ -49,7 +49,7 @@ namespace Application.Features.GoodsReceiveManager.Queries
         public string? IMEI2 { get; set; }
         public string? ServiceNo { get; set; }
     }
-   
+
 
     public class AttributeDetailDto
     {
@@ -327,7 +327,7 @@ namespace Application.Features.GoodsReceiveManager.Queries
                 var product = poItem.Product;
 
                 var orderedQty = poItem.Quantity ?? 0;
-                var totalReceivedQty = poItem.ReceivedQuantity ;
+                var totalReceivedQty = poItem.ReceivedQuantity;
                 var remainingQty = Math.Max(0, orderedQty - totalReceivedQty);
 
                 productAttrMap.TryGetValue(product.Id, out var attrLists);

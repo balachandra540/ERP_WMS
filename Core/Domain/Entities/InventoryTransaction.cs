@@ -27,5 +27,7 @@ public class InventoryTransaction : BaseEntity
     public double? QtySCSys { get; set; }
     public double? QtySCCount { get; set; }
     public double? QtySCDelta { get; set; }
+   public ICollection<InventoryTransactionAttributesDetails> InventoryTransactionAttributesDetails { get; set; }
+
 
 }

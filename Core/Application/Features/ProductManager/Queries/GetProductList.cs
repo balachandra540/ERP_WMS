@@ -1,9 +1,12 @@
 ﻿using Application.Common.CQS.Queries;
 using Application.Common.Extensions;
+using Application.Features.InventoryTransactionManager.Queries;
 using AutoMapper;
 using Domain.Entities;
+using Domain.Enums;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Query;
 
 namespace Application.Features.ProductManager.Queries;
 
@@ -205,4 +208,214 @@ public class GetProductIdByPLUHandler : IRequestHandler<GetProductIdByPLURequest
         };
     }
 }
-// ────────────────────────────────────────────────────────────────
+
+public class ProductStockSummaryDto
+{
+    public string ProductId { get; set; } = null!;
+    public decimal TotalStock { get; set; }
+    public decimal TotalMovement { get; set; }
+    public decimal RequestStock { get; set; }
+
+    public List<ProductStockAttributeDto> Attributes { get; set; } = new();
+}
+
+public class ProductStockAttributeDto
+{
+    public string? Attribute1DetailId { get; set; }
+    public string? Attribute2DetailId { get; set; }
+
+    public string? IMEI1 { get; set; }
+    public string? IMEI2 { get; set; }
+    public string? ServiceNo { get; set; }
+
+    public decimal Quantity { get; set; }
+}
+public class GetProductStockByProductIdRequest
+    : IRequest<ProductStockSummaryDto?>
+{
+    public string ProductId { get; init; } = null!;
+    public string? IMEI1 { get; init; }
+    public string? IMEI2 { get; init; }
+    public string? ServiceNo { get; init; }
+    public string warehouseId { get; init; }
+}
+
+public class GetProductStockByProductIdHandler
+    : IRequestHandler<GetProductStockByProductIdRequest, ProductStockSummaryDto?>
+{
+    private readonly IQueryContext _context;
+
+    public GetProductStockByProductIdHandler(IQueryContext context)
+    {
+        _context = context;
+    }
+
+    public async Task<ProductStockSummaryDto?> Handle(
+        GetProductStockByProductIdRequest request,
+        CancellationToken cancellationToken)
+    {
+        var result = await
+        (
+            from it in _context.InventoryTransaction
+                .AsNoTracking()
+                .ApplyIsDeletedFilter(false)
+
+            join itad in _context.InventoryTransactionAttributesDetails
+                .AsNoTracking()
+                .ApplyIsDeletedFilter(false)
+                on it.Id equals itad.InventoryTransactionId
+
+            join grid in _context.GoodsReceiveItemDetails
+                .AsNoTracking()
+                on itad.GoodsReceiveItemDetailsId equals grid.Id
+
+            join gri in _context.GoodsReceiveItem
+                .AsNoTracking()
+                on grid.GoodsReceiveItemId equals gri.Id
+
+            where it.Status == InventoryTransactionStatus.Confirmed
+                   && it.WarehouseId == request.warehouseId
+                  && it.ProductId == request.ProductId
+          // 🔥 EXACT MATCH USING ANY ONE IDENTIFIER
+          && (
+                (!string.IsNullOrEmpty(request.IMEI1) && grid.IMEI1 == request.IMEI1)
+             || (!string.IsNullOrEmpty(request.IMEI2) && grid.IMEI2 == request.IMEI2)
+             || (!string.IsNullOrEmpty(request.ServiceNo) && grid.ServiceNo == request.ServiceNo)
+          )
+
+            group new { it, gri, grid } by it.ProductId into g
+
+            select new ProductStockSummaryDto
+            {
+                ProductId = g.Key!,
+
+                TotalStock = g
+                    .GroupBy(x => new
+                    {
+                        x.grid.IMEI1,
+                        x.grid.IMEI2,
+                        x.grid.ServiceNo
+                    })
+                    .Count(ig => ig.Sum(x => x.it.Movement ?? 0) > 0),
+
+                TotalMovement = g.Sum(x => (decimal)(x.it.Movement ?? 0)),
+                RequestStock = 0,
+
+                Attributes =
+                    g.GroupBy(x => new
+                    {
+                        x.gri.Attribute1DetailId,
+                        x.gri.Attribute2DetailId,
+                        x.grid.IMEI1,
+                        x.grid.IMEI2,
+                        x.grid.ServiceNo
+                    })
+                    .Select(ag => new ProductStockAttributeDto
+                    {
+                        Attribute1DetailId = ag.Key.Attribute1DetailId,
+                        Attribute2DetailId = ag.Key.Attribute2DetailId,
+                        IMEI1 = ag.Key.IMEI1,
+                        IMEI2 = ag.Key.IMEI2,
+                        ServiceNo = ag.Key.ServiceNo,
+                        Quantity = ag.Sum(x => (decimal)(x.it.Movement ?? 0))
+                    })
+                    .Where(a => a.Quantity > 0)
+                    .ToList()
+            }
+        )
+        .Where(x => x.TotalStock > 0)
+        .FirstOrDefaultAsync(cancellationToken);
+
+        return result;
+    }
+}
+
+//public class CheckDetailValuesExistHandler
+//    : IRequestHandler<CheckDetailValuesExistRequest, CheckDetailValueExistResult>
+//{
+//    private readonly IQueryContext _context;
+
+//    public CheckDetailValuesExistHandler(IQueryContext context)
+//    {
+//        _context = context;
+//    }
+
+//    public async Task<CheckDetailValueExistResult> Handle(
+//        CheckDetailValuesExistRequest request,
+//        CancellationToken cancellationToken)
+//    {
+
+//        var result = await
+// (
+//     from it in _context.InventoryTransaction
+//         .AsNoTracking()
+//         .ApplyIsDeletedFilter(false)
+
+//     join itad in _context.InventoryTransactionAttributesDetails
+//         .AsNoTracking()
+//         .ApplyIsDeletedFilter(false)
+//         on it.Id equals itad.InventoryTransactionId
+
+//     join grid in _context.GoodsReceiveItemDetails
+//         .AsNoTracking()
+//         on itad.GoodsReceiveItemDetailsId equals grid.Id
+
+//     join gri in _context.GoodsReceiveItem
+//         .AsNoTracking()
+//         on grid.GoodsReceiveItemId equals gri.Id
+
+//     where it.Status == InventoryTransactionStatus.Confirmed
+//           && it.ProductId == request.ProductId
+//     // && it.WarehouseId == request.WarehouseId
+
+//     group new { it, gri, grid, itad } by it.ProductId into g
+
+//     select new ProductStockSummaryDto
+//     {
+//         ProductId = g.Key!,
+
+//         // 🔹 PRODUCT TOTALS
+//         TotalStock = (decimal)(g.Sum(x => x.it.Stock) ?? 0),
+//         TotalMovement = (decimal)(g.Sum(x => x.it.Movement) ?? 0),
+//         RequestStock = 0,
+
+//         // 🔹 ATTRIBUTE + SERIALIZED STOCK
+//         Attributes =
+//             g.GroupBy(x => new
+//             {
+//                 x.gri.Attribute1DetailId,
+//                 x.gri.Attribute2DetailId,
+//                 x.grid.IMEI1,
+//                 x.grid.IMEI2,
+//                 x.grid.ServiceNo
+//             })
+//             .Select(ag => new ProductStockAttributeDto
+//             {
+//                 Attribute1DetailId = ag.Key.Attribute1DetailId,
+//                 Attribute2DetailId = ag.Key.Attribute2DetailId,
+//                 IMEI1 = ag.Key.IMEI1,
+//                 IMEI2 = ag.Key.IMEI2,
+//                 ServiceNo = ag.Key.ServiceNo,
+//                 // ✅ Availability per serial
+//                 Quantity = ag.Sum(x => (decimal)(x.it.Movement ?? 0))
+//             })
+//             .Where(a => a.Quantity > 0)
+//             .ToList()
+//     }
+// )
+// .Where(x => x.TotalStock > 0)
+// .FirstOrDefaultAsync(cancellationToken);
+
+
+//        return result;
+//    }
+//}
+
+
+
+
+
+
+
+
+

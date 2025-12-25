@@ -8,38 +8,39 @@ namespace Application.Features.InventoryTransactionManager;
 public partial class InventoryTransactionService
 {
     public async Task<InventoryTransaction> DeliveryOrderCreateInvenTrans(
-        string? moduleId,
-        string? warehouseId,
-        string? productId,
-        double? movement,
-        string? createdById,
-        CancellationToken cancellationToken = default
-        )
+    string? moduleId,
+    string? warehouseId,
+    string? productId,
+    double? movement,
+    string? createdById,
+    CancellationToken cancellationToken = default
+)
     {
-        var parent = await _queryContext
-            .DeliveryOrder
+        var parent = await _queryContext.DeliveryOrder
             .AsNoTracking()
-            .SingleOrDefaultAsync(x => x.Id == moduleId, cancellationToken);
+            .SingleOrDefaultAsync(x => x.Id == moduleId, cancellationToken)
+            ?? throw new Exception($"DeliveryOrder not found: {moduleId}");
 
-        if (parent == null)
+        var child = new InventoryTransaction
         {
-            throw new Exception($"Parent entity not found: {moduleId}");
-        }
+            CreatedById = createdById,
+            Number = _numberSequenceService.GenerateNumber(nameof(InventoryTransaction), "", "IVT"),
 
-        var child = new InventoryTransaction();
-        child.CreatedById = createdById;
+            ModuleId = parent.Id,
+            ModuleName = nameof(DeliveryOrder),
+            ModuleCode = "DO",
+            ModuleNumber = parent.Number,
 
-        child.Number = _numberSequenceService.GenerateNumber(nameof(InventoryTransaction), "", "IVT");
-        child.ModuleId = parent.Id;
-        child.ModuleName = nameof(DeliveryOrder);
-        child.ModuleCode = "DO";
-        child.ModuleNumber = parent.Number;
-        child.MovementDate = parent.DeliveryDate;
-        child.Status = (InventoryTransactionStatus?)parent.Status;
+            MovementDate = parent.DeliveryDate,
+            Status = (InventoryTransactionStatus?)parent.Status,
 
-        child.WarehouseId = warehouseId;
-        child.ProductId = productId;
-        child.Movement = movement;
+            WarehouseId = warehouseId,
+            ProductId = productId,
+
+            // ✅ SALE = STOCK OUT
+            //Movement = -Math.Abs(movement ?? 0)
+             Movement = movement 
+        };
 
         CalculateInvenTrans(child);
 

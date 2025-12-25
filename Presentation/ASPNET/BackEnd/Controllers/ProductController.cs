@@ -203,6 +203,75 @@ public class ProductController : BaseApiController
             Content = response
         });
     }
+    [HttpGet("GetProductStockByProductId")]
+    public async Task<ActionResult<ApiSuccessResult<ProductStockSummaryDto>>> GetProductStockByProductIdAsync(
+        [FromQuery] string? imei1,
+        [FromQuery] string? imei2,
+        [FromQuery] string? serviceNo,
+        [FromQuery] string productId,
+        [FromQuery] string locationId,
+
+        CancellationToken cancellationToken)
+    {
+        var request = new GetProductStockByProductIdRequest
+        {
+            IMEI1 = imei1,
+            IMEI2 = imei2,
+            ServiceNo = serviceNo,
+            ProductId = productId,   
+            warehouseId = locationId
+        };
+
+        var response = await _sender.Send(request, cancellationToken);
+
+        return Ok(new ApiSuccessResult<ProductStockSummaryDto>
+        {
+            Code = StatusCodes.Status200OK,
+            Message = "IMEI / ServiceNo validation executed successfully",
+            Content = response
+        });
+    }
+
+    //[HttpGet("checkIMEIorServiceNoExistOrNot")]
+    //public async Task<ActionResult<ApiSuccessResult<CheckDetailValueExistResult>>>
+    //CheckIMEIorServiceNoExistOrNot(
+    //    [FromQuery] string value,
+    //    CancellationToken cancellationToken)
+    //{
+    //    var request = new CheckDetailValueExistRequest
+    //    {
+    //        Value = value
+    //    };
+
+    //    var response = await _sender.Send(request, cancellationToken);
+
+    //    return Ok(new ApiSuccessResult<CheckDetailValueExistResult>
+    //    {
+    //        Code = StatusCodes.Status200OK,
+    //        Message = "Validation executed successfully",
+    //        Content = response
+    //    });
+    //}
+
+    //public async Task<ActionResult<ApiSuccessResult<GetProductAndGoodsReceiveByPluResult>>>
+    //GetProductAndGoodsReceiveByPluAsync(
+    //    [FromQuery] int plu,
+    //    CancellationToken cancellationToken)
+    //{
+    //    var request = new GetProductAndGoodsReceiveByPluRequest
+    //    {
+    //        Plu = plu
+    //    };
+
+    //    var response = await _sender.Send(request, cancellationToken);
+
+    //    return Ok(new ApiSuccessResult<GetProductAndGoodsReceiveByPluResult>
+    //    {
+    //        Code = StatusCodes.Status200OK,
+    //        Message = $"Success executing {nameof(GetProductAndGoodsReceiveByPluAsync)}",
+    //        Content = response
+    //    });
+    //}
 
 }
 

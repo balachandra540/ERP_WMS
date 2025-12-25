@@ -149,6 +149,31 @@ public class GoodsReceiveController : BaseApiController
         });
     }
 
+    //[HttpGet("GetAttrListLookupData")]
+    //public async Task<ActionResult<ApiSuccessResult<GetAttrListLookupDataResult>>> GetAttrListLookupDataAsync(
+    //   [FromQuery] string attributeType,
+    //   [FromQuery] string value,
+    //   CancellationToken cancellationToken)
+    //{
+    //    if (string.IsNullOrWhiteSpace(attributeType) || string.IsNullOrWhiteSpace(value))
+    //    {
+    //        return BadRequest(new ApiErrorResult { Code = StatusCodes.Status400BadRequest, Message = "attributeType and value are required." });
+    //    }
+
+    //    var request = new GetAttrListLookupDataRequest(attributeType.Trim(), value.Trim());
+
+    //    var response = await _sender.Send(request, cancellationToken);
+
+    //    return Ok(new ApiSuccessResult<GetAttrListLookupDataResult>
+    //    {
+    //        Code = StatusCodes.Status200OK,
+    //        Message = $"Success executing {nameof(GetAttrListLookupDataAsync)}",
+    //        Content = response
+    //    });
+    //}
+
+
+
 
     //var details = await _context.GoodsReceiveItemDetails
     //    .AsNoTracking()

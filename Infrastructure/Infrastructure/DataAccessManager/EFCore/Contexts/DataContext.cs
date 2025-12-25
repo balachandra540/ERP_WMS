@@ -67,6 +67,7 @@ public class DataContext : IdentityDbContext<ApplicationUser>, IEntityDbSet
 
     public DbSet<GoodsReceiveItemDetails> GoodsReceiveItemDetails { get; set; }
     public DbSet<InventoryTransactionAttributesDetails> InventoryTransactionAttributesDetails { get; set; }
+    public DbSet<SalesOrderItemDetails> SalesOrderItemDetails { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -121,13 +122,14 @@ public class DataContext : IdentityDbContext<ApplicationUser>, IEntityDbSet
         modelBuilder.ApplyConfiguration(new NegativeAdjustmentConfiguration());
         modelBuilder.ApplyConfiguration(new PositiveAdjustmentConfiguration());
         modelBuilder.ApplyConfiguration(new ScrappingConfiguration());
-        modelBuilder.ApplyConfiguration(new GoodsReceiveItemConfiguration()); // NEW
+        modelBuilder.ApplyConfiguration(new GoodsReceiveItemConfiguration());
         modelBuilder.ApplyConfiguration(new ProductGroupAttributeConfiguration());
         modelBuilder.ApplyConfiguration(new ProductGroupAttributeValueConfiguration());
         modelBuilder.ApplyConfiguration(new PurchaseOrderItemAttributeCombinationConfiguration());
         modelBuilder.ApplyConfiguration(new ProductPriceDefinitionConfiguration());
         modelBuilder.ApplyConfiguration(new GoodsReceiveItemDetailConfiguration());
         modelBuilder.ApplyConfiguration(new InventoryTransactionAttributesDetailsConfiguration());
+        modelBuilder.ApplyConfiguration(new SalesOrderItemDetailsConfiguration());
 
     }
 

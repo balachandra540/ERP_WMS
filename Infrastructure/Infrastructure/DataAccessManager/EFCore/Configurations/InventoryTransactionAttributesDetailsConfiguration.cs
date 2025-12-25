@@ -19,14 +19,24 @@ namespace Infrastructure.DataAccessManager.EFCore.Configurations
 
 
             builder.HasOne(x => x.InventoryTransaction)
-                .WithMany()
+              .WithMany(x => x.InventoryTransactionAttributesDetails)
                 .HasForeignKey(x => x.InventoryTransactionId)
-                .OnDelete(DeleteBehavior.Restrict);
+                .OnDelete(DeleteBehavior.Restrict).IsRequired();
 
+            // Optional FK to GoodsReceiveItemDetails
             builder.HasOne(x => x.GoodsReceiveItemDetails)
-                .WithMany()
-                .HasForeignKey(x => x.GoodsReceiveItemDetailsId)
-                .OnDelete(DeleteBehavior.Restrict);
+                  .WithMany()
+                  .HasForeignKey(x => x.GoodsReceiveItemDetailsId)
+                  .OnDelete(DeleteBehavior.Restrict)
+                  .IsRequired(false);
+
+            // Optional FK to SalesOrderItemDetails
+            builder.HasOne(x => x.SalesOrderItemDetails)
+                  .WithMany()
+                  .HasForeignKey(x => x.SalesOrderItemDetailsId)
+                  .OnDelete(DeleteBehavior.Restrict)
+                  .IsRequired(false);
+
         }
     }
 
