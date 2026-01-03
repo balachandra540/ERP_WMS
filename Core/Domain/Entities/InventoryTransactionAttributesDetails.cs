@@ -19,6 +19,12 @@ namespace Domain.Entities
         public string? SalesOrderItemDetailsId { get; set; }
         public SalesOrderItemDetails? SalesOrderItemDetails { get; set; }
 
+        // ✅ NEW
+        public string? TransferOutDetailsId { get; set; }
+        public TransferOutDetails? TransferOutDetails { get; set; }
+
+
+
 
     }
 

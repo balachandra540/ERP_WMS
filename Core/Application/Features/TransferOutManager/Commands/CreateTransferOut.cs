@@ -1,4 +1,5 @@
-﻿using Application.Common.Repositories;
+﻿using Application.Common.CQS.Queries;
+using Application.Common.Repositories;
 using Application.Common.Services.SecurityManager;
 using Application.Features.InventoryTransactionManager;
 using Application.Features.NumberSequenceManager;
@@ -6,7 +7,7 @@ using Domain.Entities;
 using Domain.Enums;
 using FluentValidation;
 using MediatR;
-
+using Microsoft.EntityFrameworkCore;
 namespace Application.Features.TransferOutManager.Commands;
 
 // Models for the combined operation
@@ -22,12 +23,23 @@ public class CreateTransferOutWithInventoryRequest : IRequest<CreateTransferOutW
 
     // Collection of items for InventoryTransactions
     public List<InventoryItem> Items { get; init; } = new List<InventoryItem>();
+
+    // ✅ NEW: Serial / IMEI level details
+    
+}
+public class TransferOutDetailRequest
+{
+    public int RowIndex { get; init; }
+    public string? IMEI1 { get; init; }
+    public string? IMEI2 { get; init; }
+    public string? ServiceNo { get; init; }
+    public string? Id { get; init; }
 }
 
 
 public class CreateTransferOutWithInventoryResult
 {
-    public TransferOut? TransferOutData { get; set; }
+    public TransferOut? Data { get; set; }
     public List<InventoryTransaction> InventoryTransactionData { get; set; } = new List<InventoryTransaction>();
 }
 
@@ -64,19 +76,33 @@ public class CreateTransferOutWithInventoryHandler : IRequestHandler<CreateTrans
     private readonly NumberSequenceService _numberSequenceService;
     private readonly ISecurityService _securityService;
     private readonly InventoryTransactionService _inventoryTransactionService;
+    private readonly ICommandRepository<TransferOutDetails> _transferOutDetailRepository;
+    private readonly ICommandRepository<InventoryTransactionAttributesDetails> _attrRepository;
+    //private readonly ICommandRepository<GoodsReceiveItemDetails> _GoodsReceiveItemDetailsRepository;
+
+    private readonly IQueryContext _queryContext;
 
     public CreateTransferOutWithInventoryHandler(
         ICommandRepository<TransferOut> transferOutRepository,
+        ICommandRepository<TransferOutDetails> transferOutDetailRepository,
         IUnitOfWork unitOfWork,
         NumberSequenceService numberSequenceService,
         ISecurityService securityService,
-        InventoryTransactionService inventoryTransactionService)
+        InventoryTransactionService inventoryTransactionService,
+        ICommandRepository<InventoryTransactionAttributesDetails> attrRepository,
+        //ICommandRepository<GoodsReceiveItemDetails> GoodsReceiveItemDetailsRepository,
+        IQueryContext queryContext
+)
     {
         _transferOutRepository = transferOutRepository;
+        _transferOutDetailRepository = transferOutDetailRepository;
         _unitOfWork = unitOfWork;
         _numberSequenceService = numberSequenceService;
         _securityService = securityService;
         _inventoryTransactionService = inventoryTransactionService;
+        //_GoodsReceiveItemDetailsRepository = GoodsReceiveItemDetailsRepository;
+        _queryContext = queryContext;
+        _attrRepository = attrRepository;
     }
 
     public async Task<CreateTransferOutWithInventoryResult> Handle(CreateTransferOutWithInventoryRequest request, CancellationToken cancellationToken = default)
@@ -98,10 +124,11 @@ public class CreateTransferOutWithInventoryHandler : IRequestHandler<CreateTrans
             await _transferOutRepository.CreateAsync(transferOut, cancellationToken);
             await _unitOfWork.SaveAsync(cancellationToken);
 
-            // Step 2: Create InventoryTransactions for each item
+            // Step 4: Create InventoryTransactions and link to TransferOutDetails
             var inventoryTransactions = new List<InventoryTransaction>();
             foreach (var item in request.Items)
             {
+                // Create inventory transaction
                 var inventoryTransaction = await _inventoryTransactionService.TransferOutCreateInvenTrans(
                     transferOut.Id, // Use TransferOut ID as ModuleId
                     item.ProductId,
@@ -110,18 +137,69 @@ public class CreateTransferOutWithInventoryHandler : IRequestHandler<CreateTrans
                     cancellationToken);
 
                 inventoryTransactions.Add(inventoryTransaction);
+
+                foreach (var d in item.Details)
+                {
+                    //var detail = new TransferOutDetails
+                    //{
+                    //    TransferOutId = transferOut.Id,
+                    //    RowIndex = d.RowIndex,
+                    //    IMEI1 = d.IMEI1,
+                    //    IMEI2 = d.IMEI2,
+                    //    ServiceNo = d.ServiceNo,
+                    //    CreatedById = request.CreatedById,
+                    //    CreatedAtUtc = DateTime.UtcNow
+                    //};
+                    //await _transferOutDetailRepository.CreateAsync(detail, cancellationToken);
+                    //await _unitOfWork.SaveAsync(cancellationToken);
+
+                    var goodsReceiveDetail = await _queryContext.GoodsReceiveItemDetails
+                    .AsNoTracking()
+                    .Where(x =>
+                        !x.IsDeleted &&
+                        (
+                            (!string.IsNullOrEmpty(d.IMEI1) && x.IMEI1 == d.IMEI1) ||
+                            (!string.IsNullOrEmpty(d.IMEI2) && x.IMEI2 == d.IMEI2) ||
+                            (!string.IsNullOrEmpty(d.ServiceNo) && x.ServiceNo == d.ServiceNo)
+                        )
+                    )
+                    .FirstOrDefaultAsync(cancellationToken);
+                    if (goodsReceiveDetail == null)
+                    {
+                        throw new Exception(
+                            $"GoodsReceive item not found. " +
+                            $"IMEI1:{d.IMEI1}, IMEI2:{d.IMEI2}, ServiceNo:{d.ServiceNo}");
+                    }
+
+                    var attr = new InventoryTransactionAttributesDetails
+                    {
+                        InventoryTransactionId = inventoryTransaction.Id,
+                        GoodsReceiveItemDetailsId = goodsReceiveDetail.Id,
+                        //TransferOutDetailsId = detail.Id,
+                        CreatedById = request.CreatedById,
+                        CreatedAtUtc = DateTime.UtcNow
+                    };
+                    await _attrRepository.CreateAsync(attr, cancellationToken);
+
+                    if (inventoryTransaction.InventoryTransactionAttributesDetails == null)
+                        inventoryTransaction.InventoryTransactionAttributesDetails = new List<InventoryTransactionAttributesDetails>();
+
+                    inventoryTransaction.InventoryTransactionAttributesDetails.Add(attr);
+                }
+
             }
 
-            // Save all changes
+            // Step 5: Save all inventory transactions
             await _unitOfWork.SaveAsync(cancellationToken);
+
 
             return new CreateTransferOutWithInventoryResult
             {
-                TransferOutData = transferOut,
+                Data = transferOut,
                 InventoryTransactionData = inventoryTransactions
             };
         }
-        catch
+        catch(Exception ex)
         {
             // Since explicit transaction management is not available, rely on SaveAsync for atomicity
             throw; // Let the exception bubble up to be handled by the caller

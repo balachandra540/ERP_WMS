@@ -66,10 +66,20 @@ public class FromWarehouseIdResult
 public class ProductStockSummaryDto
 {
     public string Id { get; set; } // Adjust type if ProductId is int or Guid
-    public string ProductId { get; set; } // Adjust type if ProductId is int or Guid
+    public string ProductId { get; set; }
     public decimal TotalStock { get; set; }
     public decimal TotalMovement { get; set; } // Assuming Movement is double? and summed
-    public decimal RequestStock { get; set; } // Equals TotalMovement when ModuleId exists
+    public decimal RequestStock { get; set; }
+
+    public List<ProductDetailEntryDto> DetailEntries { get; set; } = new();
+}
+
+public class ProductDetailEntryDto
+{
+    public string GoodsReceiveItemDetailsId { get; set; }
+    public string IMEI1 { get; set; }
+    public string IMEI2 { get; set; }
+    public string ServiceNo { get; set; }
 }
 public class FromWarehouseIdRequest : IRequest<FromWarehouseIdResult>
 {

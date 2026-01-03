@@ -21,6 +21,8 @@ public record GetTransferOutListDto
     public string? WarehouseToId { get; init; }
     public string? WarehouseToName { get; init; }
     public DateTime? CreatedAtUtc { get; init; }
+    public List<TransferOutDetails> Details { get; init; } = new();
+
 }
 
 public class GetTransferOutListProfile : Profile
@@ -40,6 +42,10 @@ public class GetTransferOutListProfile : Profile
                 dest => dest.StatusName,
                 opt => opt.MapFrom(src => src.Status.HasValue ? src.Status.Value.ToFriendlyName() : string.Empty)
             );
+        //.ForMember(
+        //    d => d.Details,
+        //o => o.MapFrom(s => s.TransferOutDetails));
+
 
     }
 }
@@ -70,16 +76,18 @@ public class GetTransferOutListHandler : IRequestHandler<GetTransferOutListReque
     public async Task<GetTransferOutListResult> Handle(GetTransferOutListRequest request, CancellationToken cancellationToken)
     {
         var query = _context
-            .TransferOut
-            .AsNoTracking()
-            .ApplyIsDeletedFilter(request.IsDeleted)
-            .Include(x => x.WarehouseFrom)
-            .Include(x => x.WarehouseTo)
-            .AsQueryable();
-        // ✅ Apply location filter (through SalesOrder)
+     .TransferOut
+     .AsNoTracking()
+     .ApplyIsDeletedFilter(request.IsDeleted)
+     .Include(x => x.WarehouseFrom)
+     .Include(x => x.WarehouseTo)
+     .AsQueryable();
+
         if (request.wareHouseId != null && request.wareHouseId.Length > 0)
         {
-            query = query.Where(x => x.WarehouseFromId != null && request.wareHouseId.Contains(x.WarehouseFromId));
+            query = query.Where(x =>
+                x.WarehouseFromId != null &&
+                request.wareHouseId.Contains(x.WarehouseFromId));
         }
 
         var entities = await query.ToListAsync(cancellationToken);
@@ -90,6 +98,7 @@ public class GetTransferOutListHandler : IRequestHandler<GetTransferOutListReque
         {
             Data = dtos
         };
+
     }
 
 

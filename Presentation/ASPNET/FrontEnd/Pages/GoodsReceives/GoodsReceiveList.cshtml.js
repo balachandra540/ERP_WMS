@@ -925,7 +925,8 @@ const App = {
             // Reset errors...
             let isValid = true;
             let hasValidReceivedQuantity = false;
-
+            let hasValidMrp = false;
+             
             if (!state.deleteMode && state.secondaryData.length > 0) {
                 debugger;
 
@@ -997,6 +998,16 @@ const App = {
                         isValid = false;
                         break;
                     }
+                     if (mrp < 0) {
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Validation Error',
+                            text: 'MRP should not be negative.',
+                            confirmButtonText: 'OK'
+                        });
+                        isValid = false;
+                        break;
+                    }
                 }
 
                 if (isValid && !hasValidReceivedQuantity) {
@@ -1004,6 +1015,15 @@ const App = {
                         icon: 'error',
                         title: 'Validation Error',
                         text: 'At least one item must have received quantity greater than 0.',
+                        confirmButtonText: 'OK'
+                    });
+                    isValid = false;
+                }
+                if (!hasValidMrp) {
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Validation Error',
+                        text: 'MRP should not be negative.',
                         confirmButtonText: 'OK'
                     });
                     isValid = false;

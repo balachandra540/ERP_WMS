@@ -464,9 +464,11 @@
                     deletedRecords: []
                 };
 
-                let currentSecondaryData = state.id !== "" && batchChanges.changedRecords.length > 0
-                    ? [...batchChanges.changedRecords]
-                    : [...state.secondaryData];
+                //let currentSecondaryData = state.id !== "" && batchChanges.changedRecords.length > 0
+                //    ? [...batchChanges.changedRecords]
+                //    : [...state.secondaryData];
+                let currentSecondaryData = [...state.secondaryData];
+
                 const matchRecord = (a, b) =>
                     (a.productId && b.productId && a.productId === b.productId) ||
                     (a.id && b.id && a.id === b.id);

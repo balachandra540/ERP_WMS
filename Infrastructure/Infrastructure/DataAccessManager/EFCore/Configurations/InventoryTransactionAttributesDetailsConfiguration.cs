@@ -36,6 +36,12 @@ namespace Infrastructure.DataAccessManager.EFCore.Configurations
                   .HasForeignKey(x => x.SalesOrderItemDetailsId)
                   .OnDelete(DeleteBehavior.Restrict)
                   .IsRequired(false);
+            builder.Property(x => x.TransferOutDetailsId);
+
+            builder.HasOne(x => x.TransferOutDetails)
+                .WithMany() // no back-navigation required
+                .HasForeignKey(x => x.TransferOutDetailsId)
+                .OnDelete(DeleteBehavior.SetNull);
 
         }
     }

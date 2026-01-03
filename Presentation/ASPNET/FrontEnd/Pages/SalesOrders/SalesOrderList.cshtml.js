@@ -998,7 +998,7 @@ const App = {
             productListLookupData: [],
             priceDefinitionListLookupData: [],
             activeDetailRow: [],
-            scannedPluAttributesData:[],
+            //scannedPluAttributesData:[],
             mainTitle: '',
             id: '',
             number: '',
@@ -1787,9 +1787,11 @@ const App = {
                 console.log('Batch Changes:', batchChanges);
 
                 // Base data if editing an existing document
-                let currentSecondaryData = state.id !== ""
-                    ? [...state.secondaryData]
-                    : [];
+                //let currentSecondaryData = state.id !== ""
+                //    ? [...state.secondaryData]
+                //    : [];
+
+                let currentSecondaryData = [...state.secondaryData];
 
                 const addedRecords = batchChanges.addedRecords || [];
                 const changedRecords = batchChanges.changedRecords || [];
@@ -1843,9 +1845,9 @@ const App = {
                 }
 
                 // --- 2️⃣ PROCESS ADDED RECORDS ---
-                for (let added of addedRecords) {
-                    currentSecondaryData.push(filterFields(added));
-                }
+                //for (let added of addedRecords) {
+                //    currentSecondaryData.push(filterFields(added));
+                //}
 
                 // --- 3️⃣ PROCESS DELETED RECORDS ---
                 let deletedRecords = (batchChanges.deletedRecords || []).flat(Infinity);
@@ -1994,7 +1996,8 @@ const App = {
                             }, 1500);
                         }
 
-                    } else {
+                    }
+                    else {
                         Swal.fire({
                             icon: 'error',
                             title: state.deleteMode ? 'Delete Failed' : 'Save Failed',
@@ -2385,7 +2388,7 @@ const App = {
                 //    return;
                 //}
 
-                const rowIndex = 0;
+                const rowIndex = state.currentDetailRowIndex;
                 let entries = [];
                 const inputs = document.querySelectorAll(".detail-input");
 

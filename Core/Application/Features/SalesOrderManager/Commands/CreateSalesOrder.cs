@@ -90,6 +90,7 @@ public class CreateSalesOrderHandler
     private readonly ISecurityService _securityService;
     private readonly ICommandRepository<SalesOrderItemDetails> _itemDetailsRepository;
     private readonly ICommandRepository<InventoryTransactionAttributesDetails> _inventoryTransactionAttributesDetailsRepository;
+    private readonly ICommandRepository<GoodsReceiveItemDetails> _goodsReceiveItemDetailsRepository;
     private readonly IQueryContext _queryContext;
 
 
@@ -100,7 +101,8 @@ public class CreateSalesOrderHandler
         ICommandRepository<Warehouse> warehouseRepository,
         ICommandRepository<Product> productRepository,
         ICommandRepository<SalesOrderItemDetails> itemDetailsRepository, // 👈 ADD
-        InventoryTransactionService inventoryTransactionService,
+        ICommandRepository<GoodsReceiveItemDetails> goodsReceiveItemDetailsRepository,
+    InventoryTransactionService inventoryTransactionService,
         IUnitOfWork unitOfWork,
         NumberSequenceService numberSequenceService,
         SalesOrderService salesOrderService,
@@ -120,6 +122,7 @@ public class CreateSalesOrderHandler
         _salesOrderService = salesOrderService;
         _securityService = securityService;
         _inventoryTransactionAttributesDetailsRepository = inventoryTransactionAttributesDetailsRepository;
+        _goodsReceiveItemDetailsRepository = goodsReceiveItemDetailsRepository;
         _queryContext = queryContext;
     }
 
@@ -170,6 +173,31 @@ public class CreateSalesOrderHandler
 
             foreach (var d in dto.Attributes)
             {
+                // -----------------------------
+                // 1️⃣ Find GoodsReceiveItemDetails by IMEI / ServiceNo
+                // -----------------------------
+                var goodsReceiveDetail = await _queryContext.GoodsReceiveItemDetails
+                    .AsNoTracking()
+                    .Where(x =>
+                        !x.IsDeleted &&
+                        (
+                            (!string.IsNullOrEmpty(d.IMEI1) && x.IMEI1 == d.IMEI1) ||
+                            (!string.IsNullOrEmpty(d.IMEI2) && x.IMEI2 == d.IMEI2) ||
+                            (!string.IsNullOrEmpty(d.ServiceNo) && x.ServiceNo == d.ServiceNo)
+                        )
+                    )
+                    .FirstOrDefaultAsync(cancellationToken);
+
+                //if (goodsReceiveDetail == null)
+                //{
+                //    throw new Exception(
+                //        $"GoodsReceive item not found. " +
+                //        $"IMEI1:{d.IMEI1}, IMEI2:{d.IMEI2}, ServiceNo:{d.ServiceNo}");
+                //}
+
+                
+
+
                 var detail = new SalesOrderItemDetails
                 {
                     SalesOrderItemId = item.Id,
@@ -179,6 +207,7 @@ public class CreateSalesOrderHandler
                     ServiceNo = d.ServiceNo,
                     CreatedById = request.CreatedById!,
                     CreatedAtUtc = DateTime.UtcNow,
+
                 };
 
                 await _itemDetailsRepository.CreateAsync(detail, cancellationToken);
@@ -242,10 +271,30 @@ public class CreateSalesOrderHandler
                 // 4️⃣ Create attribute ledger HERE (ONLY ONCE)
                 foreach (var detail in itemDetails)
                 {
+                    var goodsReceiveDetail = await _queryContext.GoodsReceiveItemDetails
+                    .AsNoTracking()
+                    .Where(x =>
+                        !x.IsDeleted &&
+                        (
+                            (!string.IsNullOrEmpty(detail.IMEI1) && x.IMEI1 == detail.IMEI1) ||
+                            (!string.IsNullOrEmpty(detail.IMEI2) && x.IMEI2 == detail.IMEI2) ||
+                            (!string.IsNullOrEmpty(detail.ServiceNo) && x.ServiceNo == detail.ServiceNo)
+                        )
+                    )
+                    .FirstOrDefaultAsync(cancellationToken);
+                    if (goodsReceiveDetail == null)
+                    {
+                        throw new Exception(
+                            $"GoodsReceive item not found. " +
+                            $"IMEI1:{detail.IMEI1}, IMEI2:{ detail.IMEI2}, ServiceNo:{detail.ServiceNo}");
+                    }
+
                     await _inventoryTransactionAttributesDetailsRepository.CreateAsync(
                         new InventoryTransactionAttributesDetails
                         {
                             InventoryTransactionId = inventoryTx.Id,
+                            // ✅ NEW
+                            GoodsReceiveItemDetailsId = goodsReceiveDetail.Id,
                             SalesOrderItemDetailsId = detail.Id,
                             CreatedById = request.CreatedById,
                             CreatedAtUtc = DateTime.UtcNow

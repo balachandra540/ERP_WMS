@@ -58,13 +58,18 @@ public class UpdateSalesOrderRequest : IRequest<UpdateSalesOrderResult>
     public string? LocationId { get; init; }
 
     public List<UpdateSalesOrderItemDto> Items { get; init; } = new();
-    public List<string>? DeletedItemIds { get; init; }
+    public List<DeleteSalesOrderItemDto>? DeletedItemIds { get; init; }
+
+}
+public class DeleteSalesOrderItemDto
+{
+    public string? Id { get; init; }
 }
 
-// -------------------------------
-// VALIDATOR
-// -------------------------------
-public class UpdateSalesOrderValidator : AbstractValidator<UpdateSalesOrderRequest>
+    // -------------------------------
+    // VALIDATOR
+    // -------------------------------
+    public class UpdateSalesOrderValidator : AbstractValidator<UpdateSalesOrderRequest>
 {
     public UpdateSalesOrderValidator()
     {
@@ -172,9 +177,9 @@ public class UpdateSalesOrderHandler
         // -----------------------------------------------------
         if (request.DeletedItemIds != null)
         {
-            foreach (var id in request.DeletedItemIds)
+            foreach (var dto in request.DeletedItemIds)
             {
-                var item = existingItems.FirstOrDefault(x => x.Id == id);
+                var item = existingItems.FirstOrDefault(x => x.Id == dto.Id);
                 if (item != null)
                 {
                     _itemRepository.Delete(item);
@@ -294,10 +299,29 @@ public class UpdateSalesOrderHandler
 
                 foreach (var detail in itemDetails)
                 {
+                    var goodsReceiveDetail = await _queryContext.GoodsReceiveItemDetails
+                    .AsNoTracking()
+                    .Where(x =>
+                        !x.IsDeleted &&
+                        (
+                            (!string.IsNullOrEmpty(detail.IMEI1) && x.IMEI1 == detail.IMEI1) ||
+                            (!string.IsNullOrEmpty(detail.IMEI2) && x.IMEI2 == detail.IMEI2) ||
+                            (!string.IsNullOrEmpty(detail.ServiceNo) && x.ServiceNo == detail.ServiceNo)
+                        )
+                    )
+                    .FirstOrDefaultAsync(cancellationToken);
+                    if (goodsReceiveDetail == null)
+                    {
+                        throw new Exception(
+                            $"GoodsReceive item not found. " +
+                            $"IMEI1:{detail.IMEI1}, IMEI2:{detail.IMEI2}, ServiceNo:{detail.ServiceNo}");
+                    }
+
                     await _inventoryTransactionAttributesDetailsRepository.CreateAsync(
                         new InventoryTransactionAttributesDetails
                         {
                             InventoryTransactionId = inventoryTx.Id,
+                            GoodsReceiveItemDetailsId = goodsReceiveDetail.Id,
                             SalesOrderItemDetailsId = detail.Id,
                             UpdatedById = request.UpdatedById,
                             UpdatedAtUtc = DateTime.UtcNow

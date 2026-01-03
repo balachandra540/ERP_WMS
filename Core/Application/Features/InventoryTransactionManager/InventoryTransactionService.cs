@@ -16,12 +16,13 @@ public partial class InventoryTransactionService
     private readonly IQueryContext _queryContext;
     private readonly ICommandRepository<InventoryTransaction> _inventoryTransactionRepository;
     private readonly IUnitOfWork _unitOfWork;
-
+    private readonly ICommandRepository<InventoryTransactionAttributesDetails> _inventoryTransactionAttributesRepository;
     public InventoryTransactionService(
         NumberSequenceService numberSequenceService,
         WarehouseService warehouseService,
         IQueryContext queryContext,
         ICommandRepository<InventoryTransaction> inventoryTransactionRepository,
+        ICommandRepository<InventoryTransactionAttributesDetails> inventoryTransactionAttributesRepository,
         IUnitOfWork unitOfWork
         )
     {
@@ -30,6 +31,7 @@ public partial class InventoryTransactionService
         _queryContext = queryContext;
         _inventoryTransactionRepository = inventoryTransactionRepository;
         _unitOfWork = unitOfWork;
+        _inventoryTransactionAttributesRepository = inventoryTransactionAttributesRepository;
     }
 
     public double GetStock(string? warehouseId, string? productId, string? currentId = null)

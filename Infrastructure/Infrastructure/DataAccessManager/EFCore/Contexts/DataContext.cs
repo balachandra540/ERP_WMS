@@ -68,6 +68,8 @@ public class DataContext : IdentityDbContext<ApplicationUser>, IEntityDbSet
     public DbSet<GoodsReceiveItemDetails> GoodsReceiveItemDetails { get; set; }
     public DbSet<InventoryTransactionAttributesDetails> InventoryTransactionAttributesDetails { get; set; }
     public DbSet<SalesOrderItemDetails> SalesOrderItemDetails { get; set; }
+    public DbSet<TransferOutDetails> TransferOutDetails { get; set; } = default!;
+
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -130,6 +132,7 @@ public class DataContext : IdentityDbContext<ApplicationUser>, IEntityDbSet
         modelBuilder.ApplyConfiguration(new GoodsReceiveItemDetailConfiguration());
         modelBuilder.ApplyConfiguration(new InventoryTransactionAttributesDetailsConfiguration());
         modelBuilder.ApplyConfiguration(new SalesOrderItemDetailsConfiguration());
+        modelBuilder.ApplyConfiguration(new TransferOutDetailsConfiguration());
 
     }
 

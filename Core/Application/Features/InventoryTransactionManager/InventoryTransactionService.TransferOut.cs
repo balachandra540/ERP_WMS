@@ -119,16 +119,64 @@ public partial class InventoryTransactionService
             query = query.Where(x => x.Status == InventoryTransactionStatus.Confirmed);
 
         // Project directly to ProductStockSummaryDto
-        var result = await query
-            .Select(x => new ProductStockSummaryDto
-            {
-                Id = x.Id, // Assuming Id types match
-                ProductId = x.ProductId,
-                TotalMovement = (decimal)(x.Movement ?? 0), // Explicit cast to decimal
-                TotalStock = (decimal)(x.Movement ?? 0),      // Explicit cast to decimal
-                RequestStock = (decimal)(x.Movement ?? 0) // Explicit cast to decimal
-            })
-            .ToListAsync(cancellationToken);
+        //var result = await query
+        //    .Select(x => new ProductStockSummaryDto
+        //    {
+        //        Id = x.Id, // Assuming Id types match
+        //        ProductId = x.ProductId,
+        //        TotalMovement = (decimal)(x.Movement ?? 0), // Explicit cast to decimal
+        //        TotalStock = (decimal)(x.Movement ?? 0),      // Explicit cast to decimal
+        //        RequestStock = (decimal)(x.Movement ?? 0) // Explicit cast to decimal
+        //    })
+        //    .ToListAsync(cancellationToken);
+
+        var result = await (
+    from it in query // your existing InventoryTransaction query
+    join attr in _queryContext.InventoryTransactionAttributesDetails
+        on it.Id equals attr.InventoryTransactionId
+    join gr in _queryContext.GoodsReceiveItemDetails
+        on attr.GoodsReceiveItemDetailsId equals gr.Id
+    group gr by new
+    {
+        it.Id,
+        it.ProductId,
+        it.Movement
+    }
+    into g
+    select new ProductStockSummaryDto
+    {
+        Id = g.Key.Id,
+        ProductId = g.Key.ProductId ?? "",
+        RequestStock = (decimal)(g.Key.Movement ?? 0),
+
+        DetailEntries = g.Select(x => new ProductDetailEntryDto
+        {
+            GoodsReceiveItemDetailsId = x.Id,
+            IMEI1 = x.IMEI1 ?? "",
+            IMEI2 = x.IMEI2 ?? "",
+            ServiceNo = x.ServiceNo ?? ""
+        }).ToList()
+    }).ToListAsync(cancellationToken);
+
+        //select new ProductStockSummaryDto
+        //{
+        //    // InventoryTransaction Id
+        //    Id = it.Id,
+
+        //    ProductId = it.ProductId ?? "",
+
+        //    //GoodsReceiveItemDetails fields
+        //    GoodsReceiveItemDetailsId = gr.Id,
+        //     IMEI1 = gr.IMEI1 ?? "",
+        //    IMEI2 = gr.IMEI2 ?? "",
+        //    ServiceNo = gr.ServiceNo ?? "",
+
+        //    // Stock values
+        //    TotalMovement = (decimal)(it.Movement ?? 0),
+        //    TotalStock = (decimal)(it.Movement ?? 0),
+        //    RequestStock = (decimal)(it.Movement ?? 0)
+        //}
+        //).ToListAsync(cancellationToken);
 
         return result;
     }

@@ -13,4 +13,6 @@ public class TransferOut : BaseEntity
     public Warehouse? WarehouseFrom { get; set; }
     public string? WarehouseToId { get; set; }
     public Warehouse? WarehouseTo { get; set; }
+    public ICollection<TransferOutDetails> TransferOutDetails { get; set; }
+       = new List<TransferOutDetails>();
 }

@@ -102,12 +102,13 @@ public partial class InventoryTransactionService
         CancellationToken cancellationToken = default
         )
     {
-        var childs = await _queryContext
-            .InventoryTransaction
-            .AsNoTracking()
-            .ApplyIsDeletedFilter(false)
-            .Where(x => x.ModuleId == moduleId && x.ModuleName == moduleName)
-            .ToListAsync(cancellationToken);
+        var childs = await _queryContext.InventoryTransaction
+        .AsNoTracking()
+        .ApplyIsDeletedFilter(false)
+        .Where(x => x.ModuleId == moduleId && x.ModuleName == moduleName)
+        .Include(x => x.InventoryTransactionAttributesDetails)
+            .ThenInclude(a => a.GoodsReceiveItemDetails)
+        .ToListAsync(cancellationToken);
 
         return childs;
     }
