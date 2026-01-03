@@ -131,8 +131,33 @@
                             }
                             e.updateData(state.deliveryOrderListLookupData, query);
                         },
-                        change: (e) => {
-                            state.deliveryOrderId = e.value;
+
+                        // Update this within the deliveryOrderListLookup object
+                        change: async (e) => {
+                            try {
+                                if (!e.value) return;
+                                state.deliveryOrderId = e.value;
+
+                                const response = await services.getSecondaryData(null, state.deliveryOrderId);
+                                const items = response?.data?.content?.data || [];
+
+                                // returnQuantity IS the movement
+                                state.secondaryData = items.map(item => ({
+                                    id: '',
+                                    warehouseId: item.warehouseId,
+                                    productId: item.productId,
+                                    orderQuantity: item.movement || 0,      // Original order qty
+                                    returnQuantity: 1                      // Default: 1 (user can change)
+                                }));
+
+                                secondaryGrid.refresh();
+                                methods.refreshSummary();
+
+                            } catch (error) {
+                                console.error("Error:", error);
+                                state.secondaryData = [];
+                                secondaryGrid.refresh();
+                            }
                         }
                     });
                     deliveryOrderListLookup.obj.appendTo(deliveryOrderIdRef.value);
@@ -188,26 +213,37 @@
             getMainData: async () => {
                 try {
                     const locationId = StorageManager.getLocation();
-                    const response = await AxiosManager.get('/SalesReturn/GetSalesReturnList?LocationId='+locationId, {});
+                    const response = await AxiosManager.get('/SalesReturn/GetSalesReturnList?LocationId=' + locationId, {});
                     return response;
                 } catch (error) {
                     throw error;
                 }
             },
-            createMainData: async (returnDate, description, status, deliveryOrderId, createdById) => {
+            createMainData: async (returnDate, description, status, deliveryOrderId, items, createdById) => {
                 try {
                     const response = await AxiosManager.post('/SalesReturn/CreateSalesReturn', {
-                        returnDate, description, status, deliveryOrderId, createdById
+                        returnDate,
+                        description,
+                        status,
+                        deliveryOrderId,
+                        items, // Added secondary data array
+                        createdById
                     });
                     return response;
                 } catch (error) {
                     throw error;
                 }
             },
-            updateMainData: async (id, returnDate, description, status, deliveryOrderId, updatedById) => {
+            updateMainData: async (id, returnDate, description, status, deliveryOrderId, items, updatedById) => {
                 try {
                     const response = await AxiosManager.post('/SalesReturn/UpdateSalesReturn', {
-                        id, returnDate, description, status, deliveryOrderId, updatedById
+                        id,
+                        returnDate,
+                        description,
+                        status,
+                        deliveryOrderId,
+                        items, // Added secondary data array
+                        updatedById
                     });
                     return response;
                 } catch (error) {
@@ -242,14 +278,28 @@
                     throw error;
                 }
             },
-            getSecondaryData: async (moduleId) => {
+            getSecondaryData: async (modelId, deliveryOrderId) => {
+                debugger;
                 try {
-                    const response = await AxiosManager.get('/InventoryTransaction/SalesReturnGetInvenTransList?moduleId=' + moduleId, {});
+                    let response;
+
+                    if (modelId) {
+                        // Fetch data by transferOutId (moduleId)
+                        response = await AxiosManager.get('/InventoryTransaction/SalesReturnGetInvenTransList?moduleId=' + modelId, {});
+                    } else if (deliveryOrderId) {
+                        // Fetch data by warehouseFromId
+                        response = await AxiosManager.get('/InventoryTransaction/DeliveryOrderGetInvenTransList?moduleId=' + deliveryOrderId, {});
+                    } else {
+                        throw new Error("Either modelId or warehouseId must be provided.");
+                    }
+
                     return response;
                 } catch (error) {
+                    console.error("Error in getSecondaryData:", error);
                     throw error;
                 }
             },
+
             createSecondaryData: async (moduleId, warehouseId, productId, movement, createdById) => {
                 try {
                     const response = await AxiosManager.post('/InventoryTransaction/SalesReturnCreateInvenTrans', {
@@ -330,16 +380,87 @@
                 const response = await services.getWarehouseListLookupData();
                 state.warehouseListLookupData = response?.data?.content?.data.filter(warehouse => warehouse.systemWarehouse === false) || [];
             },
-            populateSecondaryData: async (salesReturnId) => {
+            populateSecondaryData: async (salesReturnId, deliveryOrderId) => {
                 try {
-                    const response = await services.getSecondaryData(salesReturnId);
-                    state.secondaryData = response?.data?.content?.data.map(item => ({
-                        ...item,
-                        createdAtUtc: new Date(item.createdAtUtc)
-                    }));
+                    if (salesReturnId) {
+                        // ✅ EDIT MODE → Load existing Sales Return items
+                        const response = await services.getSecondaryData(salesReturnId, deliveryOrderId);
+
+                        state.secondaryData =
+                            response?.data?.content?.data?.map(item => ({
+                                id: item.id,
+                                warehouseId: item.warehouseId,
+                                productId: item.productId,
+
+                                // ✅ ORDER QTY (from original delivery order movement)
+                                orderQuantity: Number(item.orderQuantity ?? item.movement ?? 0),
+
+                                // ✅ USER ENTERED RETURN QTY (already saved)
+                                returnQuantity: Number(item.movement ?? 0),
+
+                                // backend-required field
+                                movement: Number(item.movement ?? 0),
+
+                                createdAtUtc: item.createdAtUtc
+                                    ? new Date(item.createdAtUtc)
+                                    : null
+                            })) || [];
+
+                    } else {
+                        // ✅ NEW MODE → Load from Delivery Order
+                        state.secondaryData = [];
+
+                        if (deliveryOrderId) {
+                            const stockResponse =
+                                await services.getSecondaryData(null, deliveryOrderId);
+
+                            const stockData =
+                                stockResponse?.data?.content?.data || [];
+
+                            state.secondaryData = stockData.map(item => ({
+                                id: '',
+                                warehouseId: item.warehouseId,
+                                productId: item.productId,
+
+                                // ✅ FROM DELIVERY ORDER
+                                orderQuantity: Number(item.movement || 0),
+
+                                // ✅ USER MUST ENTER
+                                returnQuantity: 0,
+
+                                // backend-required
+                                movement: 0
+                            }));
+
+                            // Optional: product availability map
+                            state.allProductStocks = new Map(
+                                stockData.map(item => [item.productId, item.movement])
+                            );
+
+                            state.availableProducts =
+                                state.productListLookupData?.filter(
+                                    prod => state.allProductStocks.has(prod.id)
+                                ) || [];
+                        } else {
+                            state.allProductStocks = new Map();
+                            state.availableProducts = [];
+                        }
+                    }
+
                     methods.refreshSummary();
+                    secondaryGrid.refresh(state.secondaryData);
+                    state.showComplexDiv = true;
+
                 } catch (error) {
+                    console.error("Error populating secondary data:", error);
+
                     state.secondaryData = [];
+                    state.allProductStocks = new Map();
+                    state.availableProducts = [];
+
+                    methods.refreshSummary();
+                    secondaryGrid.refresh([]);
+                    state.showComplexDiv = true;
                 }
             },
             refreshSummary: () => {
@@ -357,19 +478,68 @@
             handleSubmit: async function () {
                 try {
                     state.isSubmitting = true;
+
+                    // Ensure grid edit is committed
                     await new Promise(resolve => setTimeout(resolve, 300));
 
                     if (!validateForm()) {
                         return;
                     }
 
-                    const response = state.id === ''
-                        ? await services.createMainData(state.returnDate, state.description, state.status, state.deliveryOrderId, StorageManager.getUserId())
-                        : state.deleteMode
-                            ? await services.deleteMainData(state.id, StorageManager.getUserId())
-                            : await services.updateMainData(state.id, state.returnDate, state.description, state.status, state.deliveryOrderId, StorageManager.getUserId());
+                    // ✅ VALIDATION: returnQuantity must be >= 1
+                    const invalidRow = state.secondaryData.find(
+                        item => item.returnQuantity == null || Number(item.returnQuantity) < 1
+                    );
+
+                    if (invalidRow) {
+                        Swal.fire({
+                            icon: 'warning',
+                            title: 'Invalid Return Quantity',
+                            text: 'Return Quantity must be 1 or greater for all items.'
+                        });
+                        return;
+                    }
+
+                    // ✅ Prepare secondary data
+                    const items = state.secondaryData.map(item => ({
+                        id: item.id || null,
+                        warehouseId: item.warehouseId,
+                        productId: item.productId,
+
+                        // ✅ movement = user-entered returnQuantity
+                        movement: Number(item.returnQuantity)
+                    }));
+
+                    const userId = StorageManager.getUserId();
+                    let response;
+
+                    if (state.deleteMode) {
+                        response = await services.deleteMainData(state.id, userId);
+
+                    } else if (state.id === '') {
+                        response = await services.createMainData(
+                            state.returnDate,
+                            state.description,
+                            state.status,
+                            state.deliveryOrderId,
+                            items,
+                            userId
+                        );
+
+                    } else {
+                        response = await services.updateMainData(
+                            state.id,
+                            state.returnDate,
+                            state.description,
+                            state.status,
+                            state.deliveryOrderId,
+                            items,
+                            userId
+                        );
+                    }
 
                     if (response.data.code === 200) {
+
                         await methods.populateMainData();
                         mainGrid.refresh();
 
@@ -377,6 +547,8 @@
                             state.mainTitle = 'Edit Sales Return';
                             state.id = response?.data?.content?.data.id ?? '';
                             state.number = response?.data?.content?.data.number ?? '';
+
+                            // Reload secondary data with DB IDs
                             await methods.populateSecondaryData(state.id);
                             secondaryGrid.refresh();
                             state.showComplexDiv = true;
@@ -387,7 +559,6 @@
                                 timer: 2000,
                                 showConfirmButton: false
                             });
-
                         } else {
                             Swal.fire({
                                 icon: 'success',
@@ -396,6 +567,7 @@
                                 timer: 2000,
                                 showConfirmButton: false
                             });
+
                             setTimeout(() => {
                                 mainModal.obj.hide();
                                 resetFormState();
@@ -421,9 +593,8 @@
                 } finally {
                     state.isSubmitting = false;
                 }
-            },
+            }
         };
-
         Vue.onMounted(async () => {
             try {
                 await SecurityManager.authorizePage(['SalesReturns']);
@@ -448,7 +619,7 @@
             } catch (e) {
                 console.error('page init error:', e);
             } finally {
-                
+
             }
         });
 
@@ -590,10 +761,22 @@
         const secondaryGrid = {
             obj: null,
             create: async (dataSource) => {
+
+                let warehouseObj, productObj, returnQtyObj;
+
                 secondaryGrid.obj = new ej.grids.Grid({
                     height: 400,
                     dataSource: dataSource,
-                    editSettings: { allowEditing: true, allowAdding: true, allowDeleting: true, showDeleteConfirmDialog: true, mode: 'Normal', allowEditOnDblClick: true },
+
+                    editSettings: {
+                        allowEditing: true,
+                        allowAdding: true,
+                        allowDeleting: true,
+                        showDeleteConfirmDialog: true,
+                        mode: 'Normal',
+                        allowEditOnDblClick: true
+                    },
+
                     allowFiltering: false,
                     allowSorting: true,
                     allowSelection: true,
@@ -602,253 +785,179 @@
                     allowResizing: true,
                     allowPaging: false,
                     allowExcelExport: true,
-                    filterSettings: { type: 'CheckBox' },
-                    sortSettings: { columns: [{ field: 'warehouseName', direction: 'Descending' }] },
-                    pageSettings: { currentPage: 1, pageSize: 50, pageSizes: ["10", "20", "50", "100", "200", "All"] },
+
+                    sortSettings: { columns: [{ field: 'warehouseId', direction: 'Ascending' }] },
                     selectionSettings: { persistSelection: true, type: 'Single' },
-                    autoFit: false,
-                    showColumnMenu: false,
                     gridLines: 'Horizontal',
+
                     columns: [
                         { type: 'checkbox', width: 60 },
-                        {
-                            field: 'id', isPrimaryKey: true, headerText: 'Id', visible: false
-                        },
+                        { field: 'id', isPrimaryKey: true, visible: false },
+
+                        // ✅ WAREHOUSE
                         {
                             field: 'warehouseId',
                             headerText: 'Warehouse',
-                            width: 250,
+                            width: 220,
                             validationRules: { required: true },
-                            disableHtmlEncode: false,
-                            valueAccessor: (field, data, column) => {
-                                const warehouse = state.warehouseListLookupData.find(item => item.id === data[field]);
-                                return warehouse ? `${warehouse.name}` : '';
+                            valueAccessor: (field, data) => {
+                                const wh = state.warehouseListLookupData.find(x => x.id === data[field]);
+                                return wh ? wh.name : '';
                             },
                             editType: 'dropdownedit',
                             edit: {
-                                create: () => {
-                                    const warehouseElem = document.createElement('input');
-                                    return warehouseElem;
-                                },
-                                read: () => {
-                                    return warehouseObj.value;
-                                },
-                                destroy: function () {
-                                    warehouseObj.destroy();
-                                },
-                                write: function (args) {
+                                create: () => document.createElement('input'),
+                                read: () => warehouseObj.value,
+                                destroy: () => warehouseObj.destroy(),
+                                write: (args) => {
                                     warehouseObj = new ej.dropdowns.DropDownList({
                                         dataSource: state.warehouseListLookupData,
                                         fields: { value: 'id', text: 'name' },
                                         value: args.rowData.warehouseId,
-                                        placeholder: 'Select a Warehouse',
-                                        floatLabelType: 'Never'
+                                        placeholder: 'Select Warehouse'
                                     });
                                     warehouseObj.appendTo(args.element);
                                 }
                             }
                         },
+
+                        // ✅ PRODUCT
                         {
                             field: 'productId',
                             headerText: 'Product',
-                            width: 250,
+                            width: 260,
                             validationRules: { required: true },
-                            disableHtmlEncode: false,
-                            valueAccessor: (field, data, column) => {
-                                const product = state.productListLookupData.find(item => item.id === data[field]);
-                                return product ? `${product.numberName}` : '';
+                            valueAccessor: (field, data) => {
+                                const prod = state.productListLookupData.find(x => x.id === data[field]);
+                                return prod ? prod.numberName : '';
                             },
                             editType: 'dropdownedit',
                             edit: {
-                                create: () => {
-                                    const productElem = document.createElement('input');
-                                    return productElem;
-                                },
-                                read: () => {
-                                    return productObj.value;
-                                },
-                                destroy: function () {
-                                    productObj.destroy();
-                                },
-                                write: function (args) {
+                                create: () => document.createElement('input'),
+                                read: () => productObj.value,
+                                destroy: () => productObj.destroy(),
+                                write: (args) => {
                                     productObj = new ej.dropdowns.DropDownList({
                                         dataSource: state.productListLookupData,
                                         fields: { value: 'id', text: 'numberName' },
                                         value: args.rowData.productId,
-                                        change: function (e) {
-                                            if (movementObj) {
-                                                movementObj.value = 1;
-                                            }
-                                        },
-                                        placeholder: 'Select a Product',
-                                        floatLabelType: 'Never'
+                                        placeholder: 'Select Product'
                                     });
                                     productObj.appendTo(args.element);
                                 }
                             }
                         },
+
+                        // ✅ ORDER QTY (READ ONLY)
                         {
-                            field: 'movement',
-                            headerText: 'Movement',
-                            width: 200,
+                            field: 'orderQuantity',
+                            headerText: 'Order Qty',
+                            width: 140,
+                            textAlign: 'Right',
+                            allowEditing: false,
+                            type: 'number',
+                            format: 'N2'
+                        },
+
+                        // ✅ RETURN QTY (USER ENTERED)
+                        {
+                            field: 'returnQuantity',
+                            headerText: 'Return Qty',
+                            width: 140,
+                            textAlign: 'Right',
+                            type: 'number',
+                            format: 'N2',
                             validationRules: {
                                 required: true,
-                                custom: [(args) => {
-                                    return args['value'] > 0;
-                                }, 'Must be a positive number and not zero']
+                                custom: [
+                                    (args) => {
+                                        const row = args.rowData;
+                                        return args.value > 0 && args.value <= row.orderQuantity;
+                                    },
+                                    'Return Qty must be > 0 and ≤ Order Qty'
+                                ]
                             },
-                            type: 'number', format: 'N2', textAlign: 'Right',
                             edit: {
-                                create: () => {
-                                    const movementElem = document.createElement('input');
-                                    return movementElem;
-                                },
-                                read: () => {
-                                    return movementObj.value;
-                                },
-                                destroy: function () {
-                                    movementObj.destroy();
-                                },
-                                write: function (args) {
-                                    movementObj = new ej.inputs.NumericTextBox({
-                                        value: args.rowData.movement ?? 0,
+                                create: () => document.createElement('input'),
+                                read: () => returnQtyObj.value,
+                                destroy: () => returnQtyObj.destroy(),
+                                write: (args) => {
+                                    returnQtyObj = new ej.inputs.NumericTextBox({
+                                        value: args.rowData.returnQuantity || null,
+                                        min: 0,
+                                        max: args.rowData.orderQuantity,
+                                        decimals: 2,
+                                        placeholder: 'Enter Qty'
                                     });
-                                    movementObj.appendTo(args.element);
+                                    returnQtyObj.appendTo(args.element);
                                 }
                             }
-                        },
+                        }
                     ],
-                    toolbar: [
-                        'ExcelExport',
-                        { type: 'Separator' },
-                        'Add', 'Edit', 'Delete', 'Update', 'Cancel',
-                    ],
-                    beforeDataBound: () => { },
-                    dataBound: function () { },
-                    excelExportComplete: () => { },
+
+                    toolbar: ['ExcelExport', 'Add', 'Edit', 'Delete', 'Update', 'Cancel'],
+
+                    // ✅ STATE SYNC + MOVEMENT CALC
+                    actionComplete: (args) => {
+
+                        if (args.requestType === 'save') {
+
+                            // 🔁 always sync backend field
+                            args.data.movement = Number(args.data.returnQuantity || 0);
+
+                            if (args.action === 'add') {
+                                state.secondaryData.push(args.data);
+                            }
+
+                            if (args.action === 'edit') {
+                                const index = state.secondaryData.findIndex(x =>
+                                    x.productId === args.data.productId &&
+                                    x.warehouseId === args.data.warehouseId
+                                );
+                                if (index !== -1) {
+                                    state.secondaryData[index] = { ...args.data };
+                                }
+                            }
+                        }
+
+                        if (args.requestType === 'delete') {
+                            args.data.forEach(row => {
+                                state.secondaryData = state.secondaryData.filter(x => x !== row);
+                            });
+                        }
+
+                        methods.refreshSummary();
+                    },
+
                     rowSelected: () => {
-                        if (secondaryGrid.obj.getSelectedRecords().length == 1) {
-                            secondaryGrid.obj.toolbarModule.enableItems(['Edit'], true);
-                        } else {
-                            secondaryGrid.obj.toolbarModule.enableItems(['Edit'], false);
-                        }
+                        secondaryGrid.obj.toolbarModule.enableItems(
+                            ['Edit'],
+                            secondaryGrid.obj.getSelectedRecords().length === 1
+                        );
                     },
+
                     rowDeselected: () => {
-                        if (secondaryGrid.obj.getSelectedRecords().length == 1) {
-                            secondaryGrid.obj.toolbarModule.enableItems(['Edit'], true);
-                        } else {
-                            secondaryGrid.obj.toolbarModule.enableItems(['Edit'], false);
-                        }
+                        secondaryGrid.obj.toolbarModule.enableItems(['Edit'], false);
                     },
-                    rowSelecting: () => {
-                        if (secondaryGrid.obj.getSelectedRecords().length) {
-                            secondaryGrid.obj.clearSelection();
-                        }
-                    },
+
                     toolbarClick: (args) => {
                         if (args.item.id === 'SecondaryGrid_excelexport') {
                             secondaryGrid.obj.excelExport();
                         }
-                    },
-                    actionComplete: async (args) => {
-                        //if (args.requestType === 'save' && args.action === 'add') {
-                        //    try {
-                        //        const response = await services.createSecondaryData(state.id, args.data.warehouseId, args.data.productId, args.data.movement, StorageManager.getUserId());
-                        //        await methods.populateSecondaryData(state.id);
-                        //        secondaryGrid.refresh();
-                        //        if (response.data.code === 200) {
-                        //            Swal.fire({
-                        //                icon: 'success',
-                        //                title: 'Save Successful',
-                        //                timer: 2000,
-                        //                showConfirmButton: false
-                        //            });
-                        //        } else {
-                        //            Swal.fire({
-                        //                icon: 'error',
-                        //                title: 'Save Failed',
-                        //                text: response.data.message ?? 'Please check your data.',
-                        //                confirmButtonText: 'Try Again'
-                        //            });
-                        //        }
-                        //    } catch (error) {
-                        //        Swal.fire({
-                        //            icon: 'error',
-                        //            title: 'An Error Occurred',
-                        //            text: error.response?.data?.message ?? 'Please try again.',
-                        //            confirmButtonText: 'OK'
-                        //        });
-                        //    }
-                        //}
-                        //if (args.requestType === 'save' && args.action === 'edit') {
-                        //    try {
-                        //        const response = await services.updateSecondaryData(args.data.id, args.data.warehouseId, args.data.productId, args.data.movement, StorageManager.getUserId());
-                        //        await methods.populateSecondaryData(state.id);
-                        //        secondaryGrid.refresh();
-                        //        if (response.data.code === 200) {
-                        //            Swal.fire({
-                        //                icon: 'success',
-                        //                title: 'Update Successful',
-                        //                timer: 2000,
-                        //                showConfirmButton: false
-                        //            });
-                        //        } else {
-                        //            Swal.fire({
-                        //                icon: 'error',
-                        //                title: 'Update Failed',
-                        //                text: response.data.message ?? 'Please check your data.',
-                        //                confirmButtonText: 'Try Again'
-                        //            });
-                        //        }
-                        //    } catch (error) {
-                        //        Swal.fire({
-                        //            icon: 'error',
-                        //            title: 'An Error Occurred',
-                        //            text: error.response?.data?.message ?? 'Please try again.',
-                        //            confirmButtonText: 'OK'
-                        //        });
-                        //    }
-                        //}
-                        //if (args.requestType === 'delete') {
-                        //    try {
-                        //        const response = await services.deleteSecondaryData(args.data[0].id, StorageManager.getUserId());
-                        //        await methods.populateSecondaryData(state.id);
-                        //        secondaryGrid.refresh();
-                        //        if (response.data.code === 200) {
-                        //            Swal.fire({
-                        //                icon: 'success',
-                        //                title: 'Delete Successful',
-                        //                timer: 2000,
-                        //                showConfirmButton: false
-                        //            });
-                        //        } else {
-                        //            Swal.fire({
-                        //                icon: 'error',
-                        //                title: 'Delete Failed',
-                        //                text: response.data.message ?? 'Please check your data.',
-                        //                confirmButtonText: 'Try Again'
-                        //            });
-                        //        }
-                        //    } catch (error) {
-                        //        Swal.fire({
-                        //            icon: 'error',
-                        //            title: 'An Error Occurred',
-                        //            text: error.response?.data?.message ?? 'Please try again.',
-                        //            confirmButtonText: 'OK'
-                        //        });
-                        //    }
-                        //}
-                        methods.refreshSummary();
                     }
                 });
-                secondaryGrid.obj.appendTo(secondaryGridRef.value);
 
+                secondaryGrid.obj.appendTo(secondaryGridRef.value);
             },
+
             refresh: () => {
-                secondaryGrid.obj.setProperties({ dataSource: state.secondaryData });
+                if (secondaryGrid.obj) {
+                    secondaryGrid.obj.setProperties({
+                        dataSource: state.secondaryData
+                    });
+                }
             }
         };
-
         const mainModal = {
             obj: null,
             create: () => {
