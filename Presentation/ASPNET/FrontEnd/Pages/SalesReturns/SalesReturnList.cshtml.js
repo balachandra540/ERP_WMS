@@ -348,6 +348,45 @@
                     throw error;
                 }
             },
+            GetProductStockByProductId: async ({ imei1, imei2, serviceNo }, productId) => {
+                try {
+                    let location = StorageManager.getLocation();
+                    let query = "/Product/GetProductStockByProductId?";
+
+                    query += `imei1=${imei1}&`;
+                    query += `imei2=${imei2}&`;
+                    query += `serviceNo=${serviceNo}&`;
+                    query += `productId=${productId}&`;
+                    query += `locationId=${location}&`;
+
+                    // remove last &
+                    query = query.endsWith("&") ? query.slice(0, -1) : query;
+
+                    const response = await AxiosManager.get(query, {});
+                    return response;
+
+                } catch (error) {
+                    throw error;
+                }
+            },
+            getInventoryTransactionAttributes: async (moduleId, productId) => {
+                try {
+                    const response = await AxiosManager.get(
+                        '/GoodsReceive/GetInventoryTransactionAttributes',
+                        {
+                            params: {
+                                moduleId: moduleId,
+                                productId: productId
+                            }
+                        }
+                    );
+                    return response;
+                } catch (error) {
+                    throw error;
+                }
+            },
+
+
         };
 
         const methods = {
@@ -379,6 +418,786 @@
             populateWarehouseListLookupData: async () => {
                 const response = await services.getWarehouseListLookupData();
                 state.warehouseListLookupData = response?.data?.content?.data.filter(warehouse => warehouse.systemWarehouse === false) || [];
+            },
+    //        openDetailModal: async (RowIndex, rowData) => {
+    //            // Save the index for the save operation later
+    //            state.currentDetailRowIndex = RowIndex;
+
+    //            // Use the rowData passed from the Grid directly
+    //            if (!rowData) {
+    //                console.error("Row data not found!");
+    //                return;
+    //            }
+
+    //            // Clone the data for the active modal state
+    //            state.activeDetailRow = JSON.parse(JSON.stringify(rowData));
+    //            const activeRow = state.activeDetailRow;
+
+    //            // 3. LOAD PRODUCT (Find product from your lookup list)
+    //            const product = state.productListLookupData.find(p => p.id === activeRow.productId);
+    //            if (!product) {
+    //                Swal.fire("Error", "Product not found. Please select a product in the grid first.", "error");
+    //                return;
+    //            }
+
+    //            const qty = parseFloat(activeRow.quantity || 0);
+    //            if (qty <= 0) {
+    //                Swal.fire("Validation Error", "Please enter a quantity before adding attributes.", "error");
+    //                return;
+    //            }
+
+
+    //            // -------------------------------------------------------
+    //            // 5. BUILD FIELDS BASED ON PRODUCT CONFIG
+    //            // -------------------------------------------------------
+    //            let fields = [];
+    //            if (product.imei1) fields.push("imeI1");
+    //            if (product.imei2) fields.push("imeI2");
+    //            if (product.serviceNo) fields.push("serviceNo");
+
+    //            const existingDetails = rowData.attributes || [];
+
+    //            // -------------------------------------------------------
+    //            // 6. BUILD HTML TABLE
+    //            // -------------------------------------------------------
+    //            let html = `
+    //    <table class="table table-bordered table-sm">
+    //        <thead>
+    //            <tr>
+    //                ${fields.map(f => `<th>${f}</th>`).join("")}
+    //            </tr>
+    //        </thead>
+    //        <tbody>
+    //`;
+
+    //            for (let i = 0; i < qty; i++) {
+    //                html += `<tr>`;
+    //                fields.forEach(field => {
+    //                    const val =
+    //                        existingDetails[i] && existingDetails[i][field]
+    //                            ? existingDetails[i][field]
+    //                            : "";
+    //                    html += `
+    //            <td>
+    //                <input type="text"
+    //                       class="form-control detail-input"
+    //                       data-index="${i}"
+    //                       data-field="${field}"
+    //                       value="${val}">
+    //            </td>
+    //        `;
+    //                });
+    //                html += `</tr>`;
+    //            }
+
+    //            html += `
+    //        </tbody>
+    //    </table>
+    //`;
+
+    //            document.getElementById("detailFormArea").innerHTML = html;
+    //            // 🔥 ADD THIS: Connect the Save Button
+    //            const saveBtn = document.getElementById("detailSaveBtn");
+    //            if (saveBtn) {
+    //                saveBtn.onclick = (e) => {
+    //                    e.preventDefault();
+    //                    methods.saveDetailEntries();
+    //                };
+    //            }
+    //            await methods.attachDetailInputEvents(product);
+    //            const modalEl = document.getElementById("detailModal");
+    //            const modal = new bootstrap.Modal(modalEl);
+    //            modal.show();
+            //        },
+
+            openDetailModal: async (RowIndex, rowData) => {
+                state.currentDetailRowIndex = RowIndex;
+
+                if (!rowData) {
+                    console.error("Row data not found!");
+                    return;
+                }
+
+                state.activeDetailRow = JSON.parse(JSON.stringify(rowData));
+                const activeRow = state.activeDetailRow;
+                state.activeReturnQuantity = Number(activeRow.returnQuantity || 0);
+
+                // 🔹 Find product
+                const product = state.productListLookupData.find(
+                    p => p.id === activeRow.productId
+                );
+
+                if (!product) {
+                    Swal.fire(
+                        "Error",
+                        "Product not found. Please select a product in the grid first.",
+                        "error"
+                    );
+                    return;
+                }
+
+                const qty = parseInt(activeRow.orderQuantity || 0);
+                if (qty <= 0) {
+                    Swal.fire(
+                        "Validation Error",
+                        "Please enter a orderQuantity before adding attributes.",
+                        "error"
+                    );
+                    return;
+                }
+
+                // -------------------------------------------------------
+                // 🔹 CALL BACKEND (ModuleId = deliveryOrderId)
+                // -------------------------------------------------------
+                let apiAttributes = [];
+                try {
+                    const response = await services.getInventoryTransactionAttributes(
+                        state.deliveryOrderId,     // ✅ moduleId
+                        activeRow.productId        // ✅ productId
+                    );
+
+                    apiAttributes = response?.data?.content || [];
+                } catch (error) {
+                    console.error(error);
+                    Swal.fire("Error", "Failed to load IMEI / Service details", "error");
+                    return;
+                }
+
+                // -------------------------------------------------------
+                // 🔹 Build fields based on product config
+                // -------------------------------------------------------
+                let fields = [];
+                if (product.imei1) fields.push("imei1");
+                if (product.imei2) fields.push("imei2");
+                if (product.serviceNo) fields.push("serviceNo");
+
+                // 🔹 Use API data first, fallback to existing row data
+                const existingDetails =
+                    apiAttributes.length > 0
+                        ? apiAttributes
+                        : (rowData.attributes || []);
+
+                // -------------------------------------------------------
+                // 🔹 Build HTML Table (WITH CHECKBOX)
+                // -------------------------------------------------------
+                let html = `
+        <table class="table table-bordered table-sm">
+            <thead>
+                <tr>
+                    <th style="width:60px;">✔</th>
+                    ${fields.map(f => `<th>${f}</th>`).join("")}
+                </tr>
+            </thead>
+            <tbody>
+    `;
+
+                for (let i = 0; i < qty; i++) {
+                    const row = existingDetails[i] || {};
+                    const checked = row.isChecked ? "checked" : "";
+
+                    html += `<tr>`;
+
+                    // ✅ Checkbox
+                    html += `
+            <td class="text-center">
+                <input type="checkbox"
+                       class="form-check-input detail-checkbox"
+                       data-index="${i}"
+                       ${checked}>
+            </td>
+        `;
+
+                    // 🔹 Dynamic fields
+                    fields.forEach(field => {
+                        const val = row[field] || "";
+                        html += `
+                <td>
+                    <input type="text"
+                           class="form-control detail-input"
+                           data-index="${i}"
+                           data-field="${field}"
+                           value="${val}">
+                </td>
+            `;
+                    });
+
+                    html += `</tr>`;
+                }
+
+                html += `
+            </tbody>
+        </table>
+    `;
+
+                document.getElementById("detailFormArea").innerHTML = html;
+
+                // 🔥 Save Button
+                const saveBtn = document.getElementById("detailSaveBtn");
+                if (saveBtn) {
+                    saveBtn.onclick = (e) => {
+                        e.preventDefault();
+                        methods.saveDetailEntries();
+                    };
+                }
+
+                await methods.attachDetailInputEvents(product);
+
+                const modalEl = document.getElementById("detailModal");
+                const modal = new bootstrap.Modal(modalEl);
+                modal.show();
+            },
+
+    //        openDetailModal: async (RowIndex, rowData) => {
+    //            state.currentDetailRowIndex = RowIndex;
+
+    //            if (!rowData) {
+    //                console.error("Row data not found!");
+    //                return;
+    //            }
+
+    //            state.activeDetailRow = JSON.parse(JSON.stringify(rowData));
+    //            const activeRow = state.activeDetailRow;
+
+    //            // 🔹 Find product
+    //            const product = state.productListLookupData.find(p => p.id === activeRow.productId);
+    //            if (!product) {
+    //                Swal.fire("Error", "Product not found. Please select a product in the grid first.", "error");
+    //                return;
+    //            }
+
+    //            const qty = parseInt(activeRow.orderQuantity || 0);
+    //            if (qty <= 0) {
+    //                Swal.fire("Validation Error", "Please enter a orderQuantity before adding attributes.", "error");
+    //                return;
+    //            }
+
+    //            // -------------------------------------------------------
+    //            // 🔹 Build fields based on product config
+    //            // -------------------------------------------------------
+    //            let fields = [];
+    //            if (product.imei1) fields.push("imeI1");
+    //            if (product.imei2) fields.push("imeI2");
+    //            if (product.serviceNo) fields.push("serviceNo");
+
+    //            const existingDetails = rowData.attributes || [];
+
+    //            // -------------------------------------------------------
+    //            // 🔹 Build HTML Table (WITH CHECKBOX)
+    //            // -------------------------------------------------------
+    //            let html = `
+    //    <table class="table table-bordered table-sm">
+    //        <thead>
+    //            <tr>
+    //                <th style="width:60px;">✔</th>
+    //                ${fields.map(f => `<th>${f}</th>`).join("")}
+    //            </tr>
+    //        </thead>
+    //        <tbody>
+    //`;
+
+    //            for (let i = 0; i < qty; i++) {
+    //                const row = existingDetails[i] || {};
+    //                const checked = row.isChecked ? "checked" : "";
+
+    //                html += `<tr>`;
+
+    //                // ✅ Checkbox column
+    //                html += `
+    //        <td class="text-center">
+    //            <input type="checkbox"
+    //                   class="form-check-input detail-checkbox"
+    //                   data-index="${i}"
+    //                   ${checked}>
+    //        </td>
+    //    `;
+
+    //                // 🔹 Dynamic fields
+    //                fields.forEach(field => {
+    //                    const val = row[field] || "";
+    //                    html += `
+    //            <td>
+    //                <input type="text"
+    //                       class="form-control detail-input"
+    //                       data-index="${i}"
+    //                       data-field="${field}"
+    //                       value="${val}">
+    //            </td>
+    //        `;
+    //                });
+
+    //                html += `</tr>`;
+    //            }
+
+    //            html += `
+    //        </tbody>
+    //    </table>
+    //`;
+
+    //            document.getElementById("detailFormArea").innerHTML = html;
+
+    //            // 🔥 Save Button
+    //            const saveBtn = document.getElementById("detailSaveBtn");
+    //            if (saveBtn) {
+    //                saveBtn.onclick = (e) => {
+    //                    e.preventDefault();
+    //                    methods.saveDetailEntries();
+    //                };
+    //            }
+
+    //            await methods.attachDetailInputEvents(product);
+
+    //            const modalEl = document.getElementById("detailModal");
+    //            const modal = new bootstrap.Modal(modalEl);
+    //            modal.show();
+    //        },
+
+            showInlineError: (input, message) => {
+                let errorEl = input.nextElementSibling;
+
+                if (!errorEl || !errorEl.classList.contains("imei-error")) {
+                    errorEl = document.createElement("div");
+                    errorEl.className = "imei-error";
+                    input.after(errorEl);
+                }
+
+                errorEl.textContent = message;
+            },
+
+            clearInlineError: (input) => {
+                const errorEl = input.nextElementSibling;
+                if (errorEl && errorEl.classList.contains("imei-error")) {
+                    errorEl.remove();
+                }
+            },
+            injectDetailStyles: () => {
+                if (document.getElementById("detail-inline-styles")) return;
+
+                const style = document.createElement("style");
+                style.id = "detail-inline-styles";
+                style.innerHTML = `
+                        .imei-error {
+                            color: #dc3545;
+                            font-size: 12px;
+                            margin-top: 2px;
+                        }
+
+                        .auto-filled {
+                            background-color: #e8f5e9 !important;
+                            border-color: #28a745 !important;
+                        }
+                    `;
+
+                document.head.appendChild(style);
+            },
+
+            attachDetailInputEvents: async (product) => {
+
+                // 🔥 Ensure styles exist
+                methods.injectDetailStyles();
+
+                const inputs = document.querySelectorAll(".detail-input");
+
+                inputs.forEach(input => {
+
+                    // ---------------------------
+                    // KEYDOWN (restrict characters)
+                    // ---------------------------
+                    input.addEventListener("keydown", (e) => {
+                        const field = input.dataset.field;
+                        const key = e.key;
+
+                        if (field === "IMEI1" || field === "IMEI2") {
+                            const isDigit =
+                                /^\d$/.test(key) ||
+                                ["Backspace", "Delete", "ArrowLeft", "ArrowRight", "Tab"].includes(key);
+
+                            if (!isDigit) e.preventDefault();
+                        } else {
+                            const isValid =
+                                /^[a-zA-Z0-9]$/.test(key) ||
+                                ["Backspace", "Delete", "ArrowLeft", "ArrowRight", "Tab"].includes(key);
+
+                            if (!isValid) e.preventDefault();
+                        }
+                    });
+
+                    // ---------------------------
+                    // KEYUP + CHANGE
+                    // ---------------------------
+                    const handler = async () => {
+                        await methods.handleDetailValueChange(input, product);
+                    };
+
+                    input.addEventListener("keyup", handler);
+                    input.addEventListener("change", handler);
+                });
+            },
+
+            handleDetailValueChange: async (input, product) => {
+                const value = input.value.trim();
+                const field = input.dataset.field;
+                const index = parseInt(input.dataset.index, 10);
+
+                // ---------------------------
+                // IMEI VALIDATION
+                // ---------------------------
+                if (field === "IMEI1" || field === "IMEI2") {
+
+                    if (value.length > 0 && value.length < 15) {
+                        methods.showInlineError(input, `${field} must be 15 digits`);
+                        return;
+                    }
+
+                    if (value.length === 15 && !/^\d{15}$/.test(value)) {
+                        methods.showInlineError(input, `${field} must contain only digits`);
+                        return;
+                    }
+                }
+
+                if (!value) {
+                    methods.clearInlineError(input);
+                    return;
+                }
+
+                // ---------------------------
+                // BUILD IDENTIFIER PAYLOAD
+                // ---------------------------
+                let imei1Value = '';
+                let imei2Value = '';
+                let serviceNoValue = '';
+
+                if (field === "IMEI1") imei1Value = value;
+                if (field === "IMEI2") imei2Value = value;
+                if (field === "ServiceNo") serviceNoValue = value;
+
+                try {
+                    const response = await services.GetProductStockByProductId(
+                        {
+                            imei1: imei1Value,
+                            imei2: imei2Value,
+                            serviceNo: serviceNoValue
+                        },
+                        product.id
+                    );
+
+                    const data = response?.data?.content;
+
+                    // ❌ NO MATCH
+                    if (!data || !data.attributes || data.attributes.length === 0) {
+                        methods.showInlineError(input, "No matching stock found");
+                        return;
+                    }
+
+                    // ✅ EXACT MATCH (backend already filtered)
+                    const matched = data.attributes[0];
+
+                    // ---------------------------
+                    // ENSURE STATE
+                    // ---------------------------
+                    if (!state.activeDetailRow.detailEntries) {
+                        state.activeDetailRow.detailEntries = [];
+                    }
+                    if (!state.activeDetailRow.detailEntries[index]) {
+                        state.activeDetailRow.detailEntries[index] = {};
+                    }
+
+                    // Save current value
+                    state.activeDetailRow.detailEntries[index][field] = value;
+
+                    // ---------------------------
+                    // AUTO-BIND REMAINING FIELDS (NEW)
+                    // ---------------------------
+                    await methods.autoBindRemainingFieldsFromApi(
+                        index,
+                        matched,
+                        field
+                    );
+
+                    methods.clearInlineError(input);
+
+                    //document.getElementById("detailSaveBtn").onclick = () => {
+                    //    methods.saveDetailEntries();
+                    //    modal.hide();
+                    //};
+
+
+                } catch (error) {
+                    console.error("❌ IMEI lookup failed:", error);
+                    Swal.fire({
+                        icon: "error",
+                        title: "Error",
+                        text: "Failed to fetch product stock",
+                        timer: 2000
+                    });
+                }
+            },
+
+
+            autoBindRemainingFieldsFromApi: async (index, matched, matchedField) => {
+
+                const fieldMap = {
+                    IMEI1: matched.imeI1,
+                    IMEI2: matched.imeI2,
+                    ServiceNo: matched.serviceNo
+                };
+
+                Object.keys(fieldMap).forEach(field => {
+
+                    if (field === matchedField) return;
+
+                    const val = fieldMap[field];
+                    if (!val) return;
+
+                    if (state.activeDetailRow.detailEntries[index][field]) return;
+
+                    // Save to state
+                    state.activeDetailRow.detailEntries[index][field] = val;
+
+                    // Bind to UI
+                    const input = document.querySelector(
+                        `.detail-input[data-index="${index}"][data-field="${field}"]`
+                    );
+
+                    if (input) {
+                        input.value = val;
+                        input.readOnly = true;
+                        input.classList.add("auto-filled");
+                    }
+                });
+
+                // Lock the entered field also
+                const matchedInput = document.querySelector(
+                    `.detail-input[data-index="${index}"][data-field="${matchedField}"]`
+                );
+
+                if (matchedInput) {
+                    matchedInput.readOnly = true;
+                    matchedInput.classList.add("auto-filled");
+                }
+            },
+            //saveDetailEntries: () => {
+            //    debugger;
+            //    const rowIndex = state.currentDetailRowIndex;
+
+            //    // 1. Validation check for the index
+            //    if (rowIndex === undefined || rowIndex === null || rowIndex < 0) {
+            //        console.error("No valid row index found.");
+            //        return;
+            //    }
+
+            //    // 2. Collect entries from modal inputs
+            //    let entries = [];
+            //    const inputs = document.querySelectorAll(".detail-input");
+            //    inputs.forEach(input => {
+            //        const i = input.dataset.index;
+            //        const f = input.dataset.field;
+            //        if (!entries[i]) entries[i] = {};
+
+            //        // Normalize field names
+            //        const normalizedField = f.toUpperCase() === "IMEI1" ? "IMEI1" :
+            //            f.toUpperCase() === "IMEI2" ? "IMEI2" :
+            //                f.toUpperCase() === "SERVICENO" ? "ServiceNo" : f;
+            //        entries[i][normalizedField] = input.value;
+            //    });
+
+            //    // 3. 🔥 GET DATA FROM GRID (Since state.secondaryData is empty)
+            //    // This retrieves the actual row object currently displayed in the grid
+            //    const gridRowData = secondaryGrid.obj.getRowsObject()[rowIndex].data;
+
+            //    // 4. Attach the attributes to that object
+            //    gridRowData.detailEntries = entries;
+
+            //    // 5. Update the Grid UI and notify the manual batch tracker
+            //    secondaryGrid.obj.updateRow(rowIndex, gridRowData);
+
+            //    // 6. Sync back to state if you need it for prepareSecondaryDataForSubmission
+            //    if (state.secondaryData.length > 0) {
+            //        state.secondaryData[rowIndex] = gridRowData;
+            //    }
+
+            //    // 7. Close Modal
+            //    const modalEl = document.getElementById("detailModal");
+            //    const modal = bootstrap.Modal.getInstance(modalEl);
+            //    if (modal) modal.hide();
+
+            //    Swal.fire({ icon: 'success', title: 'Attributes updated', timer: 1000, showConfirmButton: false });
+            //},
+            saveDetailEntries: () => {
+
+                const rowIndex = state.currentDetailRowIndex;
+                const returnQty = state.activeReturnQuantity;
+
+                if (!returnQty || returnQty <= 0) {
+                    Swal.fire("Validation Error", "Return Quantity must be greater than 0", "error");
+                    return;
+                }
+
+                const rows = document.querySelectorAll("tbody tr");
+                let selectedEntries = [];
+                let selectedCount = 0;
+
+                rows.forEach((row, index) => {
+
+                    const checkbox = row.querySelector(".detail-checkbox");
+                    const isChecked = checkbox?.checked;
+
+                    const inputs = row.querySelectorAll(".detail-input");
+
+                    let entry = {};
+                    inputs.forEach(input => {
+                        const field = input.dataset.field;
+                        const value = input.value?.trim();
+
+                        if (value) {
+                            entry[field.toUpperCase()] = value;
+                        }
+                    });
+
+                    // ❌ If unchecked but has values → ERROR
+                    if (!isChecked && Object.keys(entry).length > 0) {
+                        Swal.fire(
+                            "Validation Error",
+                            `Row ${index + 1} has values but is not selected`,
+                            "error"
+                        );
+                        throw new Error("Unchecked row has values");
+                    }
+
+                    if (isChecked) {
+                        selectedCount++;
+                        selectedEntries.push({
+                            RowIndex: index,
+                            IMEI1: entry.IMEI1 || null,
+                            IMEI2: entry.IMEI2 || null,
+                            ServiceNo: entry.SERVICENO || null
+                        });
+                    }
+                });
+
+                // ❌ Quantity mismatch
+                if (selectedCount !== returnQty) {
+                    Swal.fire(
+                        "Validation Error",
+                        `Please select exactly ${returnQty} attributes`,
+                        "error"
+                    );
+                    return;
+                }
+
+                // ✅ Attach ONLY selected entries
+                const gridRowData = secondaryGrid.obj.getRowsObject()[rowIndex].data;
+                gridRowData.detailEntries = selectedEntries;
+
+                secondaryGrid.obj.updateRow(rowIndex, gridRowData);
+
+                if (state.secondaryData.length > 0) {
+                    state.secondaryData[rowIndex] = gridRowData;
+                }
+
+                const modalEl = document.getElementById("detailModal");
+                const modal = bootstrap.Modal.getInstance(modalEl);
+                modal?.hide();
+
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Attributes saved',
+                    timer: 1000,
+                    showConfirmButton: false
+                });
+            },
+
+            collectDetailAttributes: (row) => {
+                const Attributes = [];
+                const errors = [];
+
+
+                const product = state.productListLookupData.find(p => p.id === row.productId);
+                if (!product) {
+                    errors.push(`Product not found for row with productId = ${row.productId}`);
+                    return { Attributes, errors };
+                }
+
+                if (product.imei1 || product.imei2 || product.serviceNo) {
+                    if (!row.detailEntries || row.detailEntries.length === 0) {
+                        errors.push(`Please enter required product attributes (IMEI / Service No) for product`);
+                        return { Attributes, errors };
+                    }
+                }
+                // Local duplicates inside same GR item
+                // -------------------------------
+                const localIMEI1 = new Set();
+                const localIMEI2 = new Set();
+                const localServiceNo = new Set();
+
+                // -------------------------------
+                // Iterate detail rows
+                // -------------------------------
+                row.detailEntries.forEach((entry, index) => {
+                    const imei1 = (entry.IMEI1 || "").trim();
+                    const imei2 = (entry.IMEI2 || "").trim();
+                    const serviceNo = (entry.ServiceNo || "").trim();
+
+                    // -------------------------------
+                    // REQUIRED FIELD VALIDATION
+                    // -------------------------------
+                    if (product.imei1) {
+                        if (!imei1) errors.push(`IMEI1 missing at row ${index + 1} for product ${row.productId}`);
+                        else if (!/^\d{15}$/.test(imei1)) errors.push(`IMEI1 must be 15 digits at row ${index + 1}`);
+                    }
+
+                    if (product.imei2) {
+                        if (!imei2) errors.push(`IMEI2 missing at row ${index + 1}`);
+                        else if (!/^\d{15}$/.test(imei2)) errors.push(`IMEI2 must be 15 digits at row ${index + 1}`);
+                    }
+
+                    if (product.serviceNo) {
+                        if (!serviceNo) errors.push(`Service No missing at row ${index + 1}`);
+                    }
+
+                    // -------------------------------
+                    // IMEI1 != IMEI2 validation
+                    // -------------------------------
+                    if (product.imei1 && product.imei2) {
+                        if (imei1 && imei2 && imei1 === imei2) {
+                            errors.push(`IMEI1 and IMEI2 cannot be same at row ${index + 1}`);
+                        }
+                    }
+
+                    // -------------------------------
+                    // LOCAL DUPLICATE CHECK
+                    // -------------------------------
+                    if (imei1 && localIMEI1.has(imei1))
+                        errors.push(`Duplicate IMEI1 (${imei1}) within same item at row ${index + 1}`);
+
+                    if (imei2 && localIMEI2.has(imei2))
+                        errors.push(`Duplicate IMEI2 (${imei2}) within same item at row ${index + 1}`);
+
+                    if (serviceNo && localServiceNo.has(serviceNo))
+                        errors.push(`Duplicate Service No (${serviceNo}) within same item at row ${index + 1}`);
+
+                    localIMEI1.add(imei1);
+                    localIMEI2.add(imei2);
+                    localServiceNo.add(serviceNo);
+
+
+                    // -------------------------------
+                    // ADD TO RETURN PAYLOAD
+                    // -------------------------------
+                    Attributes.push({
+                        RowIndex: index,
+                        IMEI1: imei1,
+                        IMEI2: imei2,
+                        ServiceNo: serviceNo,
+                    });
+                });
+                if (row.detailEntries.length !== row.returnQuantity) {
+                    errors.push(
+                        `Return Quantity (${row.returnQuantity}) does not match selected attributes (${row.detailEntries.length})`
+                    );
+                }
+
+
+                return { Attributes, errors };
             },
             populateSecondaryData: async (salesReturnId, deliveryOrderId) => {
                 try {
@@ -471,129 +1290,297 @@
                 state.errors.returnDate = '';
                 state.errors.deliveryOrderId = '';
                 state.errors.status = '';
-            }
-        };
+            },
+            prepareSecondaryDataForSubmission: function () {
 
-        const handler = {
-            handleSubmit: async function () {
-                try {
-                    state.isSubmitting = true;
+                const batchChanges = secondaryGrid.getBatchChanges();
 
-                    // Ensure grid edit is committed
-                    await new Promise(resolve => setTimeout(resolve, 300));
+                // 1️⃣ Merge grid state
+                let currentSecondaryData =
+                    state.id !== "" ? [...state.secondaryData] : [];
 
-                    if (!validateForm()) {
-                        return;
-                    }
+                const added = batchChanges.addedRecords || [];
+                const changed = batchChanges.changedRecords || [];
+                const deleted = batchChanges.deletedRecords || [];
 
-                    // ✅ VALIDATION: returnQuantity must be >= 1
-                    const invalidRow = state.secondaryData.find(
-                        item => item.returnQuantity == null || Number(item.returnQuantity) < 1
+                const match = (a, b) => (a.id && b.id ? a.id === b.id : false);
+
+                // Apply edits
+                changed.forEach(row => {
+                    const idx = currentSecondaryData.findIndex(item => match(item, row));
+                    if (idx !== -1) currentSecondaryData[idx] = { ...currentSecondaryData[idx], ...row };
+                });
+
+                // Add new
+                currentSecondaryData.push(...added);
+
+                // Remove deleted
+                if (deleted.length > 0) {
+                    currentSecondaryData = currentSecondaryData.filter(item =>
+                        !deleted.some(del => match(item, del))
                     );
+                }
 
-                    if (invalidRow) {
-                        Swal.fire({
-                            icon: 'warning',
-                            title: 'Invalid Return Quantity',
-                            text: 'Return Quantity must be 1 or greater for all items.'
-                        });
-                        return;
+                // 2️⃣ Map to DTO + Attach Attributes
+                let validationError = null;
+
+                const itemsDto = currentSecondaryData.map((item, index) => {
+
+                    const { Attributes, errors } =
+                        methods.collectDetailAttributes(item);
+
+                    // ❌ Attribute validation errors
+                    if (errors.length > 0 && !validationError) {
+                        validationError = `Row ${index + 1}: ${errors[0]}`;
                     }
 
-                    // ✅ Prepare secondary data
-                    const items = state.secondaryData.map(item => ({
+                    // ❌ Return qty mismatch
+                    if (
+                        item.returnQuantity > 0 &&
+                        Attributes.length !== Number(item.returnQuantity)
+                    ) {
+                        validationError =
+                            `Row ${index + 1}: Selected attributes (${Attributes.length}) ` +
+                            `must match Return Qty (${item.returnQuantity})`;
+                    }
+
+                    return {
                         id: item.id || null,
                         warehouseId: item.warehouseId,
                         productId: item.productId,
 
-                        // ✅ movement = user-entered returnQuantity
-                        movement: Number(item.returnQuantity)
-                    }));
+                        // 🔥 movement = returnQuantity
+                        movement: Number(item.returnQuantity),
 
-                    const userId = StorageManager.getUserId();
-                    let response;
+                        // 🔥 attach ONLY selected attributes
+                        attributes: Attributes
+                    };
+                });
 
-                    if (state.deleteMode) {
-                        response = await services.deleteMainData(state.id, userId);
+                return {
+                    itemsDto,
+                    deletedItems: deleted.map(x => ({ id: x.id })),
+                    error: validationError
+                };
+            }
 
-                    } else if (state.id === '') {
-                        response = await services.createMainData(
-                            state.returnDate,
-                            state.description,
-                            state.status,
-                            state.deliveryOrderId,
-                            items,
-                            userId
-                        );
+        };
 
-                    } else {
-                        response = await services.updateMainData(
-                            state.id,
-                            state.returnDate,
-                            state.description,
-                            state.status,
-                            state.deliveryOrderId,
-                            items,
-                            userId
-                        );
-                    }
+        //const handler = {
+        //    handleSubmit: async function () {
+        //        try {
+        //            state.isSubmitting = true;
 
-                    if (response.data.code === 200) {
+        //            // Ensure grid edit is committed
+        //            await new Promise(resolve => setTimeout(resolve, 300));
 
-                        await methods.populateMainData();
-                        mainGrid.refresh();
+        //            if (!validateForm()) {
+        //                return;
+        //            }
 
-                        if (!state.deleteMode) {
-                            state.mainTitle = 'Edit Sales Return';
-                            state.id = response?.data?.content?.data.id ?? '';
-                            state.number = response?.data?.content?.data.number ?? '';
+        //            // ✅ VALIDATION: returnQuantity must be >= 1
+        //            const invalidRow = state.secondaryData.find(
+        //                item => item.returnQuantity == null || Number(item.returnQuantity) < 1
+        //            );
 
-                            // Reload secondary data with DB IDs
-                            await methods.populateSecondaryData(state.id);
-                            secondaryGrid.refresh();
-                            state.showComplexDiv = true;
+        //            if (invalidRow) {
+        //                Swal.fire({
+        //                    icon: 'warning',
+        //                    title: 'Invalid Return Quantity',
+        //                    text: 'Return Quantity must be 1 or greater for all items.'
+        //                });
+        //                return;
+        //            }
 
-                            Swal.fire({
-                                icon: 'success',
-                                title: 'Save Successful',
-                                timer: 2000,
-                                showConfirmButton: false
-                            });
-                        } else {
-                            Swal.fire({
-                                icon: 'success',
-                                title: 'Delete Successful',
-                                text: 'Form will be closed...',
-                                timer: 2000,
-                                showConfirmButton: false
-                            });
+        //            // ✅ Prepare secondary data
+        //            const items = state.secondaryData.map(item => ({
+        //                id: item.id || null,
+        //                warehouseId: item.warehouseId,
+        //                productId: item.productId,
 
-                            setTimeout(() => {
-                                mainModal.obj.hide();
-                                resetFormState();
-                            }, 2000);
-                        }
+        //                // ✅ movement = user-entered returnQuantity
+        //                movement: Number(item.returnQuantity)
+        //            }));
 
-                    } else {
-                        Swal.fire({
-                            icon: 'error',
-                            title: state.deleteMode ? 'Delete Failed' : 'Save Failed',
-                            text: response.data.message ?? 'Please check your data.',
-                            confirmButtonText: 'Try Again'
-                        });
-                    }
+        //            const userId = StorageManager.getUserId();
+        //            let response;
 
-                } catch (error) {
+        //            if (state.deleteMode) {
+        //                response = await services.deleteMainData(state.id, userId);
+
+        //            } else if (state.id === '') {
+        //                response = await services.createMainData(
+        //                    state.returnDate,
+        //                    state.description,
+        //                    state.status,
+        //                    state.deliveryOrderId,
+        //                    items,
+        //                    userId
+        //                );
+
+        //            } else {
+        //                response = await services.updateMainData(
+        //                    state.id,
+        //                    state.returnDate,
+        //                    state.description,
+        //                    state.status,
+        //                    state.deliveryOrderId,
+        //                    items,
+        //                    userId
+        //                );
+        //            }
+
+        //            if (response.data.code === 200) {
+
+        //                await methods.populateMainData();
+        //                mainGrid.refresh();
+
+        //                if (!state.deleteMode) {
+        //                    state.mainTitle = 'Edit Sales Return';
+        //                    state.id = response?.data?.content?.data.id ?? '';
+        //                    state.number = response?.data?.content?.data.number ?? '';
+
+        //                    // Reload secondary data with DB IDs
+        //                    await methods.populateSecondaryData(state.id);
+        //                    secondaryGrid.refresh();
+        //                    state.showComplexDiv = true;
+
+        //                    Swal.fire({
+        //                        icon: 'success',
+        //                        title: 'Save Successful',
+        //                        timer: 2000,
+        //                        showConfirmButton: false
+        //                    });
+        //                } else {
+        //                    Swal.fire({
+        //                        icon: 'success',
+        //                        title: 'Delete Successful',
+        //                        text: 'Form will be closed...',
+        //                        timer: 2000,
+        //                        showConfirmButton: false
+        //                    });
+
+        //                    setTimeout(() => {
+        //                        mainModal.obj.hide();
+        //                        resetFormState();
+        //                    }, 2000);
+        //                }
+
+        //            } else {
+        //                Swal.fire({
+        //                    icon: 'error',
+        //                    title: state.deleteMode ? 'Delete Failed' : 'Save Failed',
+        //                    text: response.data.message ?? 'Please check your data.',
+        //                    confirmButtonText: 'Try Again'
+        //                });
+        //            }
+
+        //        } catch (error) {
+        //            Swal.fire({
+        //                icon: 'error',
+        //                title: 'An Error Occurred',
+        //                text: error.response?.data?.message ?? 'Please try again.',
+        //                confirmButtonText: 'OK'
+        //            });
+        //        } finally {
+        //            state.isSubmitting = false;
+        //        }
+        //    }
+        //};
+        const handler = {
+
+        handleSubmit: async function () {
+            try {
+                state.isSubmitting = true;
+
+                await new Promise(resolve => setTimeout(resolve, 300));
+
+                if (!validateForm()) return;
+
+                // ❌ Return Quantity validation
+                const invalidRow = state.secondaryData.find(
+                    r => !r.returnQuantity || Number(r.returnQuantity) < 1
+                );
+
+                if (invalidRow) {
+                    Swal.fire({
+                        icon: 'warning',
+                        title: 'Invalid Return Quantity',
+                        text: 'Return Quantity must be at least 1 for all rows.'
+                    });
+                    return;
+                }
+
+                // 🔥 Prepare payload WITH attributes
+                const {
+                    itemsDto,
+                    deletedItems,
+                    error
+                } = methods.prepareSecondaryDataForSubmission();
+
+                if (error) {
                     Swal.fire({
                         icon: 'error',
-                        title: 'An Error Occurred',
-                        text: error.response?.data?.message ?? 'Please try again.',
-                        confirmButtonText: 'OK'
+                        title: 'Validation Error',
+                        text: error
                     });
-                } finally {
-                    state.isSubmitting = false;
+                    return;
                 }
+
+                const userId = StorageManager.getUserId();
+                let response;
+
+                if (state.deleteMode) {
+                    response = await services.deleteMainData(state.id, userId);
+
+                } else if (state.id === '') {
+                    response = await services.createMainData(
+                        state.returnDate,
+                        state.description,
+                        state.status,
+                        state.deliveryOrderId,
+                        itemsDto,
+                        userId
+                    );
+
+                } else {
+                    response = await services.updateMainData(
+                        state.id,
+                        state.returnDate,
+                        state.description,
+                        state.status,
+                        state.deliveryOrderId,
+                        itemsDto,
+                        userId
+                    );
+                }
+
+                if (response.data.code === 200) {
+
+                    await methods.populateMainData();
+                    mainGrid.refresh();
+
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Saved Successfully',
+                        timer: 1500,
+                        showConfirmButton: false
+                    });
+
+                } else {
+                    throw new Error(response.data.message);
+                }
+
+            } catch (error) {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Save Failed',
+                    text: error.message || 'Please try again.'
+                });
+            } finally {
+                state.isSubmitting = false;
             }
+        }
         };
         Vue.onMounted(async () => {
             try {
@@ -892,7 +1879,34 @@
                                     returnQtyObj.appendTo(args.element);
                                 }
                             }
-                        }
+                        },
+                        {
+                            field: 'details',
+                            headerText: 'Attributes',
+                            width: 120,
+                            disableHtmlEncode: false,
+
+                            valueAccessor: (field, data) => {
+                                const product = state.productListLookupData.find(p => p.id === data.productId);
+                                if (!product) return '';
+                                debugger;
+                                const canShow =
+                                    product.imei1 || product.imei2 || product.serviceNo;
+
+                                if (!canShow) return '';   // hide link, not column
+
+                                return `
+        <a href="#" class="view-details" data-id="${data?.purchaseOrderItemId}">
+            Attributes
+        </a>
+    `;
+                            }
+                            ,
+
+                            // Needed to allow HTML inside cell
+                            allowEditing: false
+                        },
+
                     ],
 
                     toolbar: ['ExcelExport', 'Add', 'Edit', 'Delete', 'Update', 'Cancel'],
@@ -928,7 +1942,28 @@
 
                         methods.refreshSummary();
                     },
+                    queryCellInfo: (args) => {
+                        if (args.column.field === 'details') {
+                            const link = args.cell.querySelector('.view-details');
 
+                            if (link) {
+                                link.addEventListener('click', (e) => {
+                                    e.preventDefault();
+
+                                    // 1. Get the Syncfusion Row Object
+                                    const rowElement = e.currentTarget.closest('.e-row');
+                                    const rowIndex = rowElement.rowIndex;
+                                    const rowObj = secondaryGrid.obj.getRowsObject()[rowIndex];
+
+                                    // 2. Extract the actual data (Syncfusion stores it in .data)
+                                    const rowData = rowObj.data;
+
+                                    // 3. Pass the actual data object to the modal opener
+                                    methods.openDetailModal(rowIndex, rowData);
+                                });
+                            }
+                        }
+                    },
                     rowSelected: () => {
                         secondaryGrid.obj.toolbarModule.enableItems(
                             ['Edit'],
