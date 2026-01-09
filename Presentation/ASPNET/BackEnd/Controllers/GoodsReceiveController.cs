@@ -1,5 +1,6 @@
 ﻿using Application.Features.GoodsReceiveManager.Commands;
 using Application.Features.GoodsReceiveManager.Queries;
+using Application.Features.NegativeAdjustmentManager.Commands;
 using ASPNET.BackEnd.Common.Base;
 using ASPNET.BackEnd.Common.Models;
 using MediatR;
@@ -171,6 +172,30 @@ public class GoodsReceiveController : BaseApiController
             });
         }
 
+    [Authorize]
+    [HttpGet("GetInventoryTransactionAttributes")]
+    public async Task<
+    ActionResult<ApiSuccessResult<List<CreateNegativeAdjustmentItemDetailDto>>>>
+    GetInventoryTransactionAttributesAsync(
+        [FromQuery] string moduleId,
+        [FromQuery] string productId,
+        CancellationToken cancellationToken)
+    {
+        var request = new GetInventoryTransactionAttributesQuery
+        {
+            ModuleId = moduleId,
+            ProductId = productId
+        };
+
+        var response = await _sender.Send(request, cancellationToken);
+
+        return Ok(new ApiSuccessResult<List<CreateNegativeAdjustmentItemDetailDto>>
+        {
+            Code = StatusCodes.Status200OK,
+            Message = $"Success executing {nameof(GetInventoryTransactionAttributesAsync)}",
+            Content = response
+        });
+    }
 
 }
 
