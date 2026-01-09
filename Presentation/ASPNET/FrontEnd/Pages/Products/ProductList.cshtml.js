@@ -635,9 +635,9 @@
                     allowSorting: true,
                     allowSelection: true,
                     allowGrouping: true,
-                    groupSettings: {
-                        columns: ['productGroupName']
-                    },
+                    //groupSettings: {
+                    //    columns: ['productGroupName']
+                    //},
                     allowTextWrap: true,
                     allowResizing: true,
                     allowPaging: true,

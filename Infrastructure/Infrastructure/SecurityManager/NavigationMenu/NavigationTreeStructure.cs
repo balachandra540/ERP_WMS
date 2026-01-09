@@ -123,25 +123,28 @@ public static class NavigationTreeStructure
                     "IsModule": false
                 },
                 {
+                "URL": "/Attributes/AttributesList",
+                "Name": "Attribute",
+                "IsModule": false
+                 },
+                {
                     "URL": "/Products/ProductList",
                     "Name": "Product",
                     "IsModule": false
                 },
-             {
-                "URL": "/Attributes/AttributesList",
-                "Name": "Attribute",
-                "IsModule": false
-            },
-            
+                {
+                    "URL": "/Products/ProductHistory",
+                    "Name": "Product History Audit Log",
+                    "IsModule": false
+                },
+                {
+                    "URL": "/Products/ProductPluCodes",
+                    "Name": "Product Plucodes",
+                    "IsModule": false
+                },
                 {
                     "URL": "/Products/ProductPriceDefinition",
                     "Name": "Price Definition",
-                    "IsModule": false
-                },
-                
-                {
-                    "URL": "/SalesReturns/SalesReturnList",
-                    "Name": "Sales Return",
                     "IsModule": false
                 },
                 {
@@ -154,6 +157,13 @@ public static class NavigationTreeStructure
                     "Name": "Purchase Return",
                     "IsModule": false
                 },
+                
+                {
+                    "URL": "/SalesReturns/SalesReturnList",
+                    "Name": "Sales Return",
+                    "IsModule": false
+                },
+                
                 {
                     "URL": "/TransferOuts/TransferOutList",
                     "Name": "Transfer Out",

@@ -232,26 +232,18 @@ public class ProductController : BaseApiController
         });
     }
 
-    //[HttpGet("checkIMEIorServiceNoExistOrNot")]
-    //public async Task<ActionResult<ApiSuccessResult<CheckDetailValueExistResult>>>
-    //CheckIMEIorServiceNoExistOrNot(
-    //    [FromQuery] string value,
-    //    CancellationToken cancellationToken)
-    //{
-    //    var request = new CheckDetailValueExistRequest
-    //    {
-    //        Value = value
-    //    };
+    [HttpGet("product-plu-codes")]
+    public async Task<ActionResult<ApiSuccessResult<ProductPluCodeDto>>> GetProductPluCodes(CancellationToken ct)
+    {
+        var result = await _sender.Send(new GetProductPluCodesQuery(), ct);
 
-    //    var response = await _sender.Send(request, cancellationToken);
-
-    //    return Ok(new ApiSuccessResult<CheckDetailValueExistResult>
-    //    {
-    //        Code = StatusCodes.Status200OK,
-    //        Message = "Validation executed successfully",
-    //        Content = response
-    //    });
-    //}
+        return Ok(new ApiSuccessResult<List<ProductPluCodeDto>>
+        {
+            Code = StatusCodes.Status200OK,
+            Message = "PLU codes loaded successfully",
+            Content = result
+        });
+    }
 
     //public async Task<ActionResult<ApiSuccessResult<GetProductAndGoodsReceiveByPluResult>>>
     //GetProductAndGoodsReceiveByPluAsync(

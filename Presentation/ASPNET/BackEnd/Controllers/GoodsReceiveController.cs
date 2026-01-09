@@ -6,6 +6,7 @@ using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.Threading;
 
 namespace ASPNET.BackEnd.Controllers;
 
@@ -149,64 +150,26 @@ public class GoodsReceiveController : BaseApiController
         });
     }
 
-    //[HttpGet("GetAttrListLookupData")]
-    //public async Task<ActionResult<ApiSuccessResult<GetAttrListLookupDataResult>>> GetAttrListLookupDataAsync(
-    //   [FromQuery] string attributeType,
-    //   [FromQuery] string value,
-    //   CancellationToken cancellationToken)
-    //{
-    //    if (string.IsNullOrWhiteSpace(attributeType) || string.IsNullOrWhiteSpace(value))
-    //    {
-    //        return BadRequest(new ApiErrorResult { Code = StatusCodes.Status400BadRequest, Message = "attributeType and value are required." });
-    //    }
-
-    //    var request = new GetAttrListLookupDataRequest(attributeType.Trim(), value.Trim());
-
-    //    var response = await _sender.Send(request, cancellationToken);
-
-    //    return Ok(new ApiSuccessResult<GetAttrListLookupDataResult>
-    //    {
-    //        Code = StatusCodes.Status200OK,
-    //        Message = $"Success executing {nameof(GetAttrListLookupDataAsync)}",
-    //        Content = response
-    //    });
-    //}
+        [HttpPost("searchAttribute")]
+        public async Task<IActionResult> SearchAttributeAsync(
+        [FromBody] ResolveInventoryByAttributeRequest request,
+        CancellationToken ct)
+        {
+        
 
 
+            var response = await _sender.Send(request, ct);
 
+            if (response == null)
+                return NotFound("No matching inventory found");
 
-    //var details = await _context.GoodsReceiveItemDetails
-    //    .AsNoTracking()
-    //    .Where(x => !x.IsDeleted)
-    //    .Select(x => new
-    //    {
-    //        x.IMEI1,
-    //        x.IMEI2,
-    //        x.ServiceNo
-    //    })
-    //    .ToListAsync(cancellationToken);
-
-    //return new GlobalAttributeValuesDto
-    //{
-    //    AllIMEI1 = details
-    //        .Where(x => !string.IsNullOrWhiteSpace(x.IMEI1))
-    //        .Select(x => x.IMEI1!)
-    //        .Distinct()
-    //        .ToList(),
-
-    //    AllIMEI2 = details
-    //        .Where(x => !string.IsNullOrWhiteSpace(x.IMEI2))
-    //        .Select(x => x.IMEI2!)
-    //        .Distinct()
-    //        .ToList(),
-
-    //    AllServiceNo = details
-    //        .Where(x => !string.IsNullOrWhiteSpace(x.ServiceNo))
-    //        .Select(x => x.ServiceNo!)
-    //        .Distinct()
-    //        .ToList(),
-    //};
-    //}
+                return Ok(new ApiSuccessResult<ResolveInventoryByAttributeResponse>
+            {
+                Code = StatusCodes.Status200OK,
+                Message = $"Success executing {nameof(SearchAttributeAsync)}",
+                Content = response
+            });
+        }
 
 
 }

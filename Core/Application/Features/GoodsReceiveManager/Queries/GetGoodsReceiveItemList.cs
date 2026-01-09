@@ -372,4 +372,110 @@ namespace Application.Features.GoodsReceiveManager.Queries
         }
 
     }
+
+    public class ResolveInventoryByAttributeRequest : IRequest<ResolveInventoryByAttributeResponse>
+    {
+        public string InputValue { get; set; } = string.Empty;
+    }
+
+    public class ResolveInventoryByAttributeResponse
+    {
+        public string ResolvedAttributeType { get; set; } = string.Empty;
+
+        public GoodsReceiveItemDetailDto Attributes { get; set; } = new();
+        public List<TransactionHistoryDto> History { get; set; } = new();
+    }
+
+    
+
+    public class TransactionHistoryDto
+    {
+        public string? ModuleName { get; set; } = string.Empty;
+        public string? ModuleCode { get; set; } = string.Empty;
+        public DateTime? MovementDate { get; set; }
+        public double? Movement { get; set; } 
+        public double? Stock { get; set; }
+    }
+
+
+public class ResolveInventoryByAttributeHandler
+    : IRequestHandler<
+        ResolveInventoryByAttributeRequest,
+        ResolveInventoryByAttributeResponse?>
+    {
+        private readonly IQueryContext _queryContext;
+
+        public ResolveInventoryByAttributeHandler(IQueryContext queryContext)
+        {
+            _queryContext = queryContext;
+        }
+
+        public async Task<ResolveInventoryByAttributeResponse?> Handle(
+            ResolveInventoryByAttributeRequest request,
+            CancellationToken ct)
+        {
+            if (string.IsNullOrWhiteSpace(request.InputValue))
+                return null;
+
+            var value = request.InputValue.Trim();
+
+            // ---------------------------------------------------------
+            // 1️⃣ Resolve GoodsReceiveItemDetails by attribute
+            // ---------------------------------------------------------
+            var grItem = await _queryContext.GoodsReceiveItemDetails
+                .AsNoTracking()
+                .FirstOrDefaultAsync(x =>
+                    x.IMEI1 == value ||
+                    x.IMEI2 == value ||
+                    x.ServiceNo == value,
+                    ct);
+
+            if (grItem == null)
+                return null;
+
+            // ---------------------------------------------------------
+            // 2️⃣ Identify resolved attribute type
+            // ---------------------------------------------------------
+            var resolvedType =
+                grItem.IMEI1 == value ? "IMEI1" :
+                grItem.IMEI2 == value ? "IMEI2" :
+                grItem.ServiceNo == value ? "ServiceNo" :
+                "Unknown";
+
+            // ---------------------------------------------------------
+            // 3️⃣ Fetch Inventory Transaction History
+            // ---------------------------------------------------------
+            var history = await _queryContext.InventoryTransactionAttributesDetails
+                .AsNoTracking()
+                .Where(x => x.GoodsReceiveItemDetailsId == grItem.Id)
+                .Select(x => x.InventoryTransaction)
+                .OrderBy(x => x.MovementDate)
+                .Select(t => new TransactionHistoryDto
+                {
+                    ModuleName = t.ModuleName,
+                    ModuleCode = t.ModuleCode,
+                    MovementDate = t.MovementDate,
+                    Movement = t.Movement,
+                    Stock = t.Stock
+                })
+                .ToListAsync(ct);
+
+            // ---------------------------------------------------------
+            // 4️⃣ Compose response
+            // ---------------------------------------------------------
+            return new ResolveInventoryByAttributeResponse
+            {
+                ResolvedAttributeType = resolvedType,
+                Attributes = new GoodsReceiveItemDetailDto
+                {
+                    IMEI1 = grItem.IMEI1,
+                    IMEI2 = grItem.IMEI2,
+                    ServiceNo = grItem.ServiceNo
+                },
+                History = history
+            };
+        }
+    }
 }
+
+

@@ -757,7 +757,7 @@
                     allowSorting: true,
                     allowSelection: true,
                     allowGrouping: true,
-                    groupSettings: { columns: ['vendorCategoryName'] },
+                    //groupSettings: { columns: ['vendorCategoryName'] },
                     allowTextWrap: true,
                     allowResizing: true,
                     allowPaging: true,

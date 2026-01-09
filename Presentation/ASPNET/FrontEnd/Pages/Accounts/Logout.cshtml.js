@@ -32,7 +32,9 @@
                         showConfirmButton: false
                     });
                     setTimeout(() => {
-                        window.location.href = '/';
+                        //window.location.href = '/';
+
+                        window.location.href = '/Accounts/Login';
                     }, 2000);
                 } else {
                     Swal.fire({

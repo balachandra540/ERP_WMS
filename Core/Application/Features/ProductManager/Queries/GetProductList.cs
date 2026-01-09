@@ -329,88 +329,47 @@ public class GetProductStockByProductIdHandler
         return result;
     }
 }
+public class ProductPluCodeDto
+{
+    public string Id { get; set; } = string.Empty;
+    public string? ProductId { get; set; }
+    public string? Attribute1DetailId { get; set; }
+    public string? Attribute2DetailId { get; set; }
+    public int PluCode { get; set; }
+}
+public class GetProductPluCodesQuery : IRequest<List<ProductPluCodeDto>>
+{
+}
 
-//public class CheckDetailValuesExistHandler
-//    : IRequestHandler<CheckDetailValuesExistRequest, CheckDetailValueExistResult>
-//{
-//    private readonly IQueryContext _context;
+public class GetProductPluCodesHandler
+    : IRequestHandler<GetProductPluCodesQuery, List<ProductPluCodeDto>>
+{
+    private readonly IQueryContext _queryContext;
 
-//    public CheckDetailValuesExistHandler(IQueryContext context)
-//    {
-//        _context = context;
-//    }
+    public GetProductPluCodesHandler(IQueryContext queryContext)
+    {
+        _queryContext = queryContext;
+    }
 
-//    public async Task<CheckDetailValueExistResult> Handle(
-//        CheckDetailValuesExistRequest request,
-//        CancellationToken cancellationToken)
-//    {
-
-//        var result = await
-// (
-//     from it in _context.InventoryTransaction
-//         .AsNoTracking()
-//         .ApplyIsDeletedFilter(false)
-
-//     join itad in _context.InventoryTransactionAttributesDetails
-//         .AsNoTracking()
-//         .ApplyIsDeletedFilter(false)
-//         on it.Id equals itad.InventoryTransactionId
-
-//     join grid in _context.GoodsReceiveItemDetails
-//         .AsNoTracking()
-//         on itad.GoodsReceiveItemDetailsId equals grid.Id
-
-//     join gri in _context.GoodsReceiveItem
-//         .AsNoTracking()
-//         on grid.GoodsReceiveItemId equals gri.Id
-
-//     where it.Status == InventoryTransactionStatus.Confirmed
-//           && it.ProductId == request.ProductId
-//     // && it.WarehouseId == request.WarehouseId
-
-//     group new { it, gri, grid, itad } by it.ProductId into g
-
-//     select new ProductStockSummaryDto
-//     {
-//         ProductId = g.Key!,
-
-//         // 🔹 PRODUCT TOTALS
-//         TotalStock = (decimal)(g.Sum(x => x.it.Stock) ?? 0),
-//         TotalMovement = (decimal)(g.Sum(x => x.it.Movement) ?? 0),
-//         RequestStock = 0,
-
-//         // 🔹 ATTRIBUTE + SERIALIZED STOCK
-//         Attributes =
-//             g.GroupBy(x => new
-//             {
-//                 x.gri.Attribute1DetailId,
-//                 x.gri.Attribute2DetailId,
-//                 x.grid.IMEI1,
-//                 x.grid.IMEI2,
-//                 x.grid.ServiceNo
-//             })
-//             .Select(ag => new ProductStockAttributeDto
-//             {
-//                 Attribute1DetailId = ag.Key.Attribute1DetailId,
-//                 Attribute2DetailId = ag.Key.Attribute2DetailId,
-//                 IMEI1 = ag.Key.IMEI1,
-//                 IMEI2 = ag.Key.IMEI2,
-//                 ServiceNo = ag.Key.ServiceNo,
-//                 // ✅ Availability per serial
-//                 Quantity = ag.Sum(x => (decimal)(x.it.Movement ?? 0))
-//             })
-//             .Where(a => a.Quantity > 0)
-//             .ToList()
-//     }
-// )
-// .Where(x => x.TotalStock > 0)
-// .FirstOrDefaultAsync(cancellationToken);
-
-
-//        return result;
-//    }
-//}
-
+    public async Task<List<ProductPluCodeDto>> Handle(
+        GetProductPluCodesQuery request,
+        CancellationToken ct)
+    {
+        return await _queryContext.ProductPluCodes
+            .AsNoTracking()
+            .ApplyIsDeletedFilter(false)
+            .OrderBy(x => x.PluCode)
+            .Select(x => new ProductPluCodeDto
+            {
+                Id = x.Id,
+                ProductId = x.ProductId,
+                Attribute1DetailId = x.Attribute1DetailId,
+                Attribute2DetailId = x.Attribute2DetailId,
+                PluCode = x.PluCode
+            })
+            .ToListAsync(ct);
+    }
+}
 
 
 

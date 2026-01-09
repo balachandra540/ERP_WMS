@@ -11,8 +11,20 @@ public static class FrontEndConfiguration
         return services;
     }
 
+    //public static IEndpointRouteBuilder MapFrontEndRoutes(this IEndpointRouteBuilder endpoints)
+    //{
+    //    endpoints.MapRazorPages()
+    //        .WithStaticAssets();
+    //    return endpoints;
+    //}
     public static IEndpointRouteBuilder MapFrontEndRoutes(this IEndpointRouteBuilder endpoints)
     {
+        endpoints.MapGet("/", context =>
+        {
+            context.Response.Redirect("/Accounts/Login");
+            return Task.CompletedTask;
+        });
+
         endpoints.MapRazorPages()
             .WithStaticAssets();
         return endpoints;
