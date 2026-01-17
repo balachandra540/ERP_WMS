@@ -28,7 +28,8 @@
             totalMovementFormatted: '0.00',
             allProductStocks: null,  // Map<string, decimal> for quick lookups
             availableProducts: [],   // Filtered products for add-mode dropdown
-            activeDetailRow: []
+            activeDetailRow: [],
+             isAddMode : false
 
         });
 
@@ -144,7 +145,7 @@
             state.number = '';
             state.transferReleaseDate = '';
             state.description = '';
-            state.warehouseFromId = null;
+            //state.warehouseFromId = null;
             state.warehouseToId = null;
             state.status = null;
             state.errors = {
@@ -207,45 +208,41 @@
                         dataSource: state.warehouseFromListLookupData,
                         fields: { value: 'id', text: 'name' },
                         placeholder: 'Select Warehouse From',
-                        filterBarPlaceholder: 'Search',
-                        sortOrder: 'Ascending',
-                        allowFiltering: true,
-                        filtering: (e) => {
-                            e.preventDefaultAction = true;
-                            let query = new ej.data.Query();
-                            if (e.text !== '') {
-                                query = query.where('name', 'startsWith', e.text, true);
-                            }
-                            e.updateData(state.warehouseFromListLookupData, query);
-                        },
+                        allowFiltering: false,   // optional since only one item
+                        enabled: true,           // will disable after selection
+                        //filtering: (e) => {
+                        //    e.preventDefaultAction = true;
+                        //    let query = new ej.data.Query();
+                        //    if (e.text !== '') {
+                        //        query = query.where('name', 'startsWith', e.text, true);
+                        //    }
+                        //    e.updateData(state.warehouseFromListLookupData, query);
+                        //},
+
                         change: async (e) => {
                             try {
-                                // Update selected warehouse ID in state
                                 state.warehouseFromId = e.value;
 
-                                // Choose which ID to use for fetching
                                 const modelId = state.modelId;
                                 const warehouseId = state.warehouseFromId;
 
-                                // Call populateSecondaryData with both parameters
                                 await methods.populateSecondaryData(modelId, warehouseId);
                             } catch (error) {
-                                console.error("Error fetching secondary data on warehouse change:", error);
+                                console.error("Error fetching secondary data:", error);
                             }
                         }
                     });
                     warehouseFromListLookup.obj.appendTo(warehouseFromIdRef.value);
 
-                    // Set value after append
-                    state.warehouseFromId = StorageManager.getLocation();
+                    // ✅ Get current location
+                    const currentWarehouseId = StorageManager.getLocation();
 
-                    warehouseFromListLookup.obj.value = state.warehouseFromId; // ✅ default select
-                    warehouseFromListLookup.refresh();
+                    // ✅ Select it
+                    state.warehouseFromId = currentWarehouseId;
+                    warehouseFromListLookup.obj.value = currentWarehouseId;
 
-                    //  Disable it here on load
-                    //warehouseFromListLookup.obj.enabled = false;
-
-                   
+                    // ✅ Disable dropdown
+                    warehouseFromListLookup.obj.enabled = false;
                 }
             },
             refresh: () => {
@@ -561,7 +558,8 @@
                 const response = await services.getWarehouseToListLookupData();
                 //state.warehouseToListLookupData = response?.data?.content?.data.filter(warehouse => warehouse.systemWarehouse === false) || [];
                 state.warehouseToListLookupData = response?.data?.content?.data.filter(warehouse => (warehouse.type === "Store" || warehouse.type === "Store&Sales")) || [];
-
+                //const presentWarehouseId = StorageManager.getLocation();
+                //state.warehouseToListLookupData = response?.data?.content?.data.filter(w => w.id !== presentWarehouseId) || [];
             },
             populateTransferOutStatusListLookupData: async () => {
                 const response = await services.getTransferOutStatusListLookupData();
@@ -732,6 +730,14 @@
                 state.errors.warehouseFromId = '';
                 state.errors.warehouseToId = '';
                 state.errors.status = '';
+            },
+            onMainModalShown: () => {
+                if (state.isAddMode) {
+                    setTimeout(() => {
+                        secondaryGrid.obj.addRecord();
+                    }, 200);
+                }
+
             },
             openDetailModal:  (RowIndex) => {
                 debugger;
@@ -1437,6 +1443,7 @@
 
                 mainModal.create();
                 mainModalRef.value?.addEventListener('hidden.bs.modal', methods.onMainModalHidden);
+                mainModalRef.value?.addEventListener('shown.bs.modal', methods.onMainModalShown);
                 await methods.populateWarehouseFromListLookupData();
                 await methods.populateWarehouseToListLookupData();
                 await methods.populateTransferOutStatusListLookupData();
@@ -1535,13 +1542,16 @@
                         if (args.item.id === 'AddCustom') {
                             state.deleteMode = false;
                             state.mainTitle = 'Add Transfer Out';
+                            state.isAddMode = true;
                             resetFormState();
-                            state.showComplexDiv = false;
+                            state.showComplexDiv = true;
                             mainModal.obj.show();
                         }
 
                         if (args.item.id === 'EditCustom') {
                             state.deleteMode = false;
+                            state.isAddMode = false;
+
                             if (mainGrid.obj.getSelectedRecords().length) {
                                 const selectedRecord = mainGrid.obj.getSelectedRecords()[0];
                                 state.mainTitle = 'Edit Transfer Out';
@@ -1561,6 +1571,8 @@
 
                         if (args.item.id === 'DeleteCustom') {
                             state.deleteMode = true;
+                            state.isAddMode = false;
+
                             if (mainGrid.obj.getSelectedRecords().length) {
                                 const selectedRecord = mainGrid.obj.getSelectedRecords()[0];
                                 state.mainTitle = 'Delete Transfer Out?';
@@ -1579,6 +1591,8 @@
                         }
 
                         if (args.item.id === 'PrintPDFCustom') {
+                            state.isAddMode = false;
+
                             if (mainGrid.obj.getSelectedRecords().length) {
                                 const selectedRecord = mainGrid.obj.getSelectedRecords()[0];
                                 window.open('/TransferOuts/TransferOutPdf?id=' + (selectedRecord.id ?? ''), '_blank');
@@ -1655,6 +1669,7 @@
                                 write: (args) => {
                                     pluObj = new ej.inputs.TextBox({
                                         value: args.rowData.pluCode ?? "",
+                                        cssClass: 'plu-editor',
                                         placeholder: "Enter 5+ characters"
                                     });
 
@@ -2028,6 +2043,24 @@
                             console.log('❌ Row Deleted from Batch:', args.data[0]);
                             console.log('📋 Current Batch:', secondaryGrid.manualBatchChanges);
                         }
+
+                        if (args.requestType === 'add') {
+                            // Wait for grid internal focus to finish
+                            setTimeout(() => {
+                                // Find the PLU input in the newly added row
+                                const pluInput = document.querySelector('.e-addedrow .plu-editor input');
+
+                                if (pluInput) {
+                                    // Focus and place cursor at end
+                                    pluInput.focus();
+                                    const length = pluInput.value.length;
+                                    pluInput.setSelectionRange(length, length);
+
+                                    console.log('🎯 Cursor placed in PLU input');
+                                }
+                            }, 150); // small delay to override checkbox auto-focus
+                        }
+
 
                         methods.refreshSummary?.();
                     },
