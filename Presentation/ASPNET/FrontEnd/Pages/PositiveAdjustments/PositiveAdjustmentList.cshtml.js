@@ -20,7 +20,9 @@
             },
             showComplexDiv: false,
             isSubmitting: false,
-            totalMovementFormatted: '0.00'
+            totalMovementFormatted: '0.00',
+            isAddMode: false
+
         });
 
         const mainGridRef = Vue.ref(null);
@@ -313,6 +315,15 @@
                 state.errors.adjustmentDate = '';
                 state.errors.status = '';
             },
+            onMainModalShown: () => {
+                if (state.isAddMode) {
+                    setTimeout(() => {
+                        secondaryGrid.obj.addRecord();
+                    }, 200);
+                }
+
+            },
+
             openDetailModal: async (RowIndex, rowData) => {
                 // Save the index for the save operation later
                 state.currentDetailRowIndex = RowIndex;
@@ -894,6 +905,8 @@
 
                 mainModal.create();
                 mainModalRef.value?.addEventListener('hidden.bs.modal', methods.onMainModalHidden);
+                mainModalRef.value?.addEventListener('shown.bs.modal', methods.onMainModalShown);
+
                 await methods.populatePositiveAdjustmentStatusListLookupData();
                 numberText.create();
                 adjustmentDatePicker.create();
@@ -986,6 +999,7 @@
 
                         if (args.item.id === 'AddCustom') {
                             state.deleteMode = false;
+                            state.isAddMode = true;
                             state.mainTitle = 'Add Positive Adjustment';
                             resetFormState();
                             state.showComplexDiv = true;
@@ -994,6 +1008,7 @@
 
                         if (args.item.id === 'EditCustom') {
                             state.deleteMode = false;
+                            state.isAddMode = false;
                             if (mainGrid.obj.getSelectedRecords().length) {
                                 const selectedRecord = mainGrid.obj.getSelectedRecords()[0];
                                 state.mainTitle = 'Edit Positive Adjustment';
@@ -1011,6 +1026,7 @@
 
                         if (args.item.id === 'DeleteCustom') {
                             state.deleteMode = true;
+                            state.isAddMode = false;
                             if (mainGrid.obj.getSelectedRecords().length) {
                                 const selectedRecord = mainGrid.obj.getSelectedRecords()[0];
                                 state.mainTitle = 'Delete Positive Adjustment?';
@@ -1027,6 +1043,7 @@
                         }
 
                         if (args.item.id === 'PrintPDFCustom') {
+                            state.isAddMode = false;
                             if (mainGrid.obj.getSelectedRecords().length) {
                                 const selectedRecord = mainGrid.obj.getSelectedRecords()[0];
                                 window.open('/PositiveAdjustments/PositiveAdjustmentPdf?id=' + (selectedRecord.id ?? ''), '_blank');
@@ -1359,6 +1376,7 @@
                                 write: (args) => {
                                     pluObj = new ej.inputs.TextBox({
                                         value: args.rowData.pluCode ?? "",
+                                        cssClass: 'plu-editor',
                                         placeholder: "Enter 5+ characters"
                                     });
 
@@ -1655,6 +1673,22 @@
                             secondaryGrid.manualBatchChanges.deletedRecords.push(args.data[0]);
                             console.log('❌ Row Deleted:', args.data[0]);
                             console.log('📋 Current Batch Changes:', secondaryGrid.manualBatchChanges);
+                        }
+                        if (args.requestType === 'add') {
+                            // Wait for grid internal focus to finish
+                            setTimeout(() => {
+                                // Find the PLU input in the newly added row
+                                const pluInput = document.querySelector('.e-addedrow .plu-editor input');
+
+                                if (pluInput) {
+                                    // Focus and place cursor at end
+                                    pluInput.focus();
+                                    const length = pluInput.value.length;
+                                    pluInput.setSelectionRange(length, length);
+
+                                    console.log('🎯 Cursor placed in PLU input');
+                                }
+                            }, 150); // small delay to override checkbox auto-focus
                         }
                     },
                     queryCellInfo: (args) => {

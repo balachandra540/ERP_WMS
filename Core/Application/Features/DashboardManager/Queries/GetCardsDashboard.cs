@@ -41,7 +41,7 @@ public class GetCardsDashboardHandler : IRequestHandler<GetCardsDashboardRequest
         var salesReturnTotal = await _context.InventoryTransaction
             .AsNoTracking()
             .ApplyIsDeletedFilter(false)
-            .Where(x => x.ModuleName == nameof(SalesReturn) && x.Status == InventoryTransactionStatus.Confirmed && x.Warehouse!.Type == "Store" || x.Warehouse!.Type == "Store&Sales" == false)
+            .Where(x => x.ModuleName == nameof(SalesReturn) && x.Status == InventoryTransactionStatus.Confirmed)// && x.Warehouse!.Type == "Store" || x.Warehouse!.Type == "Store&Sales" == false
             .SumAsync(x => (double?)x.Movement, cancellationToken);
 
         var purchaseTotal = await _context.PurchaseOrderItem
@@ -52,31 +52,31 @@ public class GetCardsDashboardHandler : IRequestHandler<GetCardsDashboardRequest
         var purchaseReturnTotal = await _context.InventoryTransaction
             .AsNoTracking()
             .ApplyIsDeletedFilter(false)
-            .Where(x => x.ModuleName == nameof(PurchaseReturn) && x.Status == InventoryTransactionStatus.Confirmed && (x.Warehouse!.Type == "Store" || x.Warehouse!.Type == "Store&Sales"))
+            .Where(x => x.ModuleName == nameof(PurchaseReturn) && x.Status == InventoryTransactionStatus.Confirmed)// && (x.Warehouse!.Type == "Store" || x.Warehouse!.Type == "Store&Sales")
             .SumAsync(x => (double?)x.Movement, cancellationToken);
 
         var deliveryOrderTotal = await _context.InventoryTransaction
             .AsNoTracking()
             .ApplyIsDeletedFilter(false)
-            .Where(x => x.ModuleName == nameof(DeliveryOrder) && x.Status == InventoryTransactionStatus.Confirmed && (x.Warehouse!.Type == "Store" || x.Warehouse!.Type == "Store&Sales"))
+            .Where(x => x.ModuleName == nameof(DeliveryOrder) && x.Status == InventoryTransactionStatus.Confirmed) //&& (x.Warehouse!.Type == "Store" || x.Warehouse!.Type == "Store&Sales")
             .SumAsync(x => (double?)x.Movement, cancellationToken);
 
         var goodsReceiveTotal = await _context.InventoryTransaction
             .AsNoTracking()
             .ApplyIsDeletedFilter(false)
-            .Where(x => x.ModuleName == nameof(GoodsReceive) && x.Status == InventoryTransactionStatus.Confirmed && (x.Warehouse!.Type == "Store" || x.Warehouse!.Type == "Store&Sales"))
+            .Where(x => x.ModuleName == nameof(GoodsReceive) && x.Status == InventoryTransactionStatus.Confirmed)//&& (x.Warehouse!.Type == "Store" || x.Warehouse!.Type == "Store&Sales")
             .SumAsync(x => (double?)x.Movement, cancellationToken);
 
         var transferOutTotal = await _context.InventoryTransaction
             .AsNoTracking()
             .ApplyIsDeletedFilter(false)
-            .Where(x => x.ModuleName == nameof(TransferOut) && x.Status == InventoryTransactionStatus.Confirmed && (x.Warehouse!.Type == "Store" || x.Warehouse!.Type == "Store&Sales"))
+            .Where(x => x.ModuleName == nameof(TransferOut) && x.Status == InventoryTransactionStatus.Confirmed)//&& (x.Warehouse!.Type == "Store" || x.Warehouse!.Type == "Store&Sales")
             .SumAsync(x => (double?)x.Movement, cancellationToken);
 
         var transferInTotal = await _context.InventoryTransaction
             .AsNoTracking()
             .ApplyIsDeletedFilter(false)
-            .Where(x => x.ModuleName == nameof(TransferIn) && x.Status == InventoryTransactionStatus.Confirmed && (x.Warehouse!.Type == "Store" || x.Warehouse!.Type == "Store&Sales"))
+            .Where(x => x.ModuleName == nameof(TransferIn) && x.Status == InventoryTransactionStatus.Confirmed)//&& (x.Warehouse!.Type == "Store" || x.Warehouse!.Type == "Store&Sales")
             .SumAsync(x => (double?)x.Movement, cancellationToken);
 
         var cardsDashboardData = new CardsItem

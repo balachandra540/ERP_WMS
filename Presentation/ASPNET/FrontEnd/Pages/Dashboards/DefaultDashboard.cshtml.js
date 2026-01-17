@@ -298,7 +298,7 @@
             try {
                 await SecurityManager.authorizePage(['Dashboards']);
                 await SecurityManager.validateToken();
-
+                debugger;
                 await methods.populateCardsData();
                 await methods.populateSalesData();
                 await methods.populatePurchaseData();

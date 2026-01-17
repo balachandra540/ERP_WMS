@@ -1019,7 +1019,8 @@ const App = {
             isSubmitting: false,
             subTotalAmount: '0.00',
             taxAmount: '0.00',
-            totalAmount: '0.00'
+            totalAmount: '0.00',
+            isAddMode : false
         });
 
         const customerState = Vue.reactive({
@@ -2025,6 +2026,14 @@ const App = {
                 state.errors.orderStatus = '';
                 taxListLookup.trackingChange = false;
             },
+            onMainModalShown: () => {
+                if (state.isAddMode) {
+                    setTimeout(() => {
+                        secondaryGrid.obj.addRecord();
+                    }, 200);
+                }
+               
+            },
             openDetailModal: async (RowIndex) => {
                 debugger;
 
@@ -2795,6 +2804,7 @@ const App = {
                             state.mainTitle = 'Add Sales Order';
                             resetFormState();
                             state.secondaryData = [];
+                            state.isAddMode = true;
 
                             // Create new grid properly
                             if (secondaryGrid.obj == null) {
@@ -2809,6 +2819,7 @@ const App = {
 
                         if (args.item.id === 'EditCustom') {
                             state.deleteMode = false;
+                            state.isAddMode = false;
                             if (mainGrid.obj.getSelectedRecords().length) {
                                 const selectedRecord = mainGrid.obj.getSelectedRecords()[0];
                                 state.mainTitle = 'Edit Sales Order';
@@ -2831,6 +2842,7 @@ const App = {
 
                         if (args.item.id === 'DeleteCustom') {
                             state.deleteMode = true;
+                            state.isAddMode = false;
                             if (mainGrid.obj.getSelectedRecords().length) {
                                 const selectedRecord = mainGrid.obj.getSelectedRecords()[0];
                                 state.mainTitle = 'Delete Sales Order?';
@@ -2851,6 +2863,7 @@ const App = {
                         }
 
                         if (args.item.id === 'PrintPDFCustom') {
+                            state.isAddMode = false;
                             if (mainGrid.obj.getSelectedRecords().length) {
                                 const selectedRecord = mainGrid.obj.getSelectedRecords()[0];
                                 window.open('/SalesOrders/SalesOrderPdf?id=' + (selectedRecord.id ?? ''), '_blank');
@@ -3413,11 +3426,12 @@ const App = {
                                 write: (args) => {
                                     pluObj = new ej.inputs.TextBox({
                                         value: args.rowData.pluCode ?? "",
+                                        cssClass: 'plu-editor',
                                         placeholder: "Enter 5+ characters"
                                     });
 
                                     pluObj.appendTo(args.element);
-
+                                  
                                     const inputElement = pluObj.element;
 
                                     inputElement.addEventListener('keydown', (e) => {
@@ -3759,7 +3773,7 @@ const App = {
                         'Add', 'Edit', 'Delete', 'Update', 'Cancel',
                     ],
                     beforeDataBound: () => { },
-                    dataBound: function () { },
+                    dataBound: () => {  },
                     excelExportComplete: () => { },
                     rowSelected: () => {
                         if (secondaryGrid.obj.getSelectedRecords().length == 1) {
@@ -3820,6 +3834,22 @@ const App = {
                             secondaryGrid.manualBatchChanges.deletedRecords.push(args.data[0]);
                             console.log('❌ Row Deleted:', args.data[0]);
                             console.log('📋 Current Batch Changes:', secondaryGrid.manualBatchChanges);
+                        }
+                        if (args.requestType === 'add') {
+                            // Wait for grid internal focus to finish
+                            setTimeout(() => {
+                                // Find the PLU input in the newly added row
+                                const pluInput = document.querySelector('.e-addedrow .plu-editor input');
+
+                                if (pluInput) {
+                                    // Focus and place cursor at end
+                                    pluInput.focus();
+                                    const length = pluInput.value.length;
+                                    pluInput.setSelectionRange(length, length);
+
+                                    console.log('🎯 Cursor placed in PLU input');
+                                }
+                            }, 150); // small delay to override checkbox auto-focus
                         }
                     },
                     queryCellInfo: (args) => {
@@ -3918,6 +3948,7 @@ const App = {
                 customerModal.create();
 
                 mainModalRef.value?.addEventListener('hidden.bs.modal', methods.onMainModalHidden);
+                mainModalRef.value?.addEventListener('shown.bs.modal', methods.onMainModalShown);
                 await methods.populateCustomerListLookupData();
                 customerListLookup.create();
                 await methods.populateTaxListLookupData();

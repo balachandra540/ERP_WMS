@@ -998,7 +998,10 @@ const App = {
                         isValid = false;
                         break;
                     }
-                     if (mrp < 0) {
+                    if (mrpVal > 0) {
+                        hasValidMrp = true;
+                    }
+                    else if (mrpVal < 0) {
                         Swal.fire({
                             icon: 'error',
                             title: 'Validation Error',
