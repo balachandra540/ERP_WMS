@@ -1010,7 +1010,7 @@
 
                     if (input) {
                         input.value = val;
-                        input.readOnly = true;
+                        //input.readOnly = true;
                         input.classList.add("auto-filled");
                     }
                 });

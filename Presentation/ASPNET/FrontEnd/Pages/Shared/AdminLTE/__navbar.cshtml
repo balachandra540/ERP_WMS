@@ -11,7 +11,7 @@
 
     <!-- Right navbar links -->
 
-    <span class="mt-0" id="topbarContent">Currency: </span>
+    <span class="mt-0" id="topbarContent"> </span>@* Currency: *@
     <ul class="navbar-nav ml-auto align-items-center">
 
         <!-- Location Dropdown -->
@@ -44,6 +44,7 @@
 <script>
     document.addEventListener('DOMContentLoaded', async function () {
         debugger;
+            $('body').addClass('sidebar-collapse')
 
         const locationDropdown = document.getElementById("locationDropdown");
         if (!locationDropdown) return;

@@ -2362,7 +2362,7 @@ const App = {
 
                     if (input) {
                         input.value = val;
-                        input.readOnly = true;
+                        //input.readOnly = true;
                         input.classList.add("auto-filled");
                     }
                 });
@@ -2716,7 +2716,7 @@ const App = {
                     allowSorting: true,
                     allowSelection: true,
                     allowGrouping: true,
-                    groupSettings: { columns: ['customerName'] },
+                    //groupSettings: { columns: ['customerName'] },
                     allowTextWrap: true,
                     allowResizing: true,
                     allowPaging: true,

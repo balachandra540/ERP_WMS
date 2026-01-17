@@ -111,18 +111,18 @@ public class GetAttributeDetailsHandler : IRequestHandler<GetAttributeDetailsReq
 
     public async Task<GetAttributeDetailsResult> Handle(GetAttributeDetailsRequest request, CancellationToken cancellationToken)
     {
-        if (string.IsNullOrEmpty(request.AttributeId))
-        {
-            return new GetAttributeDetailsResult { Data = new List<GetAttributeDetailDto>() };
-        }
+        //if (string.IsNullOrEmpty(request.AttributeId))
+        //{
+        //    return new GetAttributeDetailsResult { Data = new List<GetAttributeDetailDto>() };
+        //}
 
         var query = _context
-            .AttributeDetail
-            .AsNoTracking()
-            .ApplyIsDeletedFilter(request.IsDeleted)
-            .Where(x => x.AttributeId == request.AttributeId)
-            .OrderByDescending(x => x.CreatedAtUtc)
-            .AsQueryable();
+     .AttributeDetail
+     .AsNoTracking()
+     .ApplyIsDeletedFilter(request.IsDeleted)
+     .Where(x => string.IsNullOrEmpty(request.AttributeId) || x.AttributeId == request.AttributeId)  // Adjusted condition
+     .OrderByDescending(x => x.CreatedAtUtc)
+     .AsQueryable();
 
         var entities = await query.ToListAsync(cancellationToken);
         var dtos = _mapper.Map<List<GetAttributeDetailDto>>(entities);
