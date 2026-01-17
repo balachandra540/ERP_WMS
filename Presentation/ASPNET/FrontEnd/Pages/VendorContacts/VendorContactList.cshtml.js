@@ -405,9 +405,9 @@
                     allowSorting: true,
                     allowSelection: true,
                     allowGrouping: true,
-                    groupSettings: {
-                        columns: ['vendorName']
-                    },
+                    //groupSettings: {
+                    //    columns: ['vendorName']
+                    //},
                     allowTextWrap: true,
                     allowResizing: true,
                     allowPaging: true,

@@ -599,7 +599,7 @@
                         }));
 
                         // Call API with all fields
-                        const response = await services.createMainData(
+                         response = await services.createMainData(
                             state.orderDate,
                             state.description,
                             state.orderStatus,
@@ -673,14 +673,17 @@
                             // Refresh secondary data after successful save
                             await methods.populateSecondaryData();
                             secondaryGrid.refresh();
-                            state.mainTitle = 'Edit Goods Receive';
-                            state.showComplexDiv = true;
+                            state.mainTitle = 'Edit Purchase Order';
                             Swal.fire({
                                 icon: 'success',
                                 title: 'Save Successful',
                                 timer: 2000,
                                 showConfirmButton: false
                             });
+                            setTimeout(() => {
+                                mainModal.obj.hide();
+                                resetFormState();
+                            }, 2000);
                         } else {
                             Swal.fire({
                                 icon: 'success',
