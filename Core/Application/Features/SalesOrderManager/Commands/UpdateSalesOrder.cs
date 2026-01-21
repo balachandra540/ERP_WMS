@@ -58,7 +58,7 @@ public class UpdateSalesOrderRequest : IRequest<UpdateSalesOrderResult>
     public string? LocationId { get; init; }
 
     public List<UpdateSalesOrderItemDto> Items { get; init; } = new();
-    public List<DeleteSalesOrderItemDto>? DeletedItemIds { get; init; }
+    public List<DeleteSalesOrderItemDto>? DeletedItems { get; init; }
 
 }
 public class DeleteSalesOrderItemDto
@@ -175,9 +175,9 @@ public class UpdateSalesOrderHandler
         // -----------------------------------------------------
         // DELETE ITEMS
         // -----------------------------------------------------
-        if (request.DeletedItemIds != null)
+        if (request.DeletedItems != null)
         {
-            foreach (var dto in request.DeletedItemIds)
+            foreach (var dto in request.DeletedItems)
             {
                 var item = existingItems.FirstOrDefault(x => x.Id == dto.Id);
                 if (item != null)

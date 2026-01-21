@@ -23,7 +23,8 @@
             },
             showComplexDiv: false,
             isSubmitting: false,
-            totalMovementFormatted: '0.00'
+            totalMovementFormatted: '0.00',
+            isAddMode : false,
         });
 
         const mainGridRef = Vue.ref(null);
@@ -77,30 +78,40 @@
         const returnDatePicker = {
             obj: null,
             create: () => {
+                const defaultDate = state.returnDate
+                    ? new Date(state.returnDate)
+                    : new Date();
                 returnDatePicker.obj = new ej.calendars.DatePicker({
                     placeholder: 'Select Date',
                     format: 'yyyy-MM-dd',
-                    value: state.returnDate ? new Date(state.returnDate) : null,
+                    value: defaultDate,
+                    enabled: false,
                     change: (e) => {
                         state.returnDate = e.value;
                     }
                 });
+                state.returnDate = defaultDate;
                 returnDatePicker.obj.appendTo(returnDateRef.value);
             },
             refresh: () => {
                 if (returnDatePicker.obj) {
-                    returnDatePicker.obj.value = state.returnDate ? new Date(state.returnDate) : null;
+                    const Date = state.returnDate
+                        ? new Date(state.returnDate)
+                        : new Date();
+                    state.returnDate = Date;
+
+                    returnDatePicker.obj.value = Date;
                 }
             }
         };
 
-        Vue.watch(
-            () => state.returnDate,
-            (newVal, oldVal) => {
-                returnDatePicker.refresh();
-                state.errors.returnDate = '';
-            }
-        );
+        //Vue.watch(
+        //    () => state.returnDate,
+        //    (newVal, oldVal) => {
+        //        returnDatePicker.refresh();
+        //        state.errors.returnDate = '';
+        //    }
+        //);
 
         const numberText = {
             obj: null,
@@ -1291,6 +1302,14 @@
                 state.errors.deliveryOrderId = '';
                 state.errors.status = '';
             },
+            onMainModalShown: () => {
+                if (state.isAddMode) {
+                    setTimeout(() => {
+                        secondaryGrid.obj.addRecord();
+                    }, 200);
+                }
+
+            },
             prepareSecondaryDataForSubmission: function () {
 
                 const batchChanges = secondaryGrid.getBatchChanges();
@@ -1592,6 +1611,8 @@
 
                 mainModal.create();
                 mainModalRef.value?.addEventListener('hidden.bs.modal', methods.onMainModalHidden);
+                mainModalRef.value?.addEventListener('shown.bs.modal', methods.onMainModalShown);
+
                 await methods.populateDeliveryOrderListLookupData();
                 await methods.populateSalesReturnStatusListLookupData();
                 numberText.create();
@@ -1689,12 +1710,21 @@
                             state.deleteMode = false;
                             state.mainTitle = 'Add Sales Return';
                             resetFormState();
+                            state.isAddMode = true;
+                            // Create new grid properly
+                            if (secondaryGrid.obj == null) {
+                                await secondaryGrid.create(state.secondaryData);
+                            } else {
+                                secondaryGrid.refresh();
+                            }
                             state.showComplexDiv = true;
                             mainModal.obj.show();
                         }
 
                         if (args.item.id === 'EditCustom') {
                             state.deleteMode = false;
+                            state.isAddMode = false;
+
                             if (mainGrid.obj.getSelectedRecords().length) {
                                 const selectedRecord = mainGrid.obj.getSelectedRecords()[0];
                                 state.mainTitle = 'Edit Sales Return';
@@ -1713,6 +1743,8 @@
 
                         if (args.item.id === 'DeleteCustom') {
                             state.deleteMode = true;
+                            state.isAddMode = false;
+
                             if (mainGrid.obj.getSelectedRecords().length) {
                                 const selectedRecord = mainGrid.obj.getSelectedRecords()[0];
                                 state.mainTitle = 'Delete Sales Return?';
@@ -1730,6 +1762,7 @@
                         }
 
                         if (args.item.id === 'PrintPDFCustom') {
+                            state.isAddMode = false;
                             if (mainGrid.obj.getSelectedRecords().length) {
                                 const selectedRecord = mainGrid.obj.getSelectedRecords()[0];
                                 window.open('/SalesReturns/SalesReturnPdf?id=' + (selectedRecord.id ?? ''), '_blank');

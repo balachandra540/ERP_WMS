@@ -899,7 +899,7 @@
                         { field: 'name', headerText: 'Name', width: 200, minWidth: 200 },
                         { field: 'description', headerText: 'Description', width: 400, minWidth: 400 },
                         
-                        { field: 'hasAttributes', headerText: 'Has Attributes', textAlign: 'Center', width: 120, minWidth: 120, type: 'boolean', displayAsCheckBox: true },
+                       // { field: 'hasAttributes', headerText: 'Has Attributes', textAlign: 'Center', width: 120, minWidth: 120, type: 'boolean', displayAsCheckBox: true },
 
                         { field: 'createdAtUtc', headerText: 'Created At UTC', width: 150, format: 'yyyy-MM-dd HH:mm' }
                     ],
@@ -956,7 +956,7 @@
                                 state.id = selectedRecord.id ?? '';
                                 state.name = selectedRecord.name ?? '';
                                 state.description = selectedRecord.description ?? '';
-                                state.hasAttributes = selectedRecord.hasAttributes ?? false; // ✅ added
+                                state.hasAttributes = false; // ✅ added// selectedRecord.hasAttributes ??
                                 //  If hasAttributes true, check existing attributes in DB
                                 if (state.hasAttributes) {
                                     await checkExistingAttributes(state.id);

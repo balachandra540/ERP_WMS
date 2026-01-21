@@ -599,7 +599,8 @@ namespace Application.Features.GoodsReceiveManager.Commands
                     {
                         ProductId = productId,
                        // ProductName = request.ProductName,
-                        CostPrice = Convert.ToDecimal(grItem.UnitPrice),   // OR grItem.UnitPrice based on your rule
+                        //CostPrice = Convert.ToDecimal(grItem.UnitPrice),   // OR grItem.UnitPrice based on your rule
+                        CostPrice = Convert.ToDecimal(grItem.FinalUnitPrice),   // OR grItem.FinalUnitPrice based on your rule
                         EffectiveFrom = _securityService.ConvertToIst(DateTime.UtcNow),
                         IsActive = true,                        
                    };
@@ -611,7 +612,7 @@ namespace Application.Features.GoodsReceiveManager.Commands
                 {
                     // Compare prices
                     double oldPrice = Convert.ToDouble(existingPrice.CostPrice);
-                    double newPrice = grItem.UnitPrice;
+                    double newPrice = grItem.FinalUnitPrice;
 
                     if (Math.Round(oldPrice, 2) != Math.Round(newPrice, 2))
                     {

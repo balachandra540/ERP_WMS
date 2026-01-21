@@ -1057,33 +1057,68 @@ const App = {
             state.deletedItems = [];
         };
 
+        //const receiveDatePicker = {
+        //    obj: null,
+        //    create: () => {
+        //        receiveDatePicker.obj = new ej.calendars.DatePicker({
+        //            placeholder: 'Select Date',
+        //            format: 'yyyy-MM-dd',
+        //            value: state.receiveDate ? new Date(state.receiveDate) : null,
+        //            change: (e) => {
+        //                state.receiveDate = e.value;
+        //            }
+        //        });
+        //        receiveDatePicker.obj.appendTo(receiveDateRef.value);
+        //    },
+        //    refresh: () => {
+        //        if (receiveDatePicker.obj) {
+        //            receiveDatePicker.obj.value = state.receiveDate ? new Date(state.receiveDate) : null;
+        //        }
+        //    }
+        //};
         const receiveDatePicker = {
             obj: null,
             create: () => {
+                const defaultDate = state.receiveDate
+                    ? new Date(state.receiveDate)
+                    : new Date();
                 receiveDatePicker.obj = new ej.calendars.DatePicker({
                     placeholder: 'Select Date',
                     format: 'yyyy-MM-dd',
-                    value: state.receiveDate ? new Date(state.receiveDate) : null,
+                    value: state.receiveDate ? new Date(state.receiveDate) : new Date(),
+                    enabled: false,
                     change: (e) => {
                         state.receiveDate = e.value;
                     }
                 });
+
+                // ✅ IMPORTANT: sync state explicitly
+                state.receiveDate = defaultDate;
+
                 receiveDatePicker.obj.appendTo(receiveDateRef.value);
             },
             refresh: () => {
+                debugger;
                 if (receiveDatePicker.obj) {
-                    receiveDatePicker.obj.value = state.receiveDate ? new Date(state.receiveDate) : null;
+                    const date = state.receiveDate
+                        ? new Date(state.receiveDate)
+                        : new Date();
+
+                    receiveDatePicker.obj.value = date;
+
+                    // keep state in sync
+                    state.receiveDate = date;
                 }
             }
         };
 
-        Vue.watch(
-            () => state.receiveDate,
-            (newVal, oldVal) => {
-                receiveDatePicker.refresh();
-                state.errors.receiveDate = '';
-            }
-        );
+        //Vue.watch(
+        //    () => state.receiveDate,
+        //    (newVal, oldVal) => {
+        //        receiveDatePicker.refresh();
+        //        state.errors.receiveDate = '';
+        //    }
+        //);
 
         const numberText = {
             obj: null,
