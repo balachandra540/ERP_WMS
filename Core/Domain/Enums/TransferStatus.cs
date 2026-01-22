@@ -4,12 +4,12 @@ namespace Domain.Enums;
 
 public enum TransferStatus
 {
-    [Description("Draft")]
-    Draft = 0,
+    [Description("Pending")]
+    Pending = 0,
+
     [Description("Cancelled")]
     Cancelled = 1,
-    [Description("Confirmed")]
-    Confirmed = 2,
-    [Description("Archived")]
-    Archived = 3
+
+    [Description("Approved")]
+    Approved = 2
 }

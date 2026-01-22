@@ -1063,7 +1063,7 @@ const App = {
                 receiveDatePicker.obj = new ej.calendars.DatePicker({
                     placeholder: 'Select Date',
                     format: 'yyyy-MM-dd',
-                    value: state.receiveDate ? new Date(state.receiveDate) : null,
+                    value: state.receiveDate ? new Date(state.receiveDate) : new Date(),
                     change: (e) => {
                         state.receiveDate = e.value;
                     }
@@ -1072,7 +1072,7 @@ const App = {
             },
             refresh: () => {
                 if (receiveDatePicker.obj) {
-                    receiveDatePicker.obj.value = state.receiveDate ? new Date(state.receiveDate) : null;
+                    state.receiveDate ? new Date(state.receiveDate) : new Date();
                 }
             }
         };
@@ -1084,6 +1084,15 @@ const App = {
                 state.errors.receiveDate = '';
             }
         );
+        const setDefaultDate = () => {
+            if (!state.receiveDate) {
+                state.receiveDate = new Date();
+            }
+
+            if (receiveDatePicker.obj) {
+                receiveDatePicker.obj.value = new Date(state.receiveDate);
+            }
+        };
 
         const numberText = {
             obj: null,
@@ -2775,6 +2784,10 @@ const App = {
                                 timer: 2000,
                                 showConfirmButton: false
                             });
+                            setTimeout(() => {
+                                mainModal.obj.hide();
+                                resetFormState();
+                            }, 2000);
                         } else {
                             Swal.fire({
                                 icon: 'success',
@@ -3076,6 +3089,9 @@ const App = {
                         // CREATE NEW GRN
                         if (args.item.id === 'AddCustom') {
                             resetFormState();
+                            // ✅ Set TODAY as default
+                            setDefaultDate();
+
                             state.deleteMode = false;
                             state.mainTitle = 'Add Goods Receive Items';
 

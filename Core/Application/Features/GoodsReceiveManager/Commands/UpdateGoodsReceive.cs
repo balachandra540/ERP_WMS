@@ -509,7 +509,6 @@ public class UpdateGoodsReceiveHandler
         gr.OtherCharges = req.OtherCharges ?? 0;
         gr.Status = newStatus;
         gr.UpdatedById = req.UpdatedById;
-        gr.UpdatedAtUtc = DateTime.UtcNow;
 
         _goodsReceiveRepo.Update(gr);
 
@@ -555,7 +554,6 @@ public class UpdateGoodsReceiveHandler
                 exist.Attribute1DetailId = dto.Attribute1DetailId;
                 exist.Attribute2DetailId = dto.Attribute2DetailId;
                 exist.UpdatedById = req.UpdatedById;
-                exist.UpdatedAtUtc = DateTime.UtcNow;
 
                 _itemRepo.Update(exist);
                 item = exist;
@@ -578,7 +576,6 @@ public class UpdateGoodsReceiveHandler
                     Attribute1DetailId = dto.Attribute1DetailId,
                     Attribute2DetailId = dto.Attribute2DetailId,
                     CreatedById = gr.CreatedById,
-                    CreatedAtUtc = DateTime.UtcNow
                 };
 
                 await _itemRepo.CreateAsync(item, ct);
@@ -612,7 +609,6 @@ public class UpdateGoodsReceiveHandler
                     IMEI2 = d.IMEI2,
                     ServiceNo = d.ServiceNo,
                     CreatedById = req.UpdatedById,
-                    CreatedAtUtc = DateTime.UtcNow
                 };
 
                 await _detailRepo.CreateAsync(nd, ct);

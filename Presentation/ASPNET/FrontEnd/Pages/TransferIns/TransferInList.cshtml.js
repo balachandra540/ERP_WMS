@@ -156,6 +156,15 @@
                 }
             }
         };
+        const setDefaultDate = () => {
+            if (!state.transferReceiveDate) {
+                state.transferReceiveDate = new Date();
+            }
+
+            if (transferReceiveDatePicker.obj) {
+                transferReceiveDatePicker.obj.value = new Date(state.transferReceiveDate);
+            }
+        };
 
         Vue.watch(
             () => state.transferReceiveDate,
@@ -816,6 +825,7 @@
                             state.deleteMode = false;
                             state.mainTitle = 'Add Transfer In';
                             resetFormState();
+                            setDefaultDate();
                             state.showComplexDiv = false;
                             mainModal.obj.show();
                         }

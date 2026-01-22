@@ -189,6 +189,16 @@
                 state.errors.transferReleaseDate = '';
             }
         );
+        const setDefaultDate = () => {
+            if (!state.transferReleaseDate) {
+                state.transferReleaseDate = new Date();
+            }
+
+            if (transferReleaseDatePicker.obj) {
+                transferReleaseDatePicker.obj.value = new Date(state.transferReleaseDate);
+            }
+        };
+
 
         const numberText = {
             obj: null,
@@ -555,9 +565,18 @@
 
             },
             populateWarehouseToListLookupData: async () => {
+                debugger
                 const response = await services.getWarehouseToListLookupData();
+                const currentWarehouseId =StorageManager.getLocation();
+; // already known in state
+
                 //state.warehouseToListLookupData = response?.data?.content?.data.filter(warehouse => warehouse.systemWarehouse === false) || [];
-                state.warehouseToListLookupData = response?.data?.content?.data.filter(warehouse => (warehouse.type === "Store" || warehouse.type === "Store&Sales")) || [];
+                //state.warehouseToListLookupData = response?.data?.content?.data.filter(warehouse => (warehouse.type === "Store" || warehouse.type === "Store&Sales")) || [];
+                state.warehouseToListLookupData =
+                    response?.data?.content?.data.filter(w =>
+                        (w.type === "Store" || w.type === "Store&Sales") &&
+                        w.id !== currentWarehouseId
+                    ) || [];
                 //const presentWarehouseId = StorageManager.getLocation();
                 //state.warehouseToListLookupData = response?.data?.content?.data.filter(w => w.id !== presentWarehouseId) || [];
             },
@@ -1544,6 +1563,7 @@
                             state.mainTitle = 'Add Transfer Out';
                             state.isAddMode = true;
                             resetFormState();
+                            setDefaultDate();
                             state.showComplexDiv = true;
                             mainModal.obj.show();
                         }

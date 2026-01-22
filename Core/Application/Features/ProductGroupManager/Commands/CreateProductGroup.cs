@@ -14,7 +14,6 @@ public class CreateProductGroupRequest : IRequest<CreateProductGroupResult>
 {
     public string? Name { get; init; }
     public string? Description { get; init; }
-    public bool? HasAttributes { get; set; }
 
     public string? CreatedById { get; init; }
 }
@@ -48,7 +47,6 @@ public class CreateProductGroupHandler : IRequestHandler<CreateProductGroupReque
 
         entity.Name = request.Name;
         entity.Description = request.Description;
-        entity.HasAttributes = request.HasAttributes ?? false;
         await _repository.CreateAsync(entity, cancellationToken);
         await _unitOfWork.SaveAsync(cancellationToken);
 
