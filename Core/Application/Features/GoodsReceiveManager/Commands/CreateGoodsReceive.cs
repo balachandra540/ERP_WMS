@@ -595,26 +595,27 @@ namespace Application.Features.GoodsReceiveManager.Commands
                     .OrderByDescending(p => p.EffectiveFrom)
                     .FirstOrDefaultAsync(cancellationToken);
 
-                    // If not exists → create first entry and continue
-                    if (existingPrice == null)
+                // If not exists → create first entry and continue
+                if (existingPrice == null)
+                {
+                    var newPrice = new ProductPriceDefinition
                     {
-                        var newPrice = new ProductPriceDefinition
-                        {
-                            ProductId = productId,
-                            // ProductName = request.ProductName,
-                            CostPrice = Convert.ToDecimal(grItem.UnitPrice),   // OR grItem.UnitPrice based on your rule
-                            EffectiveFrom = _securityService.ConvertToIst(DateTime.UtcNow),
-                            IsActive = true,
-                        };
+                        ProductId = productId,
+                       // ProductName = request.ProductName,
+                        //CostPrice = Convert.ToDecimal(grItem.UnitPrice),   // OR grItem.UnitPrice based on your rule
+                        CostPrice = Convert.ToDecimal(grItem.FinalUnitPrice),   // OR grItem.FinalUnitPrice based on your rule
+                        EffectiveFrom = _securityService.ConvertToIst(DateTime.UtcNow),
+                        IsActive = true,                        
+                   };
 
-                        await _productpriceDefRepository.CreateAsync(newPrice, cancellationToken);
-                        await _unitOfWork.SaveAsync(cancellationToken);
-                    }
-                    else
-                    {
-                        // Compare prices
-                        double oldPrice = Convert.ToDouble(existingPrice.CostPrice);
-                        double newPrice = grItem.UnitPrice;
+                    await _productpriceDefRepository.CreateAsync(newPrice, cancellationToken);
+                    await _unitOfWork.SaveAsync(cancellationToken);
+                }
+                else
+                {
+                    // Compare prices
+                    double oldPrice = Convert.ToDouble(existingPrice.CostPrice);
+                    double newPrice = grItem.FinalUnitPrice;
 
                         if (Math.Round(oldPrice, 2) != Math.Round(newPrice, 2))
                         {

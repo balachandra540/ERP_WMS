@@ -63,33 +63,67 @@
             state.secondaryData = [];
         };
 
+        //const adjustmentDatePicker = {
+        //    obj: null,
+        //    create: () => {
+        //        adjustmentDatePicker.obj = new ej.calendars.DatePicker({
+        //            placeholder: 'Select Date',
+        //            format: 'yyyy-MM-dd',
+        //            value: state.adjustmentDate ? new Date(state.adjustmentDate) : null,
+        //            change: (e) => {
+        //                state.adjustmentDate = e.value;
+        //            }
+        //        });
+        //        adjustmentDatePicker.obj.appendTo(adjustmentDateRef.value);
+        //    },
+        //    refresh: () => {
+        //        if (adjustmentDatePicker.obj) {
+        //            adjustmentDatePicker.obj.value = state.adjustmentDate ? new Date(state.adjustmentDate) : null;
+        //        }
+        //    }
+        //};
+
         const adjustmentDatePicker = {
             obj: null,
+
             create: () => {
+                const defaultDate = state.adjustmentDate
+                    ? new Date(state.adjustmentDate)
+                    : new Date();
+
                 adjustmentDatePicker.obj = new ej.calendars.DatePicker({
                     placeholder: 'Select Date',
                     format: 'yyyy-MM-dd',
-                    value: state.adjustmentDate ? new Date(state.adjustmentDate) : null,
-                    change: (e) => {
-                        state.adjustmentDate = e.value;
-                    }
+                    value: defaultDate,
+                    enabled: false
                 });
+
+                // ✅ IMPORTANT: sync state explicitly
+                state.adjustmentDate = defaultDate;
+
                 adjustmentDatePicker.obj.appendTo(adjustmentDateRef.value);
             },
             refresh: () => {
                 if (adjustmentDatePicker.obj) {
-                    adjustmentDatePicker.obj.value = state.adjustmentDate ? new Date(state.adjustmentDate) : null;
+                    const date = state.adjustmentDate
+                        ? new Date(state.adjustmentDate)
+                        : new Date();
+
+                    adjustmentDatePicker.obj.value = date;
+
+                    // keep state in sync
+                    state.adjustmentDate = date;
                 }
             }
         };
 
-        Vue.watch(
-            () => state.adjustmentDate,
-            (newVal, oldVal) => {
-                adjustmentDatePicker.refresh();
-                state.errors.adjustmentDate = '';
-            }
-        );
+        //Vue.watch(
+        //    () => state.adjustmentDate,
+        //    (newVal, oldVal) => {
+        //        adjustmentDatePicker.refresh();
+        //        state.errors.adjustmentDate = '';
+        //    }
+        //);
 
         const numberText = {
             obj: null,

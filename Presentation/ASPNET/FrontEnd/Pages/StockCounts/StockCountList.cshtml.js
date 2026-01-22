@@ -21,7 +21,8 @@
             },
             showComplexDiv: false,
             isSubmitting: false,
-            totalMovementFormatted: '0.00'
+            totalMovementFormatted: '0.00',
+            isAddMode: false
         });
 
         const mainGridRef = Vue.ref(null);
@@ -70,33 +71,68 @@
             state.secondaryData = [];
         };
 
+        //const countDatePicker = {
+        //    obj: null,
+        //    create: () => {
+        //        countDatePicker.obj = new ej.calendars.DatePicker({
+        //            placeholder: 'Select Date',
+        //            format: 'yyyy-MM-dd',
+        //            value: state.countDate ? new Date(state.countDate) : null,
+        //            change: (e) => {
+        //                state.countDate = e.value;
+        //            }
+        //        });
+        //        countDatePicker.obj.appendTo(countDateRef.value);
+        //    },
+        //    refresh: () => {
+        //        if (countDatePicker.obj) {
+        //            countDatePicker.obj.value = state.countDate ? new Date(state.countDate) : null;
+        //        }
+        //    }
+        //};
+
         const countDatePicker = {
             obj: null,
+
             create: () => {
+                const defaultDate = state.countDate
+                    ? new Date(state.countDate)
+                    : new Date();
+
                 countDatePicker.obj = new ej.calendars.DatePicker({
                     placeholder: 'Select Date',
                     format: 'yyyy-MM-dd',
-                    value: state.countDate ? new Date(state.countDate) : null,
-                    change: (e) => {
-                        state.countDate = e.value;
-                    }
+                    value: defaultDate,
+                    enabled: false   // 🔒 disabled
                 });
+
+                // ✅ CRITICAL: sync state manually
+                state.countDate = defaultDate;
+
                 countDatePicker.obj.appendTo(countDateRef.value);
             },
+
             refresh: () => {
                 if (countDatePicker.obj) {
-                    countDatePicker.obj.value = state.countDate ? new Date(state.countDate) : null;
+                    const date = state.countDate
+                        ? new Date(state.countDate)
+                        : new Date();
+
+                    countDatePicker.obj.value = date;
+
+                    // ✅ keep state in sync
+                    state.countDate = date;
                 }
             }
         };
 
-        Vue.watch(
-            () => state.countDate,
-            (newVal, oldVal) => {
-                countDatePicker.refresh();
-                state.errors.countDate = '';
-            }
-        );
+        //Vue.watch(
+        //    () => state.countDate,
+        //    (newVal, oldVal) => {
+        //        countDatePicker.refresh();
+        //        state.errors.countDate = '';
+        //    }
+        //);
 
         const warehouseListLookup = {
             obj: null,

@@ -621,7 +621,7 @@ public class UpdateGoodsReceiveHandler
             // PRICE DEFINITION LOGIC (Weighted Average)
             // --------------------------------------------------------------
             var productId = poItem.ProductId;
-            double newUnitPrice = dto.UnitPrice ?? item.UnitPrice;
+            double newUnitPrice = dto.FinalUnitPrice ?? item.FinalUnitPrice;
 
             var existingPrice = await _priceRepo.GetQuery()
                 .Where(p => p.ProductId == productId && p.IsActive && !p.IsDeleted)

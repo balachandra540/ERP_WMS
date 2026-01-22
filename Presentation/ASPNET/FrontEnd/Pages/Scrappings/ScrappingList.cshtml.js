@@ -142,33 +142,69 @@
             state.secondaryData = [];
         };
 
+        //const scrappingDatePicker = {
+        //    obj: null,
+        //    create: () => {
+        //        scrappingDatePicker.obj = new ej.calendars.DatePicker({
+        //            placeholder: 'Select Date',
+        //            format: 'yyyy-MM-dd',
+        //            value: state.scrappingDate ? new Date(state.scrappingDate) : null,
+        //            change: (e) => {
+        //                state.scrappingDate = e.value;
+        //            }
+        //        });
+        //        scrappingDatePicker.obj.appendTo(scrappingDateRef.value);
+        //    },
+        //    refresh: () => {
+        //        if (scrappingDatePicker.obj) {
+        //            scrappingDatePicker.obj.value = state.scrappingDate ? new Date(state.scrappingDate) : new Date();
+        //            scrappingDatePicker.obj.value = state.scrappingDate ? new Date(state.scrappingDate) : null;
+        //        }
+        //    }
+        //};
+
         const scrappingDatePicker = {
             obj: null,
+
             create: () => {
+                const defaultDate = state.scrappingDate
+                    ? new Date(state.scrappingDate)
+                    : new Date();
+
                 scrappingDatePicker.obj = new ej.calendars.DatePicker({
                     placeholder: 'Select Date',
                     format: 'yyyy-MM-dd',
-                    value: state.scrappingDate ? new Date(state.scrappingDate) : null,
-                    change: (e) => {
-                        state.scrappingDate = e.value;
-                    }
+                    value: defaultDate,
+                    enabled: false   // 🔒 disabled
                 });
+
+                // ✅ IMPORTANT: manually sync state
+                state.scrappingDate = defaultDate;
+
                 scrappingDatePicker.obj.appendTo(scrappingDateRef.value);
             },
+
             refresh: () => {
                 if (scrappingDatePicker.obj) {
-                    scrappingDatePicker.obj.value = state.scrappingDate ? new Date(state.scrappingDate) : null;
+                    const date = state.scrappingDate
+                        ? new Date(state.scrappingDate)
+                        : new Date();
+
+                    scrappingDatePicker.obj.value = date;
+
+                    // ✅ keep state in sync
+                    state.scrappingDate = date;
                 }
             }
         };
 
-        Vue.watch(
-            () => state.scrappingDate,
-            (newVal, oldVal) => {
-                scrappingDatePicker.refresh();
-                state.errors.scrappingDate = '';
-            }
-        );
+        //Vue.watch(
+        //    () => state.scrappingDate,
+        //    (newVal, oldVal) => {
+        //        scrappingDatePicker.refresh();
+        //        state.errors.scrappingDate = '';
+        //    }
+        //);
 
         const numberText = {
             obj: null,

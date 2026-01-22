@@ -32,7 +32,9 @@
             attributeRows: [],
             attributeModal: null,
             currentRowContext: null,
-            productGroupId : '',
+            productGroupId: '',
+            isAddMode : false,
+
         });
 
         const mainGridRef = Vue.ref(null);
@@ -724,7 +726,15 @@
                 state.errors.taxId = '';
                 state.errors.orderStatus = '';
                 taxListLookup.trackingChange = false;
-            }
+            },
+            onMainModalShown: () => {
+                if (state.isAddMode) {
+                    setTimeout(() => {
+                        secondaryGrid.obj.addRecord();
+                    }, 200);
+                }
+
+            },
             //,
             // ───────── Attribute Combination Modal ─────────
 
@@ -890,21 +900,55 @@
             }
         };
 
+        //const orderDatePicker = {
+        //    obj: null,
+        //    create: () => {
+        //        orderDatePicker.obj = new ej.calendars.DatePicker({
+        //            format: 'yyyy-MM-dd',
+        //            value: state.orderDate ? new Date(state.orderDate) : null,
+        //            change: (e) => {
+        //                state.orderDate = e.value;
+        //            }
+        //        });
+        //        orderDatePicker.obj.appendTo(orderDateRef.value);
+        //    },
+        //    refresh: () => {
+        //        if (orderDatePicker.obj) {
+        //            orderDatePicker.obj.value = state.orderDate ? new Date(state.orderDate) : null;
+        //        }
+        //    }
+        //};
+
         const orderDatePicker = {
             obj: null,
+
             create: () => {
+                const defaultDate = state.orderDate
+                    ? new Date(state.orderDate)
+                    : new Date();
+
                 orderDatePicker.obj = new ej.calendars.DatePicker({
                     format: 'yyyy-MM-dd',
-                    value: state.orderDate ? new Date(state.orderDate) : null,
-                    change: (e) => {
-                        state.orderDate = e.value;
-                    }
+                    value: defaultDate,
+                    enabled: false   // 🔒 disabled
                 });
+
+                // ✅ IMPORTANT: manually sync state
+                state.orderDate = defaultDate;
+
                 orderDatePicker.obj.appendTo(orderDateRef.value);
             },
+
             refresh: () => {
                 if (orderDatePicker.obj) {
-                    orderDatePicker.obj.value = state.orderDate ? new Date(state.orderDate) : null;
+                    const date = state.orderDate
+                        ? new Date(state.orderDate)
+                        : new Date();
+
+                    orderDatePicker.obj.value = date;
+
+                    // ✅ keep state in sync
+                    state.orderDate = date;
                 }
             }
         };
@@ -920,13 +964,13 @@
             }
         };
 
-        Vue.watch(
-            () => state.orderDate,
-            (newVal, oldVal) => {
-                orderDatePicker.refresh();
-                state.errors.orderDate = '';
-            }
-        );
+        //Vue.watch(
+        //    () => state.orderDate,
+        //    (newVal, oldVal) => {
+        //        orderDatePicker.refresh();
+        //        state.errors.orderDate = '';
+        //    }
+        //);
 
         Vue.watch(
             () => state.vendorId,
@@ -1054,14 +1098,22 @@
                             state.deleteMode = false;
                             state.mainTitle = 'Add Purchase Order';
                             resetFormState();
+                            state.isAddMode = true;
                             state.secondaryData = [];
-                            secondaryGrid.refresh();
+                            // Create new grid properly
+                            if (secondaryGrid.obj == null) {
+                                await secondaryGrid.create(state.secondaryData);
+                            } else {
+                                secondaryGrid.refresh();
+                            }
                             state.showComplexDiv = true;
                             mainModal.obj.show();
                         }
 
                         if (args.item.id === 'EditCustom') {
                             state.deleteMode = false;
+                            state.isAddMode = false;
+
                             if (mainGrid.obj.getSelectedRecords().length) {
                                 const selectedRecord = mainGrid.obj.getSelectedRecords()[0];
                                 state.mainTitle = 'Edit Purchase Order';
@@ -1084,6 +1136,8 @@
 
                         if (args.item.id === 'DeleteCustom') {
                             state.deleteMode = true;
+                            state.isAddMode = false;
+
                             if (mainGrid.obj.getSelectedRecords().length) {
                                 const selectedRecord = mainGrid.obj.getSelectedRecords()[0];
                                 state.mainTitle = 'Delete Purchase Order?';
@@ -1104,6 +1158,7 @@
                         }
 
                         if (args.item.id === 'PrintPDFCustom') {
+                            state.isAddMode = false;
                             if (mainGrid.obj.getSelectedRecords().length) {
                                 const selectedRecord = mainGrid.obj.getSelectedRecords()[0];
                                 window.open('/PurchaseOrders/PurchaseOrderPdf?id=' + (selectedRecord.id ?? ''), '_blank');
@@ -2254,6 +2309,8 @@
 
                 mainModal.create();
                 mainModalRef.value?.addEventListener('hidden.bs.modal', methods.onMainModalHidden);
+                mainModalRef.value?.addEventListener('shown.bs.modal', methods.onMainModalShown);
+
                 await methods.populateVendorListLookupData();
                 vendorListLookup.create();
                 await methods.populateTaxListLookupData();

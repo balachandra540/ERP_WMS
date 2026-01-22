@@ -1127,9 +1127,10 @@ const App = {
             console.log('Validation - Batch Changes:', batchChanges);
 
             // Build working dataset
-            let currentSecondaryData = state.id !== ""
-                ? [...state.secondaryData]
-                : [];
+            //let currentSecondaryData = state.id !== ""
+            //    ? [...state.secondaryData]
+            //    : [];
+            let currentSecondaryData = [...state.secondaryData];
 
             const addedRecords = batchChanges.addedRecords || [];
             const changedRecords = batchChanges.changedRecords || [];
@@ -1630,6 +1631,7 @@ const App = {
             },           
             openCustomerModal: async () => {
                 try {
+
                     await methods.populateCustomerGroupListLookupData();
                     await methods.populateCustomerCategoryListLookupData();
 
@@ -1653,6 +1655,16 @@ const App = {
                     }
 
                     customerModal.obj.show();
+
+                    
+                    const modalEl = document.getElementById("CustomerModal");
+
+                    modalEl.addEventListener("hidden.bs.modal", () => {
+                        const mainModal = document.getElementById("MainModal");
+                        if (mainModal.classList.contains("show")) {
+                            document.body.classList.add("modal-open");
+                        }
+                    });
 
                 } catch (error) {
                     console.error('Error opening customer modal:', error);
@@ -1799,9 +1811,15 @@ const App = {
 
                 // --- Helper: Match by id (or purchaseOrderItemId if exists) ---
                 const matchRecord = (a, b) => {
+                    // Existing DB records
                     if (a.id && b.id) return a.id === b.id;
-                    if (a.purchaseOrderItemId && b.purchaseOrderItemId)
-                        return a.purchaseOrderItemId === b.purchaseOrderItemId;
+
+                    // New rows (no id yet)
+                    if (!a.id && !b.id) {
+                        return a.productId === b.productId &&
+                            a.pluCode === b.pluCode && a.unitPrice === b.unitPrice;
+                    }
+
                     return false;
                 };
 
@@ -1810,12 +1828,12 @@ const App = {
                     const { Attributes, errors } =
                         methods.collectDetailAttributes(item);
                     if (errors.length > 0) {
-                        Swal.fire({
-                            icon: "error",
-                            title: "Validation Failed",
-                            html: errors.join("<br>")
-                        });
-                        return;
+                        //Swal.fire({
+                        //    icon: "error",
+                        //    title: "Validation Failed",
+                        //    html: errors.join("<br>")
+                        //});
+                        throw new Error("ATTRIBUTE_VALIDATION_FAILED"); // ⛔ STOP EVERYTHING
                     }
                     // temporarily store attributes to use in DTO creation
                     item.__validatedAttributes = Attributes;
@@ -1830,7 +1848,7 @@ const App = {
                         detailEntries: item.__validatedAttributes ?? []
                     };
                 };
-
+             
                 // --- 1️⃣ PROCESS CHANGED RECORDS ---
                 for (let changed of changedRecords) {
                     const index = currentSecondaryData.findIndex(item => matchRecord(item, changed));
@@ -1846,9 +1864,17 @@ const App = {
                 }
 
                 // --- 2️⃣ PROCESS ADDED RECORDS ---
-                //for (let added of addedRecords) {
-                //    currentSecondaryData.push(filterFields(added));
-                //}
+                for (let added of addedRecords) {
+                    const index = currentSecondaryData.findIndex(item => matchRecord(item, added));
+                    if (index !== -1) {
+                        currentSecondaryData[index] = {
+                            ...currentSecondaryData[index],
+                            ...filterFields(added)
+                        };
+                    } else {
+                        currentSecondaryData.push(filterFields(added));
+                    }
+                }
 
                 // --- 3️⃣ PROCESS DELETED RECORDS ---
                 let deletedRecords = (batchChanges.deletedRecords || []).flat(Infinity);
@@ -1893,7 +1919,26 @@ const App = {
                     }
 
                     const userId = StorageManager.getUserId();
-                    const { validItems, deletedRecords } = methods.prepareSecondaryDataForSubmission();
+                    let SecondaryDataresult;
+
+                    try {
+                        SecondaryDataresult = methods.prepareSecondaryDataForSubmission();
+                    } catch (e) {
+                        if (e.message === "ATTRIBUTE_VALIDATION_FAILED") {
+                            console.warn("Submission stopped due to validation error");
+                            Swal.fire({
+                                icon: "error",
+                                title: "Validation Failed",
+                                html: "Submission stopped due to Attributes validation error"
+                            });
+                            return; // ⛔ HARD STOP
+                        }
+                        throw e; // unknown error
+                    }
+
+                    const { validItems, deletedRecords } = SecondaryDataresult;
+
+                    //const { validItems, deletedRecords } = methods.prepareSecondaryDataForSubmission();
 
                     let response;
 
@@ -2654,18 +2699,30 @@ const App = {
         const orderDatePicker = {
             obj: null,
             create: () => {
+                const defaultDate = state.orderDate
+                    ? new Date(state.orderDate)
+                    : new Date();
                 orderDatePicker.obj = new ej.calendars.DatePicker({
                     format: 'yyyy-MM-dd',
-                    value: state.orderDate ? new Date(state.orderDate) : null,
+                    value: defaultDate,
+                    enabled: false,
                     change: (e) => {
                         state.orderDate = e.value;
                     }
                 });
+
+                state.orderDate = defaultDate;
+
                 orderDatePicker.obj.appendTo(orderDateRef.value);
             },
             refresh: () => {
                 if (orderDatePicker.obj) {
-                    orderDatePicker.obj.value = state.orderDate ? new Date(state.orderDate) : null;
+                    const date = state.orderDate
+                        ? new Date(state.orderDate)
+                        : new Date();
+                    state.orderDate = date;
+
+                    orderDatePicker.obj.value = date;
                 }
             }
         };
@@ -2682,13 +2739,13 @@ const App = {
         };
 
         // Watchers
-        Vue.watch(
-            () => state.orderDate,
-            (newVal, oldVal) => {
-                orderDatePicker.refresh();
-                state.errors.orderDate = '';
-            }
-        );
+        //Vue.watch(
+        //    () => state.orderDate,
+        //    (newVal, oldVal) => {
+        //        orderDatePicker.refresh();
+        //        state.errors.orderDate = '';
+        //    }
+        //);
 
         Vue.watch(
             () => state.customerId,
@@ -3480,7 +3537,30 @@ const App = {
                                                 productObj.value = productId;
                                                 productObj.dataBind();
                                                 productObj.change({ value: productId });
-                                                console.log('✅ Product dropdown updated with ID:', productId);
+
+                                                const GridData = gridObj.dataSource;
+                                                // 🔎 check if same product already exists
+                                                const existingRow = GridData.find(r => r.productId === productId);
+                                                if (existingRow && existingRow.pluCode === enteredPLU) {
+                                                    // ✅ SAME ITEM  AGAIN
+                                                    existingRow.quantity = (existingRow.quantity || 1) + 1;
+                                                    const price = existingRow.price || existingRow.unitPrice;
+                                                    existingRow.total = existingRow.quantity * price;
+                                                    gridObj.refresh();
+                                                    return; // ⛔ stop further processing
+                                                }
+                                                else {
+                                                    const priceDef = state.priceDefinitionListLookupData
+                                                        ?.find(x => x.productId === productId && x.isActive);
+                                                    const selectedProduct = state.productListLookupData.find(item => item.id === productObj.value);
+
+                                                    const finalPrice = priceDef ? priceDef.salePrice : selectedProduct.unitPrice;
+                                                    if (quantityObj) {
+                                                        quantityObj.value = 1;
+                                                        if (totalObj) totalObj.value = finalPrice * quantityObj.value;
+                                                    }
+                                                }
+
                                             }
                                             
                                         }
@@ -3530,7 +3610,29 @@ const App = {
                                                 productObj.value = productId;
                                                 productObj.dataBind();
                                                 productObj.change({ value: productId });
-                                                console.log('✅ Product dropdown updated with ID:', productId);
+                                                const GridData = gridObj.dataSource;
+                                                // 🔎 check if same product already exists
+                                                const existingRow = GridData.find(r => r.productId === productId);
+                                                if (existingRow && existingRow.pluCode === enteredPLU) {
+                                                    // ✅ SAME ITEM  AGAIN
+                                                    existingRow.quantity = (existingRow.quantity || 1) + 1;
+                                                    const price = existingRow.price || existingRow.unitPrice;
+                                                    existingRow.total = existingRow.quantity * price;
+                                                    gridObj.refresh();
+                                                    return; // ⛔ stop further processing
+                                                }
+                                                else {
+                                                    const priceDef = state.priceDefinitionListLookupData
+                                                        ?.find(x => x.productId === productId && x.isActive);
+                                                    const selectedProduct = state.productListLookupData.find(item => item.id === productObj.value);
+
+                                                    const finalPrice = priceDef ? priceDef.salePrice : selectedProduct.unitPrice;
+                                                    if (quantityObj) {
+                                                        quantityObj.value = 1;
+                                                        if (totalObj) totalObj.value = finalPrice * quantityObj.value;
+                                                    }
+                                                }
+
                                             }
                                             
                                         } catch (error) {
@@ -3593,10 +3695,10 @@ const App = {
 
                                             if (summaryObj) summaryObj.value = selectedProduct.description;
 
-                                            if (quantityObj) {
-                                                quantityObj.value = 1;
-                                                if (totalObj) totalObj.value = finalPrice * quantityObj.value;
-                                            }                                            
+                                            //if (quantityObj) {
+                                            //    quantityObj.value = 1;
+                                            //    if (totalObj) totalObj.value = finalPrice * quantityObj.value;
+                                            //}                                            
                                         }
                                     });
 
@@ -3948,7 +4050,6 @@ const App = {
                 customerModal.create();
 
                 mainModalRef.value?.addEventListener('hidden.bs.modal', methods.onMainModalHidden);
-                mainModalRef.value?.addEventListener('shown.bs.modal', methods.onMainModalShown);
                 await methods.populateCustomerListLookupData();
                 customerListLookup.create();
                 await methods.populateTaxListLookupData();
@@ -3960,6 +4061,8 @@ const App = {
                 await secondaryGrid.create(state.secondaryData);
                 await methods.populateProductListLookupData();
                 await methods.populateProductActivePriceLookupData();
+                mainModalRef.value?.addEventListener('shown.bs.modal', methods.onMainModalShown);
+
 
             } catch (e) {
                 console.error('Page initialization error:', e);

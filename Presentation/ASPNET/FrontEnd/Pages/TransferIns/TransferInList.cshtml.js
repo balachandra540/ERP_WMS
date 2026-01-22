@@ -22,7 +22,8 @@
             },
             showComplexDiv: false,
             isSubmitting: false,
-            totalMovementFormatted: '0.00'
+            totalMovementFormatted: '0.00',
+            isAddMode: false,
         });
 
         const mainGridRef = Vue.ref(null);
@@ -137,22 +138,57 @@
             state.secondaryData = [];
         };
 
+        //const transferReceiveDatePicker = {
+        //    obj: null,
+        //    create: () => {
+        //        transferReceiveDatePicker.obj = new ej.calendars.DatePicker({
+        //            placeholder: 'Select Date',
+        //            format: 'yyyy-MM-dd',
+        //            value: state.transferReceiveDate ? new Date(state.transferReceiveDate) : null,
+        //            change: (e) => {
+        //                state.transferReceiveDate = e.value;
+        //            }
+        //        });
+        //        transferReceiveDatePicker.obj.appendTo(transferReceiveDateRef.value);
+        //    },
+        //    refresh: () => {
+        //        if (transferReceiveDatePicker.obj) {
+        //            transferReceiveDatePicker.obj.value = state.transferReceiveDate ? new Date(state.transferReceiveDate) : null;
+        //        }
+        //    }
+        //};
+
         const transferReceiveDatePicker = {
             obj: null,
+
             create: () => {
+                const defaultDate = state.transferReceiveDate
+                    ? new Date(state.transferReceiveDate)
+                    : new Date();
+
                 transferReceiveDatePicker.obj = new ej.calendars.DatePicker({
                     placeholder: 'Select Date',
                     format: 'yyyy-MM-dd',
-                    value: state.transferReceiveDate ? new Date(state.transferReceiveDate) : null,
-                    change: (e) => {
-                        state.transferReceiveDate = e.value;
-                    }
+                    value: defaultDate,
+                    enabled: false   // 🔒 disabled
                 });
+
+                // ✅ CRITICAL: manually sync state
+                state.transferReceiveDate = defaultDate;
+
                 transferReceiveDatePicker.obj.appendTo(transferReceiveDateRef.value);
             },
+
             refresh: () => {
                 if (transferReceiveDatePicker.obj) {
-                    transferReceiveDatePicker.obj.value = state.transferReceiveDate ? new Date(state.transferReceiveDate) : null;
+                    const date = state.transferReceiveDate
+                        ? new Date(state.transferReceiveDate)
+                        : new Date();
+
+                    transferReceiveDatePicker.obj.value = date;
+
+                    // ✅ keep state in sync
+                    state.transferReceiveDate = date;
                 }
             }
         };
@@ -166,13 +202,13 @@
             }
         };
 
-        Vue.watch(
-            () => state.transferReceiveDate,
-            (newVal, oldVal) => {
-                transferReceiveDatePicker.refresh();
-                state.errors.transferReceiveDate = '';
-            }
-        );
+        //Vue.watch(
+        //    () => state.transferReceiveDate,
+        //    (newVal, oldVal) => {
+        //        transferReceiveDatePicker.refresh();
+        //        state.errors.transferReceiveDate = '';
+        //    }
+        //);
 
         const numberText = {
             obj: null,
@@ -521,7 +557,15 @@
                 state.errors.transferReceiveDate = '';
                 state.errors.transferOutId = '';
                 state.errors.status = '';
-            }
+            },
+            onMainModalShown: () => {
+                if (state.isAddMode) {
+                    setTimeout(() => {
+                        secondaryGrid.obj.addRecord();
+                    }, 200);
+                }
+
+            },
         };
 
 
@@ -727,6 +771,8 @@
 
                 mainModal.create();
                 mainModalRef.value?.addEventListener('hidden.bs.modal', methods.onMainModalHidden);
+                mainModalRef.value?.addEventListener('shown.bs.modal', methods.onMainModalShown);
+
                 await methods.populateTransferOutListLookupData();
                 await methods.populateTransferInStatusListLookupData();
                 numberText.create();
@@ -825,13 +871,21 @@
                             state.deleteMode = false;
                             state.mainTitle = 'Add Transfer In';
                             resetFormState();
+                            state.isAddMode = true;
+                            // Create new grid properly
+                            if (secondaryGrid.obj == null) {
+                                await secondaryGrid.create(state.secondaryData);
+                            } else {
+                                secondaryGrid.refresh();
+                            }
+                            state.showComplexDiv = true;
                             setDefaultDate();
-                            state.showComplexDiv = false;
                             mainModal.obj.show();
                         }
 
                         if (args.item.id === 'EditCustom') {
                             state.deleteMode = false;
+                            state.isAddMode = false;
                             if (mainGrid.obj.getSelectedRecords().length) {
                                 const selectedRecord = mainGrid.obj.getSelectedRecords()[0];
                                 state.mainTitle = 'Edit Transfer In';
@@ -850,6 +904,8 @@
 
                         if (args.item.id === 'DeleteCustom') {
                             state.deleteMode = true;
+                            state.isAddMode = false;
+
                             if (mainGrid.obj.getSelectedRecords().length) {
                                 const selectedRecord = mainGrid.obj.getSelectedRecords()[0];
                                 state.mainTitle = 'Delete Transfer In?';
@@ -867,6 +923,7 @@
                         }
 
                         if (args.item.id === 'PrintPDFCustom') {
+                            state.isAddMode = false;
                             if (mainGrid.obj.getSelectedRecords().length) {
                                 const selectedRecord = mainGrid.obj.getSelectedRecords()[0];
                                 window.open('/TransferIns/TransferInPdf?id=' + (selectedRecord.id ?? ''), '_blank');

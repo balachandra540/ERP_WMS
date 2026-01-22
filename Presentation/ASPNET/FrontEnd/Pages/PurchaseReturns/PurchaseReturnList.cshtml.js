@@ -26,7 +26,9 @@
             },
             showComplexDiv: false,
             isSubmitting: false,
-            totalMovementFormatted: '0.00'
+            totalMovementFormatted: '0.00',
+            isAddMode: false,
+            
         });
 
         const mainGridRef = Vue.ref(null);
@@ -79,33 +81,68 @@
 
         };
 
+        //const returnDatePicker = {
+        //    obj: null,
+        //    create: () => {
+        //        returnDatePicker.obj = new ej.calendars.DatePicker({
+        //            placeholder: 'Select Date',
+        //            format: 'yyyy-MM-dd',
+        //            value: state.returnDate ? new Date(state.returnDate) : null,
+        //            change: (e) => {
+        //                state.returnDate = e.value;
+        //            }
+        //        });
+        //        returnDatePicker.obj.appendTo(returnDateRef.value);
+        //    },
+        //    refresh: () => {
+        //        if (returnDatePicker.obj) {
+        //            returnDatePicker.obj.value = state.returnDate ? new Date(state.returnDate) : null;
+        //        }
+        //    }
+        //};
+
         const returnDatePicker = {
             obj: null,
+
             create: () => {
+                const defaultDate = state.returnDate
+                    ? new Date(state.returnDate)
+                    : new Date();
+
                 returnDatePicker.obj = new ej.calendars.DatePicker({
                     placeholder: 'Select Date',
                     format: 'yyyy-MM-dd',
-                    value: state.returnDate ? new Date(state.returnDate) : null,
-                    change: (e) => {
-                        state.returnDate = e.value;
-                    }
+                    value: defaultDate,
+                    enabled: false   // 🔒 disabled
                 });
+
+                // ✅ CRITICAL: sync state manually
+                state.returnDate = defaultDate;
+
                 returnDatePicker.obj.appendTo(returnDateRef.value);
             },
+
             refresh: () => {
                 if (returnDatePicker.obj) {
-                    returnDatePicker.obj.value = state.returnDate ? new Date(state.returnDate) : null;
+                    const date = state.returnDate
+                        ? new Date(state.returnDate)
+                        : new Date();
+
+                    returnDatePicker.obj.value = date;
+
+                    // ✅ keep state in sync
+                    state.returnDate = date;
                 }
             }
         };
 
-        Vue.watch(
-            () => state.returnDate,
-            (newVal, oldVal) => {
-                returnDatePicker.refresh();
-                state.errors.returnDate = '';
-            }
-        );
+        //Vue.watch(
+        //    () => state.returnDate,
+        //    (newVal, oldVal) => {
+        //        returnDatePicker.refresh();
+        //        state.errors.returnDate = '';
+        //    }
+        //);
 
         const numberText = {
             obj: null,
@@ -485,6 +522,14 @@
                 state.errors.returnDate = '';
                 state.errors.goodsReceiveId = '';
                 state.errors.status = '';
+            },
+            onMainModalShown: () => {
+                if (state.isAddMode) {
+                    setTimeout(() => {
+                        secondaryGrid.obj.addRecord();
+                    }, 200);
+                }
+
             },
             openDetailModal: async (RowIndex, rowData) => {
                 state.currentDetailRowIndex = RowIndex;
@@ -1301,6 +1346,8 @@
 
                 mainModal.create();
                 mainModalRef.value?.addEventListener('hidden.bs.modal', methods.onMainModalHidden);
+                mainModalRef.value?.addEventListener('shown.bs.modal', methods.onMainModalShown);
+
                 await methods.populateGoodsReceiveListLookupData();
                 await methods.populatePurchaseReturnStatusListLookupData();
                 numberText.create();
@@ -1398,12 +1445,21 @@
                             state.deleteMode = false;
                             state.mainTitle = 'Add Purchase Return';
                             resetFormState();
+                            state.isAddMode = true;
+                            // Create new grid properly
+                            if (secondaryGrid.obj == null) {
+                                await secondaryGrid.create(state.secondaryData);
+                            } else {
+                                secondaryGrid.refresh();
+                            }
                             state.showComplexDiv = true;
                             mainModal.obj.show();
                         }
 
                         if (args.item.id === 'EditCustom') {
                             state.deleteMode = false;
+                            state.isAddMode = false;
+
                             if (mainGrid.obj.getSelectedRecords().length) {
                                 const selectedRecord = mainGrid.obj.getSelectedRecords()[0];
                                 state.mainTitle = 'Edit Purchase Return';
@@ -1422,6 +1478,8 @@
 
                         if (args.item.id === 'DeleteCustom') {
                             state.deleteMode = true;
+                            state.isAddMode = false;
+
                             if (mainGrid.obj.getSelectedRecords().length) {
                                 const selectedRecord = mainGrid.obj.getSelectedRecords()[0];
                                 state.mainTitle = 'Delete Purchase Return?';
@@ -1439,6 +1497,7 @@
                         }
 
                         if (args.item.id === 'PrintPDFCustom') {
+                            state.isAddMode = false;
                             if (mainGrid.obj.getSelectedRecords().length) {
                                 const selectedRecord = mainGrid.obj.getSelectedRecords()[0];
                                 window.open('/PurchaseReturns/PurchaseReturnPdf?id=' + (selectedRecord.id ?? ''), '_blank');

@@ -173,15 +173,64 @@
         // -----------------------------
         //   AUTO SALE PRICE CALCULATION
         //------------------------------
+        debugger;
+        //Vue.watch(
+        //    () => [state.costPrice, state.marginPercentage],
+        //    () => {
+        //        const cost = parseFloat(state.costPrice) || 0;
+        //        const margin = parseFloat(state.marginPercentage) || 0;
+
+        //        state.salePrice = cost + (cost * margin / 100);
+        //    },
+        //    { deep: true }
+        //);
+        let isInternalUpdate = false;
+
+        // cost / margin → salePrice
         Vue.watch(
             () => [state.costPrice, state.marginPercentage],
-            () => {
+            async () => {
+                if (isInternalUpdate) return;
+
                 const cost = parseFloat(state.costPrice) || 0;
                 const margin = parseFloat(state.marginPercentage) || 0;
 
-                state.salePrice = cost + (cost * margin / 100);
-            },
-            { deep: true }
+                isInternalUpdate = true;
+                state.salePrice = Number(
+                    (cost + (cost * margin / 100)).toFixed(2)
+                );
+                await Vue.nextTick();   // ✅ wait for watcher chain to finish
+                isInternalUpdate = false;
+            }
+        );
+
+        // salePrice → margin
+        Vue.watch(
+            () => state.salePrice,
+            async () => {
+                if (isInternalUpdate) return;
+
+                const cost = parseFloat(state.costPrice) || 0;
+                const sale = parseFloat(state.salePrice) || 0;
+
+                if (cost === 0) {
+                    isInternalUpdate = true;
+                    state.marginPercentage = 0;
+                    await Vue.nextTick();
+                    isInternalUpdate = false;
+                    return;
+                }
+
+                isInternalUpdate = true;
+                //state.marginPercentage = ((sale - cost) / cost) * 100;
+                state.marginPercentage = Number(
+                    (((sale - cost) / cost) * 100).toFixed(2)
+                );
+
+
+                await Vue.nextTick();   // ✅ critical
+                isInternalUpdate = false;
+            }
         );
 
         // -----------------------------

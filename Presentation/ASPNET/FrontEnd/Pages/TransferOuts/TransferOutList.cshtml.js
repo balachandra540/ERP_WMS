@@ -162,22 +162,57 @@
             state.isSubmitting = false;    // Reset submission state
         };
 
+        //const transferReleaseDatePicker = {
+        //    obj: null,
+        //    create: () => {
+        //        transferReleaseDatePicker.obj = new ej.calendars.DatePicker({
+        //            placeholder: 'Select Date',
+        //            format: 'yyyy-MM-dd',
+        //            value: state.transferReleaseDate ? new Date(state.transferReleaseDate) : null,
+        //            change: (e) => {
+        //                state.transferReleaseDate = e.value;
+        //            }
+        //        });
+        //        transferReleaseDatePicker.obj.appendTo(transferReleaseDateRef.value);
+        //    },
+        //    refresh: () => {
+        //        if (transferReleaseDatePicker.obj) {
+        //            transferReleaseDatePicker.obj.value = state.transferReleaseDate ? new Date(state.transferReleaseDate) : null;
+        //        }
+        //    }
+        //};
+
         const transferReleaseDatePicker = {
             obj: null,
+
             create: () => {
+                const defaultDate = state.transferReleaseDate
+                    ? new Date(state.transferReleaseDate)
+                    : new Date();
+
                 transferReleaseDatePicker.obj = new ej.calendars.DatePicker({
                     placeholder: 'Select Date',
                     format: 'yyyy-MM-dd',
-                    value: state.transferReleaseDate ? new Date(state.transferReleaseDate) : null,
-                    change: (e) => {
-                        state.transferReleaseDate = e.value;
-                    }
+                    value: defaultDate,
+                    enabled: false   // 🔒 disabled
                 });
+
+                // ✅ CRITICAL: manually sync state
+                state.transferReleaseDate = defaultDate;
+
                 transferReleaseDatePicker.obj.appendTo(transferReleaseDateRef.value);
             },
+
             refresh: () => {
                 if (transferReleaseDatePicker.obj) {
-                    transferReleaseDatePicker.obj.value = state.transferReleaseDate ? new Date(state.transferReleaseDate) : null;
+                    const date = state.transferReleaseDate
+                        ? new Date(state.transferReleaseDate)
+                        : new Date();
+
+                    transferReleaseDatePicker.obj.value = date;
+
+                    // ✅ keep state in sync
+                    state.transferReleaseDate = date;
                 }
             }
         };
@@ -652,12 +687,13 @@
                             hasErrors = true;
                         }
                         if (hasErrors) {
-                            Swal.fire({
-                                icon: "error",
-                                title: "Validation Failed",
-                                html: errors.join("<br>")
-                            });
-                            return;
+                            //Swal.fire({
+                            //    icon: "error",
+                            //    title: "Validation Failed",
+                            //    html: errors.join("<br>")
+                            //});
+                            //return;
+                            throw new Error("ATTRIBUTE_VALIDATION_FAILED"); 
                         }
                     });
                     
@@ -1261,7 +1297,25 @@
 
                     let response;
                     const userId = StorageManager.getUserId();
-                    const { validItems, deletedItems } = methods.prepareSecondaryDataForSubmission();
+
+                    let SecondaryDataresult;
+                    try {
+                        SecondaryDataresult = methods.prepareSecondaryDataForSubmission();
+                    } catch (e) {
+                        if (e.message === "ATTRIBUTE_VALIDATION_FAILED") {
+                            Swal.fire({
+                                icon: "error",
+                                title: "Validation Failed",
+                                html: "Submission stopped due to Attributes validation error"
+                            });
+                            return; // ⛔ HARD STOP
+                        }
+                        throw e; // unknown error
+                    }
+
+                    const { validItems, deletedItems } = SecondaryDataresult;
+
+                    //const { validItems, deletedItems } = methods.prepareSecondaryDataForSubmission();
                     if (state.id === '') {
                         // **CREATE NEW TRANSFER OUT WITH ITEMS IN ONE REQUEST**
                         const itemsDto = validItems.map(item => ({
@@ -1627,7 +1681,7 @@
                 mainGrid.obj.setProperties({ dataSource: state.mainData });
             }
         };     
-
+        let gridObj;
         const secondaryGrid = {
             obj: null,
 
@@ -1658,6 +1712,9 @@
                     allowResizing: true,
                     allowPaging: false,
                     allowExcelExport: true,
+                    created: function () {
+                        gridObj = this;
+                    },
                     filterSettings: { type: 'CheckBox' },
                     sortSettings: { columns: [{ field: 'productName', direction: 'Descending' }] },
                     pageSettings: { currentPage: 1, pageSize: 50, pageSizes: ["10", "20", "50", "100", "200", "All"] },
@@ -1743,7 +1800,18 @@
                                                 productObj.value = productId;
                                                 productObj.dataBind();
                                                 productObj.change({ value: productId });
-                                                console.log('✅ Product dropdown updated with ID:', productId);
+                                                const GridData = gridObj.dataSource;
+                                                // 🔎 check if same product already exists
+                                                const existingRow = GridData.find(r => r.productId === productId);
+                                                if (existingRow && existingRow.pluCode === enteredPLU) {
+                                                    // ✅ SAME ITEM  AGAIN
+                                                    existingRow.requestStock = (existingRow.requestStock || 1) + 1;
+                                                    gridObj.refresh();
+                                                    return; // ⛔ stop further processing
+                                                }
+                                                if (requestStockObj) {
+                                                    requestStockObj.value = 1;
+                                                }
                                             }
 
                                             // 🔥 UPDATE TOTAL STOCK - CRITICAL FIX
@@ -1795,6 +1863,20 @@
                                                 productObj.value = productId;
                                                 productObj.dataBind();
                                                 productObj.change({ value: productId });
+                                                const GridData = gridObj.dataSource;
+                                                // 🔎 check if same product already exists
+                                                const existingRow = GridData.find(r => r.productId === productId);
+                                                if (existingRow && existingRow.pluCode === enteredPLU) {
+                                                    // ✅ SAME ITEM  AGAIN
+                                                    existingRow.requestStock = (existingRow.requestStock || 1) + 1;
+                                                    gridObj.refresh();
+                                                    return; // ⛔ stop further processing
+                                                }
+                                                if (requestStockObj) {
+                                                    requestStockObj.value = 1;
+                                                }
+
+                                                
                                             }
 
                                         } catch (error) {
