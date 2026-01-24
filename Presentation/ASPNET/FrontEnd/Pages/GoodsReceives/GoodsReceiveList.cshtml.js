@@ -1112,13 +1112,22 @@ const App = {
             }
         };
 
-        //Vue.watch(
-        //    () => state.receiveDate,
-        //    (newVal, oldVal) => {
-        //        receiveDatePicker.refresh();
-        //        state.errors.receiveDate = '';
-        //    }
-        //);
+        Vue.watch(
+            () => state.receiveDate,
+            (newVal, oldVal) => {
+                receiveDatePicker.refresh();
+                state.errors.receiveDate = '';
+            }
+        );
+        const setDefaultDate = () => {
+            if (!state.receiveDate) {
+                state.receiveDate = new Date();
+            }
+
+            if (receiveDatePicker.obj) {
+                receiveDatePicker.obj.value = new Date(state.receiveDate);
+            }
+        };
 
         const numberText = {
             obj: null,
@@ -2810,6 +2819,10 @@ const App = {
                                 timer: 2000,
                                 showConfirmButton: false
                             });
+                            setTimeout(() => {
+                                mainModal.obj.hide();
+                                resetFormState();
+                            }, 2000);
                         } else {
                             Swal.fire({
                                 icon: 'success',
@@ -3111,6 +3124,9 @@ const App = {
                         // CREATE NEW GRN
                         if (args.item.id === 'AddCustom') {
                             resetFormState();
+                            // ✅ Set TODAY as default
+                            setDefaultDate();
+
                             state.deleteMode = false;
                             state.mainTitle = 'Add Goods Receive Items';
 

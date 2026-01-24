@@ -192,6 +192,15 @@
                 }
             }
         };
+        const setDefaultDate = () => {
+            if (!state.transferReceiveDate) {
+                state.transferReceiveDate = new Date();
+            }
+
+            if (transferReceiveDatePicker.obj) {
+                transferReceiveDatePicker.obj.value = new Date(state.transferReceiveDate);
+            }
+        };
 
         //Vue.watch(
         //    () => state.transferReceiveDate,
@@ -870,6 +879,7 @@
                                 secondaryGrid.refresh();
                             }
                             state.showComplexDiv = true;
+                            setDefaultDate();
                             mainModal.obj.show();
                         }
 

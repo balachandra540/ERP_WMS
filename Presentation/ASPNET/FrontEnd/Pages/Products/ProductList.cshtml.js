@@ -359,6 +359,19 @@
                 }
             },
         };
+        const setDefaultUnitMeasure = () => {
+            const defaultUnit = state.unitMeasureListLookupData
+                ?.find(x => x.name?.toLowerCase() === 'pcs');
+
+            if (defaultUnit) {
+                state.unitMeasureId = defaultUnit.id;
+
+                if (unitMeasureListLookup.obj) {
+                    unitMeasureListLookup.obj.value = defaultUnit.id;
+                }
+            }
+        };
+
         const taxListLookup = {
             obj: null,
             trackingChange: false,
@@ -705,6 +718,9 @@
                             state.deleteMode = false;
                             state.mainTitle = 'Add Product';
                             resetFormState();
+                            // ✅ APPLY DEFAULT "pcs"
+                            setDefaultUnitMeasure();
+
                             mainModal.obj.show();
                         }
 
