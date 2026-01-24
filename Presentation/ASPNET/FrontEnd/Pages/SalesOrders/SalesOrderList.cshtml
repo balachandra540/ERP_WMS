@@ -185,6 +185,18 @@
                                     </div>
                                 </div>
                                 <div class="row mb-2">
+                                    <div class="col-md-6">
+                                        <label for="PhoneNumber">Phone Number</label>
+                                        <input ref="phoneNumberRef" v-model="customerState.phoneNumber" class="form-control" placeholder="" />
+                                        <label class="text-danger" v-text="customerState.errors.phoneNumber"></label>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label for="EmailAddress">Email</label>
+                                        <input ref="emailAddressRef" v-model="customerState.emailAddress" class="form-control" placeholder="" />
+                                        <label class="text-danger" v-text="customerState.errors.emailAddress"></label>
+                                    </div>
+                                </div>
+                                <div class="row mb-2">
                                     <div class="col-12">
                                         <label for="Description">Description</label>
                                         <textarea v-model="customerState.description" class="form-control" rows="3" placeholder=""></textarea>
@@ -235,23 +247,12 @@
                                 <h5>Communication</h5>
                             </div>
                             <div class="card-body">
+                                
                                 <div class="row mb-2">
-                                    <div class="col-md-6">
-                                        <label for="PhoneNumber">Phone Number</label>
-                                        <input ref="phoneNumberRef" v-model="customerState.phoneNumber" class="form-control" placeholder="" />
-                                        <label class="text-danger" v-text="customerState.errors.phoneNumber"></label>
-                                    </div>
                                     <div class="col-md-6">
                                         <label for="FaxNumber">Fax Number</label>
                                         <input ref="faxNumberRef" v-model="customerState.faxNumber" class="form-control" placeholder="" />
                                         <label class="text-danger" v-text="customerState.errors.faxNumber"></label>
-                                    </div>
-                                </div>
-                                <div class="row mb-2">
-                                    <div class="col-md-6">
-                                        <label for="EmailAddress">Email</label>
-                                        <input ref="emailAddressRef" v-model="customerState.emailAddress" class="form-control" placeholder="" />
-                                        <label class="text-danger" v-text="customerState.errors.emailAddress"></label>
                                     </div>
                                     <div class="col-md-6">
                                         <label for="Website">Website</label>
