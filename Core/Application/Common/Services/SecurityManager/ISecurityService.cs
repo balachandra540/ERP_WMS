@@ -1,4 +1,6 @@
-﻿namespace Application.Common.Services.SecurityManager;
+﻿using Application.Features.SecurityManager.Queries;
+
+namespace Application.Common.Services.SecurityManager;
 
 public interface ISecurityService
 {
@@ -76,6 +78,12 @@ public interface ISecurityService
     public Task<List<GetUserListResultDto>> GetUserListAsync(
         CancellationToken cancellationToken
         );
+    public Task<List<GetUserLocationsListDto>> GetUserLocationListAsync(GetUserWarehouseListRequest request,
+       CancellationToken cancellationToken
+       );
+    public Task<CreateUserLocationsListDto> CreateUserWarehouseAsync(string userId, string warehouseId,bool isDefaultLocation, string createdById, CancellationToken ct);
+    public Task<UpdateUserLocationsListDto> UpdateUserWarehouseAsync(string id, string warehouseId,bool isDefaultLocation, string updatedById, CancellationToken ct);
+    public Task<bool> DeleteUserWarehouseAsync(string id, string deletedById, CancellationToken ct);
 
     public Task<CreateUserResultDto> CreateUserAsync(
         string email,

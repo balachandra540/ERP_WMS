@@ -130,7 +130,7 @@
         const resetFormState = () => {
             state.id = '';
             state.number = '';
-            state.scrappingDate = '';
+            //state.scrappingDate = '';
             state.description = '';
             state.warehouseId = null;
             state.status = null;

@@ -9,17 +9,75 @@
         </li>
     </ul>
 
+    <!-- CENTER DATE FILTER DROPDOWN -->
+    <ul class="navbar-nav mx-auto" id="dateFilterContainer" style="display:none;">
+        <li class="nav-item dropdown">
+            <a class="nav-link dropdown-toggle btn btn-light btn-sm px-3"
+               href="#"
+               id="dateFilterDropdownBtn"
+               role="button"
+               data-toggle="dropdown"
+               aria-haspopup="true"
+               aria-expanded="false">
+                <span id="selectedDateText">Today</span>
+            </a>
+
+            <div class="dropdown-menu dropdown-menu-center" aria-labelledby="dateFilterDropdownBtn" style="min-width:220px;">
+                <a class="dropdown-item date-filter-item" data-value="Today">Today</a>
+                <a class="dropdown-item date-filter-item" data-value="Yesterday">Yesterday</a>
+                <div class="dropdown-divider"></div>
+                <a class="dropdown-item date-filter-item" data-value="ThisWeek">This Week</a>
+                <a class="dropdown-item date-filter-item" data-value="LastWeek">Last Week</a>
+                <a class="dropdown-item date-filter-item" data-value="Last7Days">Last 7 Days</a>
+                <div class="dropdown-divider"></div>
+                <a class="dropdown-item date-filter-item" data-value="ThisMonth">This Month</a>
+                <a class="dropdown-item date-filter-item" data-value="LastMonth">Last Month</a>
+                <a class="dropdown-item date-filter-item" data-value="Last30Days">Last 30 Days</a>
+                <div class="dropdown-divider"></div>
+                <a class="dropdown-item date-filter-item" data-value="ThisQuarter">This Quarter</a>
+                <a class="dropdown-item date-filter-item" data-value="LastQuarter">Last Quarter</a>
+                <div class="dropdown-divider"></div>
+                <a class="dropdown-item date-filter-item" data-value="ThisFY">This Financial Year</a>
+                <a class="dropdown-item date-filter-item" data-value="LastFY">Last Financial Year</a>
+                <div class="dropdown-divider"></div>
+                <a class="dropdown-item date-filter-item text-primary" data-value="Custom">Custom Range</a>
+            </div>
+        </li>
+    </ul>
+
+
     <!-- Right navbar links -->
 
     <span class="mt-0" id="topbarContent"> </span>@* Currency: *@
     <ul class="navbar-nav ml-auto align-items-center">
 
+
+
+
         <!-- Location Dropdown -->
-        <li class="nav-item dropdown mr-3">
+       @*  <li class="nav-item dropdown mr-3">
             <select id="locationDropdown" class="form-control form-control-sm" style="min-width: 150px;">
                 <option selected disabled>Select Location</option>
             </select>
+        </li> *@
+
+        <!--Location Dropdown (Navbar Style) -->
+        <li class="nav-item dropdown mr-3" id="locationDropdownContainer">
+            <a class="nav-link dropdown-toggle btn btn-light btn-sm px-3"
+               href="#"
+               id="locationDropdownBtn"
+               role="button"
+               data-toggle="dropdown"
+               aria-haspopup="true"
+               aria-expanded="false">
+                <span id="selectedLocationText">Select Location</span>
+            </a>
+
+            <div class="dropdown-menu dropdown-menu-right" id="locationDropdownMenu" style="min-width:220px;">
+                <span class="dropdown-item text-muted">Loading...</span>
+            </div>
         </li>
+
 
         <!-- Profile Dropdown -->
         <li class="nav-item dropdown">
@@ -42,89 +100,275 @@
     </ul>
 </nav>
 <script>
-    document.addEventListener('DOMContentLoaded', async function () {
+    // document.addEventListener('DOMContentLoaded', async function () {
+    //     debugger;
+    //         $('body').addClass('sidebar-collapse')
+
+    //     const locationDropdown = document.getElementById("locationDropdown");
+    //     if (!locationDropdown) return;
+
+    //     // Step 1️⃣: Get stored warehouse IDs (string like "W001,W002")
+    //     let storedIds = StorageManager.getLocation();
+
+    //     if (!storedIds) return;
+
+    //     // Step 2️⃣: Convert to array (split by comma)
+    //     if (typeof storedIds === "string") {
+    //         storedIds = storedIds
+    //             .split(',')              // split by comma
+    //             .map(id => id.trim())    // remove spaces
+    //             .filter(id => id !== ""); // remove empty values
+    //     }
+
+    //     if (!Array.isArray(storedIds) || storedIds.length === 0) return;
+
+    //     try {
+    //         // Step 3️⃣: Fetch all warehouses
+    //         const response = await AxiosManager.get('/Warehouse/GetWarehouseList');
+    //         const warehouses = response?.data?.content?.data || [];
+
+    //         // Step 4️⃣: Add matching warehouses to dropdown
+    //         warehouses.forEach(wh => {
+    //             if (storedIds.includes(wh.id)) {
+    //                 const opt = document.createElement("option");
+    //                 opt.value = wh.id;
+    //                 opt.textContent = wh.name;
+    //                 locationDropdown.appendChild(opt);
+    //             }
+    //         });
+
+    //         // Optional: auto-select first if only one
+    //         if (locationDropdown.options.length === 2) {
+    //             locationDropdown.selectedIndex = 1;
+    //         }
+
+    //     } catch (error) {
+    //         console.error("❌ Failed to load warehouse names:", error);
+    //     }
+    //     try {
+    //         // Step 3️⃣: Fetch all  user access warehouses
+    //         const response = await AxiosManager.get('/Security/GetUserWarehouse?UserId=' + StorageManager.getUserId() +'');
+    //         if (response.data.code === 200) {
+    //                     warehouses = response.data.content.data || [];
+    //         }
+    //         // Step 4️⃣: Add matching warehouses to dropdown
+    //         warehouses.forEach(wh => {
+    //             if (storedIds.includes(wh.id)) {
+    //                 const opt = document.createElement("option");
+    //                 opt.value = wh.id;
+    //                 opt.textContent = wh.name;
+    //                 locationDropdown.appendChild(opt);
+    //             }
+    //         });
+
+    //         // Optional: auto-select first if only one
+    //         if (locationDropdown.options.length === 2) {
+    //             locationDropdown.selectedIndex = 1;
+    //         }
+
+    //     } catch (error) {
+    //         console.error("❌ Failed to load warehouse names:", error);
+    //     }
+    // });
+
+
+        document.addEventListener('DOMContentLoaded', async function () {
         debugger;
-            $('body').addClass('sidebar-collapse')
+        $('body').addClass('sidebar-collapse');
 
         const locationDropdown = document.getElementById("locationDropdown");
         if (!locationDropdown) return;
 
-        // Step 1️⃣: Get stored warehouse IDs (string like "W001,W002")
-        let storedIds = StorageManager.getLocation();
-
-        if (!storedIds) return;
-
-        // Step 2️⃣: Convert to array (split by comma)
-        if (typeof storedIds === "string") {
-            storedIds = storedIds
-                .split(',')              // split by comma
-                .map(id => id.trim())    // remove spaces
-                .filter(id => id !== ""); // remove empty values
-        }
-
-        if (!Array.isArray(storedIds) || storedIds.length === 0) return;
+        const userId = StorageManager.getUserId();   // logged-in user
+        if (!userId) return;
 
         try {
-            // Step 3️⃣: Fetch all warehouses
-            const response = await AxiosManager.get('/Warehouse/GetWarehouseList');
-            const warehouses = response?.data?.content?.data || [];
+            //Get only locations user has access to
+            const response = await AxiosManager.get('/Security/GetUserWarehouse?UserId=' + userId+'');
+            const locations = response?.data?.content?.data || [];
 
-            // Step 4️⃣: Add matching warehouses to dropdown
-            warehouses.forEach(wh => {
-                if (storedIds.includes(wh.id)) {
-                    const opt = document.createElement("option");
-                    opt.value = wh.id;
-                    opt.textContent = wh.name;
-                    locationDropdown.appendChild(opt);
+            // Clear existing options except first placeholder
+            locationDropdown.innerHTML = '<option value="">Select Location</option>';
+
+            let defaultLocationId = null;
+
+            locations.forEach(loc => {
+                const opt = document.createElement("option");
+                opt.value = loc.locationId;
+                opt.textContent = loc.locationName;
+                locationDropdown.appendChild(opt);
+
+                if (loc.isDefaultLocation) {
+                    defaultLocationId = loc.locationId;
                 }
             });
 
-            // Optional: auto-select first if only one
-            if (locationDropdown.options.length === 2) {
-                locationDropdown.selectedIndex = 1;
+            // ✅ Auto-select default location if exists
+            if (defaultLocationId) {
+                locationDropdown.value = defaultLocationId;
+            }
+            // If no default but only one location, select it
+            else if (locations.length === 1) {
+                locationDropdown.value = locations[0].locationId;
             }
 
+            locationDropdown.addEventListener('change', function () {
+                debugger;
+
+        StorageManager.saveLocation(this.value);
+
+            });
+
+
+        
+
         } catch (error) {
-            console.error("❌ Failed to load warehouse names:", error);
+            console.error("❌ Failed to load user locations:", error);
         }
+
+
+        
+            
+
     });
 
 
 
-    // document.addEventListener('DOMContentLoaded', function () {
-    //     debugger;
+        document.addEventListener('DOMContentLoaded', async function () {
 
-    //     let locationDropdown = document.getElementById("locationDropdown");
-    //     debugger;
-    //     if (!locationDropdown) return;
+        $('body').addClass('sidebar-collapse');
 
-    //     let locations =[];
-    //     // ✅ Get location data from localStorage
-    //      locations = StorageManager.getLocation();
+        const userId = StorageManager.getUserId();
+        if (!userId) return;
 
-       
-    //     // ✅ Populate dropdown dynamically
-    //     if (Array.isArray(locations) && locations.length > 0) {
-    //         locations.forEach(loc => {
-    //             const opt = document.createElement("option");
-    //             opt.value = loc;
-    //             opt.textContent = loc;
-    //             locationDropdown.appendChild(opt);
-    //         });
+        const menu = document.getElementById("locationDropdownMenu");
+        const textLabel = document.getElementById("selectedLocationText");
+
+        try {
+            const response = await AxiosManager.get('/Security/GetUserWarehouse?UserId=' + userId);
+            const locations = response?.data?.content?.data || [];
+
+            menu.innerHTML = "";
+
+            let defaultLocationId = null;
+            let defaultLocationName = null;
+
+            locations.forEach(loc => {
+
+                const a = document.createElement("a");
+                a.className = "dropdown-item location-item";
+                a.dataset.id = loc.locationId;
+                a.innerText = loc.locationName;
+
+                menu.appendChild(a);
+
+                if (loc.isDefaultLocation) {
+                    defaultLocationId = loc.locationId;
+                    defaultLocationName = loc.locationName;
+                }
+            });
+
+            // Load saved or default
+            const savedLocation = StorageManager.getLocation();
+
+            if (savedLocation) {
+                const selected = locations.find(x => x.locationId === savedLocation);
+                if (selected) textLabel.innerText = selected.locationName;
+            }
+            else if (defaultLocationId) {
+                StorageManager.saveLocation(defaultLocationId);
+                textLabel.innerText = defaultLocationName;
+            }
+            else if (locations.length === 1) {
+                StorageManager.saveLocation(locations[0].locationId);
+                textLabel.innerText = locations[0].locationName;
+            }
+
+        
+
+
+
+         const container = document.getElementById("dateFilterContainer");
+
+        if (window.location.pathname.toLowerCase().includes("defaultdashboard")) {
+            container.style.display = "block";
+        }
+
+        } catch (err) {
+            console.error("Failed to load locations", err);
+        }
+    });
+    document.addEventListener("click", function (e) {
+
+        if (e.target.classList.contains("location-item")) {
+
+            const id = e.target.dataset.id;
+            const name = e.target.innerText;
+
+            StorageManager.saveLocation(id);
+            document.getElementById("selectedLocationText").innerText = name;
+
+            notifyDashboardToReload();
+        }
+    });
+                 document.querySelectorAll(".date-filter-item").forEach(item => {
+        item.addEventListener("click", function () {
+
+            const value = this.dataset.value;
+            const text = this.innerText;
+
+            document.getElementById("selectedDateText").innerText = text;
+            localStorage.setItem("selectedDateFilter", value);
+
+            notifyDashboardToReload();
+        });
+
+    });
+
+    //         function notifyDashboardToReload() {
+
+    //     // Only trigger reload if currently on DefaultDashboard
+    //     if (window.location.pathname.toLowerCase().includes("defaultdashboard")) {
+
+    //         // Send event to Vue dashboard
+    //         window.dispatchEvent(new Event("dashboardFiltersChanged"));
     //     }
+    // }
+        function notifyDashboardToReload() {
 
-    //     // // ✅ Preselect previously chosen location
-    //     // const selected = localStorage.getItem("selectedLocation");
-    //     // if (selected) {
-    //     //     locationDropdown.value = selected;
-    //     // }
+        const locationId = StorageManager.getLocation();
+        const dateFilter = localStorage.getItem("selectedDateFilter");
+        const fromDate = localStorage.getItem("customFromDate");
+        const toDate = localStorage.getItem("customToDate");
 
-    //     // ✅ Handle change
-    //     // locationDropdown.addEventListener("change", function () {
-    //     //     const value = this.value;
-    //     //     localStorage.setItem("selectedLocation", value);
-    //     //     console.log("Selected location:", value);
-    //     // });
-    // });
+        const params = new URLSearchParams(window.location.search);
+
+        if (locationId) params.set("locationId", locationId);
+        else params.delete("locationId");
+
+        if (dateFilter) params.set("dateFilterType", dateFilter);
+        else params.delete("dateFilterType");
+
+        if (dateFilter === "Custom") {
+            params.set("fromDate", fromDate || "");
+            params.set("toDate", toDate || "");
+        } else {
+            params.delete("fromDate");
+            params.delete("toDate");
+        }
+
+        const newUrl = window.location.pathname + "?" + params.toString();
+
+        // Update URL without reloading
+        window.history.replaceState({}, "", newUrl);
+
+        // 🔥 Notify dashboard (if present)
+        if (window.location.pathname.toLowerCase().includes("defaultdashboard")) {
+            window.dispatchEvent(new Event("dashboardFiltersChanged"));
+        }
+    }
+
+
+    
 </script>
 

@@ -350,5 +350,66 @@ public class SecurityController : BaseApiController
             Content = response
         });
     }
+    [Authorize]
+    [HttpGet("GetUserWarehouse")]
+    public async Task<ActionResult<ApiSuccessResult<GetUserWarehouseListResult>>> GetUserWarehouseListAsync(
+    [FromQuery] GetUserWarehouseListRequest request,
+    CancellationToken cancellationToken)
+    {
+        var response = await _sender.Send(request, cancellationToken);
+
+        return Ok(new ApiSuccessResult<GetUserWarehouseListResult>
+        {
+            Code = StatusCodes.Status200OK,
+            Message = $"Success executing {nameof(GetUserWarehouseListAsync)}",
+            Content = response
+        });
+    }
+    [Authorize]
+    [HttpPost("CreateUserWarehouse")]
+    public async Task<ActionResult<ApiSuccessResult<CreateUserWarehouseResult>>> CreateUserWarehouseAsync(
+    CreateUserWarehouseRequest request,
+    CancellationToken cancellationToken)
+    {
+        var response = await _sender.Send(request, cancellationToken);
+
+        return Ok(new ApiSuccessResult<CreateUserWarehouseResult>
+        {
+            Code = StatusCodes.Status200OK,
+            Message = $"Success executing {nameof(CreateUserWarehouseAsync)}",
+            Content = response
+        });
+    }
+    [Authorize]
+    [HttpPost("UpdateUserWarehouse")]
+    public async Task<ActionResult<ApiSuccessResult<UpdateUserWarehouseResult>>> UpdateUserWarehouseAsync(
+        UpdateUserWarehouseRequest request,
+        CancellationToken cancellationToken)
+    {
+        var response = await _sender.Send(request, cancellationToken);
+
+        return Ok(new ApiSuccessResult<UpdateUserWarehouseResult>
+        {
+            Code = StatusCodes.Status200OK,
+            Message = $"Success executing {nameof(UpdateUserWarehouseAsync)}",
+            Content = response
+        });
+    }
+    [Authorize]
+    [HttpPost("DeleteUserWarehouse")]
+    public async Task<ActionResult<ApiSuccessResult<DeleteUserWarehouseResult>>> DeleteUserWarehouseAsync(
+        DeleteUserWarehouseRequest request,
+        CancellationToken cancellationToken)
+    {
+        var response = await _sender.Send(request, cancellationToken);
+
+        return Ok(new ApiSuccessResult<DeleteUserWarehouseResult>
+        {
+            Code = StatusCodes.Status200OK,
+            Message = $"Success executing {nameof(DeleteUserWarehouseAsync)}",
+            Content = response
+        });
+    }
+
 
 }

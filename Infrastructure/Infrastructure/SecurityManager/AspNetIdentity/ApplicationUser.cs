@@ -21,6 +21,9 @@ public class ApplicationUser : IdentityUser
 
     public string? Test { get; set; }
 
+    public ICollection<UserWarehouse> UserWarehouses { get; set; } = new List<UserWarehouse>();
+
+
     public ApplicationUser(
         string email,
         string firstName,

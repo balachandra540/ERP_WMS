@@ -125,7 +125,7 @@
         const resetFormState = () => {
             state.id = '';
             state.number = '';
-            state.transferReceiveDate = '';
+            //state.transferReceiveDate = '';
             state.description = '';
             state.transferOutId = null;
             state.status = null;

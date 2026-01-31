@@ -4,8 +4,14 @@
             cardsData: {},
             salesData: {},
             purchaseData: {},
-            inventoryData: {}
+            inventoryData: {},
+            
         });
+        const locationId = StorageManager.getLocation() ?? '';
+        const params = new URLSearchParams(window.location.search);
+        const dateFilterType = params.get("dateFilterType") ?? "Today";
+        const fromDate = params.get("fromDate") ?? null;
+        const toDate = params.get("toDate") ?? null;
 
         const cardSalesQtyRef = Vue.ref(null);
         const cardSalesReturnQtyRef = Vue.ref(null);
@@ -24,27 +30,52 @@
         const customerCategoryChartRef = Vue.ref(null);
         const vendorCategoryChartRef = Vue.ref(null);
         const stockChartRef = Vue.ref(null);
+        debugger;
+        
+        const loadAllDashboardData = async ()=> {
+            await methods.populateCardsData();
+            await methods.populateSalesData();
+            await methods.populatePurchaseData();
+            await methods.populateInventoryData();
+        }
+        const getFiltersFromQuery = () =>{
+            const params = new URLSearchParams(window.location.search);
+            params.append("locationId", locationId);
+            if (dateFilterType) params.append("dateFilterType", dateFilterType);
+            if (fromDate) params.append("fromDate", fromDate);
+            if (toDate) params.append("toDate", toDate);
+            return `${params.toString()}`;
+        }
 
         const services = {
             getCardsData: async () => {
                 try {
-                    const response = await AxiosManager.get('/Dashboard/GetCardsDashboard', {});
+                    const filters = getFiltersFromQuery();
+                    //const response = await AxiosManager.get('/Dashboard/GetCardsDashboard?locationId=' + locationId, {});
+                    const response = await AxiosManager.get('/Dashboard/GetCardsDashboard?' + filters, {});
+
                     return response;
+                    
                 } catch (error) {
                     throw error;
                 }
             },
             getSalesData: async () => {
                 try {
-                    const response = await AxiosManager.get('/Dashboard/GetSalesDashboard', {});
-                    return response;
+                    const filters = getFiltersFromQuery();
+                    //return await AxiosManager.get('/Dashboard/GetSalesDashboard?locationId=' + locationId, {});
+                    return await AxiosManager.get('/Dashboard/GetSalesDashboard?' + filters, {});
+
+                    //const response = await AxiosManager.get('/Dashboard/GetSalesDashboard?locationId=' + locationId, {});
+                    //return response;
                 } catch (error) {
                     throw error;
                 }
             },
             getPurchaseData: async () => {
                 try {
-                    const response = await AxiosManager.get('/Dashboard/GetPurchaseDashboard', {});
+                    const filters = getFiltersFromQuery();
+                    const response = await AxiosManager.get('/Dashboard/GetPurchaseDashboard?' + filters, {});
                     return response;
                 } catch (error) {
                     throw error;
@@ -52,7 +83,8 @@
             },
             getInventoryData: async () => {
                 try {
-                    const response = await AxiosManager.get('/Dashboard/GetInventoryDashboard', {});
+                    const filters = getFiltersFromQuery();
+                    const response = await AxiosManager.get('/Dashboard/GetInventoryDashboard?' + filters, {});
                     return response;
                 } catch (error) {
                     throw error;
@@ -68,26 +100,26 @@
             },
             populateSalesData: async () => {
                 const response = await services.getSalesData();
-                state.salesData = response?.data?.content?.data;
+                state.salesData = response?.data?.content?.data ?? [];
                 methods.populateSalesOrderGrid();
                 methods.populateSalesByCustomerGroupChart();
                 methods.populateSalesByCustomerCategoryChart();
             },
             populatePurchaseData: async () => {
                 const response = await services.getPurchaseData();
-                state.purchaseData = response?.data?.content?.data;
+                state.purchaseData = response?.data?.content?.data?? [];
                 methods.populatePurchaseOrderGrid();
                 methods.populatePurchaseByVendorGroupChart();
                 methods.populatePurchaseByVendorCategoryChart();
             },
             populateInventoryData: async () => {
                 const response = await services.getInventoryData();
-                state.inventoryData = response?.data?.content?.data;
+                state.inventoryData = response?.data?.content?.data ?? [];
                 methods.populateInventoryTransactionGrid();
                 methods.populateInventoryStockChart();
             },
             populateCards: () => {
-                const cardsDashboard = state.cardsData?.cardsDashboard;
+                const cardsDashboard = state.cardsData?.cardsDashboard ?? [];
 
                 if (cardsDashboard) {
                     cardSalesQtyRef.value.textContent = cardsDashboard.salesTotal || 0;
@@ -128,6 +160,7 @@
                         { field: 'product.name', headerText: 'Product', width: 150 },
                         { field: 'total', headerText: 'Total', width: 70, type: 'number', format: 'N2', textAlign: 'Right' },
                     ],
+                    emptyRecordTemplate: 'No sales orders available'
                 }, salesOrderGridRef.value);
             },
             populateInventoryTransactionGrid: () => {
@@ -251,8 +284,8 @@
                         palettes: ["#E94649", "#F6B53F", "#009CFF", "#C4C24A"],
                     },
                     customerCategoryChartRef.value);
-            },
-            populatePurchaseByVendorCategoryChart: () => {
+                },
+                populatePurchaseByVendorCategoryChart: () => {
                 const purchaseByVendorCategoryDashboard = state.purchaseData?.purchaseByVendorCategoryDashboard ?? [];
                 new ej.charts.Chart(
                     {
@@ -299,10 +332,17 @@
                 await SecurityManager.authorizePage(['Dashboards']);
                 await SecurityManager.validateToken();
                 debugger;
-                await methods.populateCardsData();
-                await methods.populateSalesData();
-                await methods.populatePurchaseData();
-                await methods.populateInventoryData();
+                await loadAllDashboardData();
+
+                // 👇 LISTEN FOR NAVBAR FILTER CHANGES
+                window.addEventListener("dashboardFiltersChanged", async () => {
+                    await loadAllDashboardData();
+                });
+
+                //await methods.populateCardsData();
+                //await methods.populateSalesData();
+                //await methods.populatePurchaseData();
+                //await methods.populateInventoryData();
 
                 
 
