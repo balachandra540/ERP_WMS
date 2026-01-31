@@ -225,10 +225,15 @@
                 mainGrid.obj = new ej.grids.Grid({
                     height: "350px",
                     dataSource,
-                    allowPaging: true,
+                    allowFiltering: false,
                     allowSorting: true,
-                    allowFiltering: true,
-                    filterSettings: { type: "CheckBox" },
+                    allowSelection: true,
+                    allowGrouping: false,
+                    allowTextWrap: true,
+                    allowResizing: true,
+                    allowPaging: false,
+                    allowSearching: false,
+                    allowExcelExport: true,                    
                     pageSettings: { pageSize: 50 },
                     toolbar: [
                         'Search',

@@ -41,13 +41,8 @@ public class GetActiveProductDiscountDefinitionListHandler
     {
         var items = await _context.ProductDiscountDefinition
             .Where(x => x.IsActive && !x.IsDeleted)
-            .GroupBy(x => x.ProductId)
-            .Select(g => g
-                .OrderByDescending(x => x.EffectiveFrom)
-                .FirstOrDefault())
-            .OrderByDescending(x => x!.EffectiveFrom)
+            .OrderByDescending(x => x.EffectiveFrom)
             .ToListAsync(cancellationToken);
-
         return new GetActiveProductDiscountDefinitionListResult
         {
             Data = items
