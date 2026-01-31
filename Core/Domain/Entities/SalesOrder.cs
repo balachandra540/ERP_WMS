@@ -13,10 +13,14 @@ public class SalesOrder : BaseEntity
     public Customer? Customer { get; set; }
     public string? TaxId { get; set; }
     public Tax? Tax { get; set; }
-    public double? BeforeTaxAmount { get; set; }
-    public double? TaxAmount { get; set; }
-    public double? AfterTaxAmount { get; set; }
+
+    // 🔥 FINANCIAL SUMMARY COLUMNS
+    public double? BeforeTaxAmount { get; set; }      // Gross Total (Pre-Discount)
+    public double? TotalDiscountAmount { get; set; }  // Sum of all line savings
+    public double? TaxAmount { get; set; }           // Calculated Tax amount
+    public double? AfterTaxAmount { get; set; }       // Final Net Payable
+
     public string? LocationId { get; set; }
-        
+
     public ICollection<SalesOrderItem> SalesOrderItemList { get; set; } = new List<SalesOrderItem>();
 }

@@ -1,5 +1,6 @@
 ﻿using Domain.Entities;
 using Infrastructure.DataAccessManager.EFCore.Common;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using static Domain.Common.Constants;
 
@@ -17,6 +18,18 @@ public class SalesOrderItemConfiguration : BaseEntityConfiguration<SalesOrderIte
         builder.Property(x => x.UnitPrice).IsRequired(false);
         builder.Property(x => x.Quantity).IsRequired(false);
         builder.Property(x => x.Total).IsRequired(false);
+        // ⭐ FIXED: Use 0.0 (double) instead of 0 (int) to match double? properties
+        builder.Property(x => x.DiscountPercentage)
+            .IsRequired(false)
+            .HasDefaultValue(0.0);
+
+        builder.Property(x => x.DiscountAmount)
+            .IsRequired(false)
+            .HasDefaultValue(0.0);
+
+        builder.Property(x => x.GrossAmount)
+            .IsRequired(false)
+            .HasDefaultValue(0.0);
         // ⭐ NEW: PLU Code field mapping
         builder.Property(x => x.PluCode)
        .IsRequired(false);

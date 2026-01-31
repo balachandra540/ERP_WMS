@@ -1,5 +1,6 @@
 ﻿using Domain.Entities;
 using Infrastructure.DataAccessManager.EFCore.Common;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using static Domain.Common.Constants;
 
@@ -20,7 +21,10 @@ public class SalesOrderConfiguration : BaseEntityConfiguration<SalesOrder>
         builder.Property(x => x.BeforeTaxAmount).IsRequired(false);
         builder.Property(x => x.TaxAmount).IsRequired(false);
         builder.Property(x => x.AfterTaxAmount).IsRequired(false);
-
+        // ⭐ NEW: Total Discount mapping for the header
+        builder.Property(x => x.TotalDiscountAmount)
+            .IsRequired(false)
+            .HasDefaultValue(0.0); // 👈 Changed 0 to 0.0
         builder.HasIndex(e => e.Number);
     }
 }

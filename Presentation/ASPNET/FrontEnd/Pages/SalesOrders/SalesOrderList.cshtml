@@ -110,21 +110,35 @@
                                     <div class="card-body">
                                         <div class="row justify-content-end">
                                             <div class="col-md-6">
+
                                                 <div class="d-flex justify-content-between py-2 border-bottom">
-                                                    <span class="fw-bold">Subtotal</span>
+                                                    <span class="fw-bold">Total of All Items (Before Tax & Discount)</span>
                                                     <span id="SubTotalAmount">{{ state.subTotalAmount }}</span>
                                                 </div>
+
                                                 <div class="d-flex justify-content-between py-2 border-bottom">
-                                                    <span class="fw-bold">Tax</span>
+                                                    <span class="fw-bold">Discount Applied</span>
+                                                    <span id="DiscountAmount" class="text-danger">
+                                                        − {{ state.discountAmount }}
+                                                    </span>
+                                                </div>
+
+                                                <div class="d-flex justify-content-between py-2 border-bottom">
+                                                    <span class="fw-bold">Tax Amount</span>
                                                     <span id="TaxAmount">{{ state.taxAmount }}</span>
                                                 </div>
+
                                                 <div class="d-flex justify-content-between py-2">
-                                                    <span class="fw-bold">Total Amount</span>
-                                                    <span id="TotalAmount" class="fw-bold text-success">{{ state.totalAmount }}</span>
+                                                    <span class="fw-bold">Total Payable</span>
+                                                    <span id="TotalAmount" class="fw-bold text-success">
+                                                        {{ state.totalAmount }}
+                                                    </span>
                                                 </div>
+
                                             </div>
                                         </div>
                                     </div>
+
                                 </div>
                             </div>
                         </div>
