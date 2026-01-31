@@ -1112,13 +1112,13 @@ const App = {
             }
         };
 
-        Vue.watch(
-            () => state.receiveDate,
-            (newVal, oldVal) => {
-                receiveDatePicker.refresh();
-                state.errors.receiveDate = '';
-            }
-        );
+        //Vue.watch(
+        //    () => state.receiveDate,
+        //    (newVal, oldVal) => {
+        //        receiveDatePicker.refresh();
+        //        state.errors.receiveDate = '';
+        //    }
+        //);
         const setDefaultDate = () => {
             if (!state.receiveDate) {
                 state.receiveDate = new Date();

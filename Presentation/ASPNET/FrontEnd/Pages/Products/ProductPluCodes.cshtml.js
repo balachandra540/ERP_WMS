@@ -1,4 +1,10 @@
-﻿//const state = Vue.reactive({
+﻿/// <reference path="../../../wwwroot/content/scripts/jsbarcode.all.min.js" />
+/// <reference path="../../../wwwroot/content/scripts/jsbarcode.all.min.js" />
+/// <reference path="../../../wwwroot/content/scripts/jsbarcode.all.min.js" />
+/// <reference path="../../../wwwroot/content/scripts/jsbarcode.all.min.js" />
+/// <reference path="../../../wwwroot/content/scripts/jsbarcode.all.min.js" />
+/// <reference path="../../../wwwroot/content/scripts/jsbarcode.all.min.js" />
+//const state = Vue.reactive({
 //    pluCodes: [],
 //    isLoadingPlu: false,
 //    loadError: ''
@@ -149,6 +155,8 @@ const App = {
             </div>
         `;
                 }
+                //<script src="~/wwwroot/content/scripts/jsbarcode.all.min.js"></script>
+                
 
 
                 printWindow.document.write(`
