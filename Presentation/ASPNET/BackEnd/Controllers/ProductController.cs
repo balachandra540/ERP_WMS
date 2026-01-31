@@ -245,6 +245,107 @@ public class ProductController : BaseApiController
         });
     }
 
+    
+        // -----------------------------
+        // CREATE
+        //------------------------------
+        [Authorize]
+        [HttpPost("CreateProductDiscountDefinition")]
+        public async Task<ActionResult<ApiSuccessResult<CreateProductDiscountDefinitionResult>>>
+            CreateProductDiscountDefinitionAsync(
+                CreateProductDiscountDefinitionRequest request,
+                CancellationToken cancellationToken)
+        {
+            var response = await _sender.Send(request, cancellationToken);
+
+            return Ok(new ApiSuccessResult<CreateProductDiscountDefinitionResult>
+            {
+                Code = StatusCodes.Status200OK,
+                Message = $"Success executing {nameof(CreateProductDiscountDefinitionAsync)}",
+                Content = response
+            });
+        }
+
+        // -----------------------------
+        // UPDATE
+        //------------------------------
+        [Authorize]
+        [HttpPost("UpdateProductDiscountDefinition")]
+        public async Task<ActionResult<ApiSuccessResult<UpdateProductDiscountDefinitionResult>>>
+            UpdateProductDiscountDefinitionAsync(
+                UpdateProductDiscountDefinitionRequest request,
+                CancellationToken cancellationToken)
+        {
+            var response = await _sender.Send(request, cancellationToken);
+
+            return Ok(new ApiSuccessResult<UpdateProductDiscountDefinitionResult>
+            {
+                Code = StatusCodes.Status200OK,
+                Message = $"Success executing {nameof(UpdateProductDiscountDefinitionAsync)}",
+                Content = response
+            });
+        }
+
+        // -----------------------------
+        // DELETE
+        //------------------------------
+        [Authorize]
+        [HttpPost("DeleteProductDiscountDefinition")]
+        public async Task<ActionResult<ApiSuccessResult<DeleteProductDiscountDefinitionResult>>>
+            DeleteProductDiscountDefinitionAsync(
+                DeleteProductDiscountDefinitionRequest request,
+                CancellationToken cancellationToken)
+        {
+            var response = await _sender.Send(request, cancellationToken);
+
+            return Ok(new ApiSuccessResult<DeleteProductDiscountDefinitionResult>
+            {
+                Code = StatusCodes.Status200OK,
+                Message = $"Success executing {nameof(DeleteProductDiscountDefinitionAsync)}",
+                Content = response
+            });
+        }
+
+        // -----------------------------
+        // GET LIST (ACTIVE / ALL)
+        //------------------------------
+        [Authorize]
+        [HttpGet("GetProductDiscountDefinitionList")]
+        public async Task<ActionResult<ApiSuccessResult<GetProductDiscountDefinitionListResult>>>
+            GetProductDiscountDefinitionListAsync(
+                CancellationToken cancellationToken)
+        {
+            var request = new GetProductDiscountDefinitionListRequest();
+            var response = await _sender.Send(request, cancellationToken);
+
+            return Ok(new ApiSuccessResult<GetProductDiscountDefinitionListResult>
+            {
+                Code = StatusCodes.Status200OK,
+                Message = $"Success executing {nameof(GetProductDiscountDefinitionListAsync)}",
+                Content = response
+            });
+        }
+
+    [Authorize]
+    [HttpGet("GetActiveProductDiscountDefinitionList")]
+    public async Task<ActionResult<ApiSuccessResult<GetActiveProductDiscountDefinitionListResult>>>
+GetActiveProductDiscountDefinitionListAsync(
+    CancellationToken cancellationToken)
+    {
+        var request = new GetActiveProductDiscountDefinitionListRequest();
+
+        var response = await _sender.Send(request, cancellationToken);
+
+        return Ok(new ApiSuccessResult<GetActiveProductDiscountDefinitionListResult>
+        {
+            Code = StatusCodes.Status200OK,
+            Message = $"Success executing {nameof(GetActiveProductDiscountDefinitionListAsync)}",
+            Content = response
+        });
+    }
+
+
+
     //public async Task<ActionResult<ApiSuccessResult<GetProductAndGoodsReceiveByPluResult>>>
     //GetProductAndGoodsReceiveByPluAsync(
     //    [FromQuery] int plu,

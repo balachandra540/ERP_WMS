@@ -997,6 +997,7 @@ const App = {
             secondaryData: [],
             productListLookupData: [],
             priceDefinitionListLookupData: [],
+            discountDefinitionListLookupData: [],
             activeDetailRow: [],
             //scannedPluAttributesData:[],
             mainTitle: '',
@@ -1535,6 +1536,17 @@ const App = {
                     throw error;
                 }
             },
+            getDiscountDefinitionListLookupData: async () => {
+                try {
+                    const response = await AxiosManager.get(
+                        '/Product/GetActiveProductDiscountDefinitionList',
+                        {}
+                    );
+                    return response;
+                } catch (error) {
+                    throw error;
+                }
+            },
             getProductIdByPLU: async (pluCode) => {
                 try {
                     const response = await AxiosManager.get(
@@ -1785,6 +1797,11 @@ const App = {
             populateProductActivePriceLookupData : async () => {
                 const response = await services.getpriceDefinitionListLookupData();
                 state.priceDefinitionListLookupData = response?.data?.content?.data;
+            },
+            populateProductActiveDiscountLookupData: async () => {
+                const response = await services.getDiscountDefinitionListLookupData();
+                state.discountDefinitionListLookupData =
+                    response?.data?.content?.data ?? [];
             },
             refreshPaymentSummary: async (id) => {
                 const record = state.mainData.find(item => item.id === id);
@@ -3430,20 +3447,29 @@ const App = {
         const secondaryGrid = {
             obj: null,
 
-            // 🔥 ADD BATCH TRACKING
             manualBatchChanges: {
                 addedRecords: [],
                 changedRecords: [],
                 deletedRecords: []
             },
+
             create: async (dataSource) => {
                 secondaryGrid.obj = new ej.grids.Grid({
                     height: 400,
-                    dataSource: dataSource,
-                    editSettings: { allowEditing: true, allowAdding: true, allowDeleting: true, showDeleteConfirmDialog: true, mode: 'Normal', allowEditOnDblClick: true },
-                    created: function () {
+                    dataSource,
+                    editSettings: {
+                        allowEditing: true,
+                        allowAdding: true,
+                        allowDeleting: true,
+                        showDeleteConfirmDialog: true,
+                        mode: 'Normal',
+                        allowEditOnDblClick: true
+                    },
+
+                    created() {
                         gridObj = this;
                     },
+
                     allowFiltering: false,
                     allowSorting: true,
                     allowSelection: true,
@@ -3451,559 +3477,799 @@ const App = {
                     allowTextWrap: true,
                     allowResizing: true,
                     allowPaging: false,
-                    allowSearching: false,
-                    allowExcelExport: true,
-                    filterSettings: { type: 'CheckBox' },
-                    sortSettings: { columns: [{ field: 'productName', direction: 'Descending' }] },
-                    pageSettings: { currentPage: 1, pageSize: 50, pageSizes: ["10", "20", "50", "100", "200", "All"] },
-                    selectionSettings: { persistSelection: true, type: 'Single' },
-                    autoFit: false,
-                    showColumnMenu: false,
                     gridLines: 'Horizontal',
+
                     columns: [
                         { type: 'checkbox', width: 60 },
-                        {
-                            field: 'id', isPrimaryKey: true, headerText: 'Id', visible: false
-                        },
-                        {
-                            field: "pluCode",
-                            headerText: "PLU Code",
-                            width: 140,
-                            editType: "stringedit",
-                            validationRules: { required: true },
+                        { field: 'id', isPrimaryKey: true, visible: false },
 
+                        // =========================
+                        // PLU CODE
+                        // =========================
+                        {
+                            field: 'pluCode',
+                            headerText: 'PLU Code',
+                            width: 140,
+                            validationRules: { required: true },
                             edit: {
-                                create: () => {
-                                    let pluElem = document.createElement("input");
-                                    return pluElem;
-                                },
+                                create: () => document.createElement('input'),
                                 read: () => pluObj?.value,
                                 destroy: () => pluObj?.destroy(),
 
                                 write: (args) => {
                                     pluObj = new ej.inputs.TextBox({
-                                        value: args.rowData.pluCode ?? "",
+                                        value: args.rowData.pluCode ?? '',
                                         cssClass: 'plu-editor',
-                                        placeholder: "Enter 5+ characters"
+                                        placeholder: 'Enter 5+ characters'
                                     });
 
                                     pluObj.appendTo(args.element);
-                                  
-                                    const inputElement = pluObj.element;
 
-                                    inputElement.addEventListener('keydown', (e) => {
-                                        const key = e.key;
-                                        const isValidKey = /^[a-zA-Z0-9]$/.test(key) ||
-                                            ['Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'Tab', 'Enter'].includes(key);
+                                    const resolveProduct = async () => {
+                                        const enteredPLU = pluObj.value?.trim();
+                                        if (!enteredPLU || enteredPLU.length < 5) return;
 
-                                        if (!isValidKey) {
-                                            e.preventDefault();
-                                            console.log('❌ Invalid character blocked:', key);
-                                        }
-                                    });
+                                        const result = await services.getProductIdByPLU(enteredPLU);
+                                        const productId = result?.data?.content?.productId;
 
-                                    inputElement.addEventListener('keyup', async (e) => {
-                                        const enteredPLU = inputElement.value?.trim() ?? "";
-
-                                        console.log('⬆️ KEYUP Event - PLU:', enteredPLU, 'Length:', enteredPLU.length);
-
-                                        if (enteredPLU.length < 5) {
-                                            console.log('⏳ Waiting for more characters... (' + enteredPLU.length + '/5)');
+                                        if (!productId) {
+                                            Swal.fire('Invalid PLU', 'No product found', 'warning');
                                             return;
                                         }
 
-                                        try {
-                                            console.log('📡 Calling API for PLU:', enteredPLU);
-                                            const result = await services.getProductIdByPLU(enteredPLU);
-                                            const productId = result?.data?.content?.productId;
+                                        args.rowData.productId = productId;
 
-                                            if (!productId) {
-                                                Swal.fire({
-                                                    icon: 'warning',
-                                                    title: 'Invalid PLU',
-                                                    text: 'No product found for this PLU code',
-                                                    timer: 2000,
-                                                    showConfirmButton: false
-                                                });
-                                                console.log('❌ No product found for PLU:', enteredPLU);
-                                                return;
-                                            }
+                                        const product =
+                                            state.productListLookupData.find(x => x.id === productId);
 
-                                            console.log('✅ Product found - ID:', productId);
+                                        // 🔥 SALE PRICE (priority)
+                                        const priceDef =
+                                            state.priceDefinitionListLookupData
+                                                ?.find(x => x.productId === productId && x.isActive);
 
-                                            args.rowData.productId = productId;
+                                        const salePrice = priceDef
+                                            ? priceDef.salePrice
+                                            : product.unitPrice;
 
-                                            if (productObj) {
-                                                productObj.value = productId;
-                                                productObj.dataBind();
-                                                productObj.change({ value: productId });
+                                        // 🔥 DISCOUNT
+                                        const discountDef =
+                                            state.discountDefinitionListLookupData
+                                                ?.find(x => x.productId === productId && x.isActive);
 
-                                                const GridData = gridObj.dataSource;
-                                                // 🔎 check if same product already exists
-                                                const existingRow = GridData.find(r => r.productId === productId);
-                                                if (existingRow && existingRow.pluCode === enteredPLU) {
-                                                    // ✅ SAME ITEM  AGAIN
-                                                    existingRow.quantity = (existingRow.quantity || 1) + 1;
-                                                    const price = existingRow.price || existingRow.unitPrice;
-                                                    existingRow.total = existingRow.quantity * price;
-                                                    gridObj.refresh();
-                                                    return; // ⛔ stop further processing
-                                                }
-                                                else {
-                                                    const priceDef = state.priceDefinitionListLookupData
-                                                        ?.find(x => x.productId === productId && x.isActive);
-                                                    const selectedProduct = state.productListLookupData.find(item => item.id === productObj.value);
+                                        const discountAmount =
+                                            calculateDiscountAmount(salePrice, discountDef);
 
-                                                    const finalPrice = priceDef ? priceDef.salePrice : selectedProduct.unitPrice;
-                                                    if (quantityObj) {
-                                                        quantityObj.value = 1;
-                                                        if (totalObj) totalObj.value = finalPrice * quantityObj.value;
-                                                    }
-                                                }
+                                        const finalPrice = salePrice - discountAmount;
 
-                                            }
-                                            
-                                        }
-                                        catch (error) {
-                                            console.error('❌ KEYUP Error:', error);
-                                            Swal.fire({
-                                                icon: 'error',
-                                                title: 'Error',
-                                                text: 'Failed to fetch product details',
-                                                timer: 2000
-                                            });
-                                        }
-                                    });
+                                        // 🔥 ASSIGN VALUES
+                                        args.rowData.unitPrice = finalPrice;
+                                        args.rowData.discountPercentage =
+                                            discountDef?.discountPercentage ?? 0;
+                                        args.rowData.discountAmount = discountAmount;
+                                        args.rowData.quantity = 1;
+                                        args.rowData.total = finalPrice;
 
-                                    inputElement.addEventListener('change', async (e) => {
-                                        const enteredPLU = inputElement.value?.trim() ?? "";
+                                        if (priceObj) priceObj.value = finalPrice;
+                                        if (quantityObj) quantityObj.value = 1;
+                                        if (totalObj) totalObj.value = finalPrice;
+                                    };
 
-                                        console.log('📝 CHANGE Event - PLU:', enteredPLU, 'Length:', enteredPLU.length);
-
-                                        if (!enteredPLU || enteredPLU.length < 5) {
-                                            console.log('❌ PLU too short, skipping API call');
-                                            return;
-                                        }
-
-                                        try {
-                                            console.log('📡 Calling API for PLU:', enteredPLU);
-                                            const result = await services.getProductIdByPLU(enteredPLU);
-                                            const productId = result?.data?.content?.productId;
-
-                                            if (!productId) {
-                                                Swal.fire({
-                                                    icon: 'warning',
-                                                    title: 'Invalid PLU',
-                                                    text: 'No product found for this PLU code',
-                                                    timer: 2000,
-                                                    showConfirmButton: false
-                                                });
-                                                console.log('❌ No product found for PLU:', enteredPLU);
-                                                return;
-                                            }
-
-                                            console.log('✅ Product found - ID:', productId);
-
-                                            args.rowData.productId = productId;
-
-                                            if (productObj) {
-                                                productObj.value = productId;
-                                                productObj.dataBind();
-                                                productObj.change({ value: productId });
-                                                const GridData = gridObj.dataSource;
-                                                // 🔎 check if same product already exists
-                                                const existingRow = GridData.find(r => r.productId === productId);
-                                                if (existingRow && existingRow.pluCode === enteredPLU) {
-                                                    // ✅ SAME ITEM  AGAIN
-                                                    existingRow.quantity = (existingRow.quantity || 1) + 1;
-                                                    const price = existingRow.price || existingRow.unitPrice;
-                                                    existingRow.total = existingRow.quantity * price;
-                                                    gridObj.refresh();
-                                                    return; // ⛔ stop further processing
-                                                }
-                                                else {
-                                                    const priceDef = state.priceDefinitionListLookupData
-                                                        ?.find(x => x.productId === productId && x.isActive);
-                                                    const selectedProduct = state.productListLookupData.find(item => item.id === productObj.value);
-
-                                                    const finalPrice = priceDef ? priceDef.salePrice : selectedProduct.unitPrice;
-                                                    if (quantityObj) {
-                                                        quantityObj.value = 1;
-                                                        if (totalObj) totalObj.value = finalPrice * quantityObj.value;
-                                                    }
-                                                }
-
-                                            }
-                                            
-                                        } catch (error) {
-                                            console.error('❌ CHANGE Error:', error);
-                                            Swal.fire({
-                                                icon: 'error',
-                                                title: 'Error',
-                                                text: 'Failed to fetch product details',
-                                                timer: 2000
-                                            });
-                                        }
-                                    });
+                                    pluObj.element.addEventListener('keyup', resolveProduct);
+                                    pluObj.element.addEventListener('change', resolveProduct);
                                 }
                             }
                         },
+
+                        // =========================
+                        // PRODUCT
+                        // =========================
                         {
                             field: 'productId',
                             headerText: 'Product',
                             width: 250,
-                            validationRules: { required: true },
                             allowEditing: false,
-                            disableHtmlEncode: false,
-
-                            valueAccessor: (field, data) => {
-                                const product = state.productListLookupData.find(x => x.id === data[field]);
-                                return product ? product.name : "";
-                            },
-
-                            editType: 'dropdownedit',
-                            edit: {
-                                create: () => {
-                                    let productElem = document.createElement("input");
-                                    return productElem;
-                                },
-                                read: () => productObj?.value,
-                                destroy: () => productObj?.destroy(),
-
-                                write: (args) => {
-                                    productObj = new ej.dropdowns.DropDownList({
-                                        dataSource: state.productListLookupData,
-                                        fields: { value: 'id', text: 'name' },
-                                        value: args.rowData.productId,
-
-                                        enabled: false,
-
-                                        change: (e) => {
-                                            const selectedProduct = state.productListLookupData.find(item => item.id === e.value);
-                                            if (!selectedProduct) return;
-
-                                            args.rowData.productId = selectedProduct.id;
-
-                                            if (numberObj) numberObj.value = selectedProduct.number;
-
-                                            const priceDef = state.priceDefinitionListLookupData
-                                                ?.find(x => x.productId === selectedProduct.id && x.isActive);
-
-                                            const finalPrice = priceDef ? priceDef.salePrice : selectedProduct.unitPrice;
-
-                                            if (priceObj) priceObj.value = finalPrice;
-
-                                            if (summaryObj) summaryObj.value = selectedProduct.description;
-
-                                            //if (quantityObj) {
-                                            //    quantityObj.value = 1;
-                                            //    if (totalObj) totalObj.value = finalPrice * quantityObj.value;
-                                            //}                                            
-                                        }
-                                    });
-
-                                    productObj.appendTo(args.element);
-                                }
-                            }
+                            valueAccessor: (f, d) =>
+                                state.productListLookupData.find(x => x.id === d[f])?.name ?? ''
                         },
+
+                        // =========================
+                        // UNIT PRICE (AFTER DISCOUNT)
+                        // =========================
                         {
                             field: 'unitPrice',
                             headerText: 'Unit Price',
-                            width: 200, validationRules: { required: true }, type: 'number', format: 'N2', textAlign: 'Right',
+                            width: 140,
+                            format: 'N2',
                             edit: {
-                                create: () => {
-                                    let priceElem = document.createElement('input');
-                                    return priceElem;
-                                },
-                                read: () => {
-                                    return priceObj.value;
-                                },
-                                destroy: () => {
-                                    priceObj.destroy();
-                                },
+                                create: () => document.createElement('input'),
+                                read: () => priceObj.value,
+                                destroy: () => priceObj.destroy(),
                                 write: (args) => {
                                     priceObj = new ej.inputs.NumericTextBox({
                                         value: args.rowData.unitPrice ?? 0,
-                                        change: (e) => {
-                                            if (quantityObj && totalObj) {
-                                                const total = e.value * quantityObj.value;
-                                                totalObj.value = total;
-                                            }
-                                        }
+                                        readonly: true
                                     });
                                     priceObj.appendTo(args.element);
                                 }
                             }
                         },
+
+                        // =========================
+                        // DISCOUNT %
+                        // =========================
+                        {
+                            field: 'discountPercentage',
+                            headerText: 'Discount %',
+                            width: 120,
+                            allowEditing: false
+                        },
+
+                        // =========================
+                        // DISCOUNT AMOUNT
+                        // =========================
+                        {
+                            field: 'discountAmount',
+                            headerText: 'Discount Amount',
+                            width: 140,
+                            format: 'N2',
+                            allowEditing: false
+                        },
+
+                        // =========================
+                        // QUANTITY
+                        // =========================
                         {
                             field: 'quantity',
                             headerText: 'Quantity',
-                            width: 200,
+                            width: 120,
                             validationRules: {
                                 required: true,
-                                custom: [(args) => {
-                                    return args['value'] > 0;
-                                }, 'Must be a positive number and not zero']
+                                custom: [
+                                    args => args.value > 0,
+                                    'Must be greater than zero'
+                                ]
                             },
-                            type: 'number', format: 'N2', textAlign: 'Right',
                             edit: {
-                                create: () => {
-                                    let quantityElem = document.createElement('input');
-                                    return quantityElem;
-                                },
-                                read: () => {
-                                    return quantityObj.value;
-                                },
-                                destroy: () => {
-                                    quantityObj.destroy();
-                                },
+                                create: () => document.createElement('input'),
+                                read: () => quantityObj.value,
+                                destroy: () => quantityObj.destroy(),
                                 write: (args) => {
                                     quantityObj = new ej.inputs.NumericTextBox({
-                                        value: args.rowData.quantity ?? 0,
-                                        change: (e) => {
-                                            if (priceObj && totalObj) {
-                                                const total = e.value * priceObj.value;
-                                                totalObj.value = total;
-                                            }
+                                        value: args.rowData.quantity ?? 1,
+                                        change: e => {
+                                            const total = e.value * priceObj.value;
+                                            totalObj.value = total;
+                                            args.rowData.total = total;
                                         }
                                     });
                                     quantityObj.appendTo(args.element);
                                 }
                             }
                         },
-                        {
-                            field: 'details',
-                            headerText: 'Attributes',
-                            width: 120,
-                            disableHtmlEncode: false,
 
-                            valueAccessor: (field, data) => {
-                                const product = state.productListLookupData.find(p => p.id === data.productId);
-                                if (!product) return '';
-                                debugger;
-                                const canShow =
-                                    product.imei1 || product.imei2 || product.serviceNo;
-
-                                if (!canShow) return '';   // hide link, not column
-
-                                return `
-        <a href="#" class="view-details" data-id="${data?.purchaseOrderItemId}">
-            Attributes
-        </a>
-    `;
-                            }
-                            ,
-
-                            // Needed to allow HTML inside cell
-                            allowEditing: false
-                        },
-                       
+                        // =========================
+                        // TOTAL
+                        // =========================
                         {
                             field: 'total',
                             headerText: 'Total',
-                            width: 200, validationRules: { required: false }, type: 'number', format: 'N2', textAlign: 'Right',
-                            edit: {
-                                create: () => {
-                                    let totalElem = document.createElement('input');
-                                    return totalElem;
-                                },
-                                read: () => {
-                                    return totalObj.value;
-                                },
-                                destroy: () => {
-                                    totalObj.destroy();
-                                },
-                                write: (args) => {
-                                    totalObj = new ej.inputs.NumericTextBox({
-                                        value: args.rowData.total ?? 0,
-                                        readonly: true
-                                    });
-                                    totalObj.appendTo(args.element);
-                                }
-                            }
-                        },
-                        {
-                            field: 'productNumber',
-                            headerText: 'Product Number',
-                            allowEditing: false,
-                            width: 180,
-                            edit: {
-                                create: () => {
-                                    let numberElem = document.createElement('input');
-                                    return numberElem;
-                                },
-                                read: () => {
-                                    return numberObj.value;
-                                },
-                                destroy: () => {
-                                    numberObj.destroy();
-                                },
-                                write: (args) => {
-                                    numberObj = new ej.inputs.TextBox();
-                                    numberObj.value = args.rowData.productNumber;
-                                    numberObj.readonly = true;
-                                    numberObj.appendTo(args.element);
-                                }
-                            }
-                        },
-                        {
-                            field: 'summary',
-                            headerText: 'Summary',
-                            width: 200,
-                            edit: {
-                                create: () => {
-                                    let summaryElem = document.createElement('input');
-                                    return summaryElem;
-                                },
-                                read: () => {
-                                    return summaryObj.value;
-                                },
-                                destroy: () => {
-                                    summaryObj.destroy();
-                                },
-                                write: (args) => {
-                                    summaryObj = new ej.inputs.TextBox();
-                                    summaryObj.value = args.rowData.summary;
-                                    summaryObj.appendTo(args.element);
-                                }
-                            }
-                        },
+                            width: 160,
+                            format: 'N2',
+                            allowEditing: false
+                        }
                     ],
-                    toolbar: [
-                        'ExcelExport',
-                        { type: 'Separator' },
-                        'Add', 'Edit', 'Delete', 'Update', 'Cancel',
-                    ],
-                    beforeDataBound: () => { },
-                    dataBound: () => {  },
-                    excelExportComplete: () => { },
-                    rowSelected: () => {
-                        if (secondaryGrid.obj.getSelectedRecords().length == 1) {
-                            secondaryGrid.obj.toolbarModule.enableItems(['Edit'], true);
-                        } else {
-                            secondaryGrid.obj.toolbarModule.enableItems(['Edit'], false);
-                        }
-                    },
-                    rowDeselected: () => {
-                        if (secondaryGrid.obj.getSelectedRecords().length == 1) {
-                            secondaryGrid.obj.toolbarModule.enableItems(['Edit'], true);
-                        } else {
-                            secondaryGrid.obj.toolbarModule.enableItems(['Edit'], false);
-                        }
-                    },
-                    rowSelecting: () => {
-                        if (secondaryGrid.obj.getSelectedRecords().length) {
-                            secondaryGrid.obj.clearSelection();
-                        }
-                    },
-                    toolbarClick: (args) => {
-                        if (args.item.id === 'SecondaryGrid_excelexport') {
-                            secondaryGrid.obj.excelExport();
-                        }
-                    },
-                    actionBegin: async function (args) {
-                        if (args.requestType === 'searching') {
-                            const searchText = args.searchString ?? "";
-                            // Search logic here
-                        }
-                    },
 
-                    // 🔥 UNCOMMENTED AND IMPLEMENTED actionComplete
-                    actionComplete: async (args) => {
-                        if (args.requestType === 'save' && args.action === 'add') {
-                            // 🔥 TRACK ADDED ROW
-                            secondaryGrid.manualBatchChanges.addedRecords.push(args.data);
-                            console.log('✅ Row Added:', args.data);
-                            console.log('📋 Current Batch Changes:', secondaryGrid.manualBatchChanges);
-                        }
+                    toolbar: ['Add', 'Edit', 'Delete', 'Update', 'Cancel'],
 
-                        if (args.requestType === 'save' && args.action === 'edit') {
-                            // 🔥 TRACK MODIFIED ROW (update if exists, else add)
-                            const index = secondaryGrid.manualBatchChanges.changedRecords.findIndex(
-                                r => r.id === args.data?.id
-                            );
-                            if (index > -1) {
-                                secondaryGrid.manualBatchChanges.changedRecords[index] = args.data;
-                            } else {
+                    actionComplete: (args) => {
+                        if (args.requestType === 'save') {
+                            if (args.action === 'add')
+                                secondaryGrid.manualBatchChanges.addedRecords.push(args.data);
+                            if (args.action === 'edit')
                                 secondaryGrid.manualBatchChanges.changedRecords.push(args.data);
-                            }
-                            console.log('🔄 Row Modified:', args.data);
-                            console.log('📋 Current Batch Changes:', secondaryGrid.manualBatchChanges);
                         }
 
                         if (args.requestType === 'delete') {
-                            // 🔥 TRACK DELETED ROW
                             secondaryGrid.manualBatchChanges.deletedRecords.push(args.data[0]);
-                            console.log('❌ Row Deleted:', args.data[0]);
-                            console.log('📋 Current Batch Changes:', secondaryGrid.manualBatchChanges);
                         }
-                        if (args.requestType === 'add') {
-                            // Wait for grid internal focus to finish
-                            setTimeout(() => {
-                                // Find the PLU input in the newly added row
-                                const pluInput = document.querySelector('.e-addedrow .plu-editor input');
-
-                                if (pluInput) {
-                                    // Focus and place cursor at end
-                                    pluInput.focus();
-                                    const length = pluInput.value.length;
-                                    pluInput.setSelectionRange(length, length);
-
-                                    console.log('🎯 Cursor placed in PLU input');
-                                }
-                            }, 150); // small delay to override checkbox auto-focus
-                        }
-                    },
-                    queryCellInfo: (args) => {
-                        if (args.column.field === 'details') {
-                            debugger;
-                            const link = args.cell.querySelector('.view-details');
-
-                            if (link) {
-                                link.addEventListener('click', (e) => {
-                                    debugger;
-                                    e.preventDefault();
-                                    
-                                    //            const rowIndex = args.element.closest('.e-row').rowIndex;
-                                    //            const rowObj = secondaryGrid.obj.getRowsObject()[rowIndex];
-                                    //            const rowData = rowObj.changes ?? rowObj.data;
-                                    //            const maxQty = parseFloat(rowData.remaingQuantity || 0);
-                                    //            const val = parseFloat(args.value || 0);
-                                    //            return val <= maxQty;
-                                    //        }, 'Received Qty cannot exceed Remaining Qty']
-                                    //const rowData = args.data;
-                                    const rowIndex = e.currentTarget.closest('.e-row').rowIndex;
-                                    const rowObj = secondaryGrid.obj.getRowsObject()[rowIndex];
-                                    methods.openDetailModal(rowIndex);
-                                });
-                            }
-                        }
-                    },
-
+                    }
                 });
+
                 secondaryGrid.obj.appendTo(secondaryGridRef.value);
             },
 
-            // 🔥 GET ALL BATCH CHANGES
-            getBatchChanges: () => {
-                return secondaryGrid.manualBatchChanges;
-            },
+            getBatchChanges: () => secondaryGrid.manualBatchChanges,
 
-            // 🔥 CLEAR BATCH CHANGES (after successful save)
             clearBatchChanges: () => {
                 secondaryGrid.manualBatchChanges = {
                     addedRecords: [],
                     changedRecords: [],
                     deletedRecords: []
                 };
-                console.log('✅ Batch changes cleared');
             },
 
             refresh: () => {
-                if (!secondaryGrid.obj) return;
                 secondaryGrid.obj.setProperties({ dataSource: state.secondaryData });
             }
         };
+
+    //    const secondaryGrid = {
+    //        obj: null,
+
+    //        // 🔥 ADD BATCH TRACKING
+    //        manualBatchChanges: {
+    //            addedRecords: [],
+    //            changedRecords: [],
+    //            deletedRecords: []
+    //        },
+    //        create: async (dataSource) => {
+    //            secondaryGrid.obj = new ej.grids.Grid({
+    //                height: 400,
+    //                dataSource: dataSource,
+    //                editSettings: { allowEditing: true, allowAdding: true, allowDeleting: true, showDeleteConfirmDialog: true, mode: 'Normal', allowEditOnDblClick: true },
+    //                created: function () {
+    //                    gridObj = this;
+    //                },
+    //                allowFiltering: false,
+    //                allowSorting: true,
+    //                allowSelection: true,
+    //                allowGrouping: false,
+    //                allowTextWrap: true,
+    //                allowResizing: true,
+    //                allowPaging: false,
+    //                allowSearching: false,
+    //                allowExcelExport: true,
+    //                filterSettings: { type: 'CheckBox' },
+    //                sortSettings: { columns: [{ field: 'productName', direction: 'Descending' }] },
+    //                pageSettings: { currentPage: 1, pageSize: 50, pageSizes: ["10", "20", "50", "100", "200", "All"] },
+    //                selectionSettings: { persistSelection: true, type: 'Single' },
+    //                autoFit: false,
+    //                showColumnMenu: false,
+    //                gridLines: 'Horizontal',
+    //                columns: [
+    //                    { type: 'checkbox', width: 60 },
+    //                    {
+    //                        field: 'id', isPrimaryKey: true, headerText: 'Id', visible: false
+    //                    },
+    //                    {
+    //                        field: "pluCode",
+    //                        headerText: "PLU Code",
+    //                        width: 140,
+    //                        editType: "stringedit",
+    //                        validationRules: { required: true },
+
+    //                        edit: {
+    //                            create: () => {
+    //                                let pluElem = document.createElement("input");
+    //                                return pluElem;
+    //                            },
+    //                            read: () => pluObj?.value,
+    //                            destroy: () => pluObj?.destroy(),
+
+    //                            write: (args) => {
+    //                                pluObj = new ej.inputs.TextBox({
+    //                                    value: args.rowData.pluCode ?? "",
+    //                                    cssClass: 'plu-editor',
+    //                                    placeholder: "Enter 5+ characters"
+    //                                });
+
+    //                                pluObj.appendTo(args.element);
+                                  
+    //                                const inputElement = pluObj.element;
+
+    //                                inputElement.addEventListener('keydown', (e) => {
+    //                                    const key = e.key;
+    //                                    const isValidKey = /^[a-zA-Z0-9]$/.test(key) ||
+    //                                        ['Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'Tab', 'Enter'].includes(key);
+
+    //                                    if (!isValidKey) {
+    //                                        e.preventDefault();
+    //                                        console.log('❌ Invalid character blocked:', key);
+    //                                    }
+    //                                });
+
+    //                                inputElement.addEventListener('keyup', async (e) => {
+    //                                    const enteredPLU = inputElement.value?.trim() ?? "";
+
+    //                                    console.log('⬆️ KEYUP Event - PLU:', enteredPLU, 'Length:', enteredPLU.length);
+
+    //                                    if (enteredPLU.length < 5) {
+    //                                        console.log('⏳ Waiting for more characters... (' + enteredPLU.length + '/5)');
+    //                                        return;
+    //                                    }
+
+    //                                    try {
+    //                                        console.log('📡 Calling API for PLU:', enteredPLU);
+    //                                        const result = await services.getProductIdByPLU(enteredPLU);
+    //                                        const productId = result?.data?.content?.productId;
+
+    //                                        if (!productId) {
+    //                                            Swal.fire({
+    //                                                icon: 'warning',
+    //                                                title: 'Invalid PLU',
+    //                                                text: 'No product found for this PLU code',
+    //                                                timer: 2000,
+    //                                                showConfirmButton: false
+    //                                            });
+    //                                            console.log('❌ No product found for PLU:', enteredPLU);
+    //                                            return;
+    //                                        }
+
+    //                                        console.log('✅ Product found - ID:', productId);
+
+    //                                        args.rowData.productId = productId;
+
+    //                                        if (productObj) {
+    //                                            productObj.value = productId;
+    //                                            productObj.dataBind();
+    //                                            productObj.change({ value: productId });
+
+    //                                            const GridData = gridObj.dataSource;
+    //                                            // 🔎 check if same product already exists
+    //                                            const existingRow = GridData.find(r => r.productId === productId);
+    //                                            if (existingRow && existingRow.pluCode === enteredPLU) {
+    //                                                // ✅ SAME ITEM  AGAIN
+    //                                                existingRow.quantity = (existingRow.quantity || 1) + 1;
+    //                                                const price = existingRow.price || existingRow.unitPrice;
+    //                                                existingRow.total = existingRow.quantity * price;
+    //                                                gridObj.refresh();
+    //                                                return; // ⛔ stop further processing
+    //                                            }
+    //                                            else {
+    //                                                const priceDef = state.priceDefinitionListLookupData
+    //                                                    ?.find(x => x.productId === productId && x.isActive);
+    //                                                const selectedProduct = state.productListLookupData.find(item => item.id === productObj.value);
+
+    //                                                const finalPrice = priceDef ? priceDef.salePrice : selectedProduct.unitPrice;
+    //                                                if (quantityObj) {
+    //                                                    quantityObj.value = 1;
+    //                                                    if (totalObj) totalObj.value = finalPrice * quantityObj.value;
+    //                                                }
+    //                                            }
+
+    //                                        }
+                                            
+    //                                    }
+    //                                    catch (error) {
+    //                                        console.error('❌ KEYUP Error:', error);
+    //                                        Swal.fire({
+    //                                            icon: 'error',
+    //                                            title: 'Error',
+    //                                            text: 'Failed to fetch product details',
+    //                                            timer: 2000
+    //                                        });
+    //                                    }
+    //                                });
+
+    //                                inputElement.addEventListener('change', async (e) => {
+    //                                    const enteredPLU = inputElement.value?.trim() ?? "";
+
+    //                                    console.log('📝 CHANGE Event - PLU:', enteredPLU, 'Length:', enteredPLU.length);
+
+    //                                    if (!enteredPLU || enteredPLU.length < 5) {
+    //                                        console.log('❌ PLU too short, skipping API call');
+    //                                        return;
+    //                                    }
+
+    //                                    try {
+    //                                        console.log('📡 Calling API for PLU:', enteredPLU);
+    //                                        const result = await services.getProductIdByPLU(enteredPLU);
+    //                                        const productId = result?.data?.content?.productId;
+
+    //                                        if (!productId) {
+    //                                            Swal.fire({
+    //                                                icon: 'warning',
+    //                                                title: 'Invalid PLU',
+    //                                                text: 'No product found for this PLU code',
+    //                                                timer: 2000,
+    //                                                showConfirmButton: false
+    //                                            });
+    //                                            console.log('❌ No product found for PLU:', enteredPLU);
+    //                                            return;
+    //                                        }
+
+    //                                        console.log('✅ Product found - ID:', productId);
+
+    //                                        args.rowData.productId = productId;
+
+    //                                        if (productObj) {
+    //                                            productObj.value = productId;
+    //                                            productObj.dataBind();
+    //                                            productObj.change({ value: productId });
+    //                                            const GridData = gridObj.dataSource;
+    //                                            // 🔎 check if same product already exists
+    //                                            const existingRow = GridData.find(r => r.productId === productId);
+    //                                            if (existingRow && existingRow.pluCode === enteredPLU) {
+    //                                                // ✅ SAME ITEM  AGAIN
+    //                                                existingRow.quantity = (existingRow.quantity || 1) + 1;
+    //                                                const price = existingRow.price || existingRow.unitPrice;
+    //                                                existingRow.total = existingRow.quantity * price;
+    //                                                gridObj.refresh();
+    //                                                return; // ⛔ stop further processing
+    //                                            }
+    //                                            else {
+    //                                                const priceDef = state.priceDefinitionListLookupData
+    //                                                    ?.find(x => x.productId === productId && x.isActive);
+    //                                                const selectedProduct = state.productListLookupData.find(item => item.id === productObj.value);
+
+    //                                                const finalPrice = priceDef ? priceDef.salePrice : selectedProduct.unitPrice;
+    //                                                if (quantityObj) {
+    //                                                    quantityObj.value = 1;
+    //                                                    if (totalObj) totalObj.value = finalPrice * quantityObj.value;
+    //                                                }
+    //                                            }
+
+    //                                        }
+                                            
+    //                                    } catch (error) {
+    //                                        console.error('❌ CHANGE Error:', error);
+    //                                        Swal.fire({
+    //                                            icon: 'error',
+    //                                            title: 'Error',
+    //                                            text: 'Failed to fetch product details',
+    //                                            timer: 2000
+    //                                        });
+    //                                    }
+    //                                });
+    //                            }
+    //                        }
+    //                    },
+    //                    {
+    //                        field: 'productId',
+    //                        headerText: 'Product',
+    //                        width: 250,
+    //                        validationRules: { required: true },
+    //                        allowEditing: false,
+    //                        disableHtmlEncode: false,
+
+    //                        valueAccessor: (field, data) => {
+    //                            const product = state.productListLookupData.find(x => x.id === data[field]);
+    //                            return product ? product.name : "";
+    //                        },
+
+    //                        editType: 'dropdownedit',
+    //                        edit: {
+    //                            create: () => {
+    //                                let productElem = document.createElement("input");
+    //                                return productElem;
+    //                            },
+    //                            read: () => productObj?.value,
+    //                            destroy: () => productObj?.destroy(),
+
+    //                            write: (args) => {
+    //                                productObj = new ej.dropdowns.DropDownList({
+    //                                    dataSource: state.productListLookupData,
+    //                                    fields: { value: 'id', text: 'name' },
+    //                                    value: args.rowData.productId,
+
+    //                                    enabled: false,
+
+    //                                    change: (e) => {
+    //                                        const selectedProduct = state.productListLookupData.find(item => item.id === e.value);
+    //                                        if (!selectedProduct) return;
+
+    //                                        args.rowData.productId = selectedProduct.id;
+
+    //                                        if (numberObj) numberObj.value = selectedProduct.number;
+
+    //                                        const priceDef = state.priceDefinitionListLookupData
+    //                                            ?.find(x => x.productId === selectedProduct.id && x.isActive);
+
+    //                                        const finalPrice = priceDef ? priceDef.salePrice : selectedProduct.unitPrice;
+
+    //                                        if (priceObj) priceObj.value = finalPrice;
+
+    //                                        if (summaryObj) summaryObj.value = selectedProduct.description;
+
+    //                                        //if (quantityObj) {
+    //                                        //    quantityObj.value = 1;
+    //                                        //    if (totalObj) totalObj.value = finalPrice * quantityObj.value;
+    //                                        //}                                            
+    //                                    }
+    //                                });
+
+    //                                productObj.appendTo(args.element);
+    //                            }
+    //                        }
+    //                    },
+    //                    {
+    //                        field: 'unitPrice',
+    //                        headerText: 'Unit Price',
+    //                        width: 200, validationRules: { required: true }, type: 'number', format: 'N2', textAlign: 'Right',
+    //                        edit: {
+    //                            create: () => {
+    //                                let priceElem = document.createElement('input');
+    //                                return priceElem;
+    //                            },
+    //                            read: () => {
+    //                                return priceObj.value;
+    //                            },
+    //                            destroy: () => {
+    //                                priceObj.destroy();
+    //                            },
+    //                            write: (args) => {
+    //                                priceObj = new ej.inputs.NumericTextBox({
+    //                                    value: args.rowData.unitPrice ?? 0,
+    //                                    change: (e) => {
+    //                                        if (quantityObj && totalObj) {
+    //                                            const total = e.value * quantityObj.value;
+    //                                            totalObj.value = total;
+    //                                        }
+    //                                    }
+    //                                });
+    //                                priceObj.appendTo(args.element);
+    //                            }
+    //                        }
+    //                    },
+    //                    {
+    //                        field: 'quantity',
+    //                        headerText: 'Quantity',
+    //                        width: 200,
+    //                        validationRules: {
+    //                            required: true,
+    //                            custom: [(args) => {
+    //                                return args['value'] > 0;
+    //                            }, 'Must be a positive number and not zero']
+    //                        },
+    //                        type: 'number', format: 'N2', textAlign: 'Right',
+    //                        edit: {
+    //                            create: () => {
+    //                                let quantityElem = document.createElement('input');
+    //                                return quantityElem;
+    //                            },
+    //                            read: () => {
+    //                                return quantityObj.value;
+    //                            },
+    //                            destroy: () => {
+    //                                quantityObj.destroy();
+    //                            },
+    //                            write: (args) => {
+    //                                quantityObj = new ej.inputs.NumericTextBox({
+    //                                    value: args.rowData.quantity ?? 0,
+    //                                    change: (e) => {
+    //                                        if (priceObj && totalObj) {
+    //                                            const total = e.value * priceObj.value;
+    //                                            totalObj.value = total;
+    //                                        }
+    //                                    }
+    //                                });
+    //                                quantityObj.appendTo(args.element);
+    //                            }
+    //                        }
+    //                    },
+    //                    {
+    //                        field: 'details',
+    //                        headerText: 'Attributes',
+    //                        width: 120,
+    //                        disableHtmlEncode: false,
+
+    //                        valueAccessor: (field, data) => {
+    //                            const product = state.productListLookupData.find(p => p.id === data.productId);
+    //                            if (!product) return '';
+    //                            debugger;
+    //                            const canShow =
+    //                                product.imei1 || product.imei2 || product.serviceNo;
+
+    //                            if (!canShow) return '';   // hide link, not column
+
+    //                            return `
+    //    <a href="#" class="view-details" data-id="${data?.purchaseOrderItemId}">
+    //        Attributes
+    //    </a>
+    //`;
+    //                        }
+    //                        ,
+
+    //                        // Needed to allow HTML inside cell
+    //                        allowEditing: false
+    //                    },
+                       
+    //                    {
+    //                        field: 'total',
+    //                        headerText: 'Total',
+    //                        width: 200, validationRules: { required: false }, type: 'number', format: 'N2', textAlign: 'Right',
+    //                        edit: {
+    //                            create: () => {
+    //                                let totalElem = document.createElement('input');
+    //                                return totalElem;
+    //                            },
+    //                            read: () => {
+    //                                return totalObj.value;
+    //                            },
+    //                            destroy: () => {
+    //                                totalObj.destroy();
+    //                            },
+    //                            write: (args) => {
+    //                                totalObj = new ej.inputs.NumericTextBox({
+    //                                    value: args.rowData.total ?? 0,
+    //                                    readonly: true
+    //                                });
+    //                                totalObj.appendTo(args.element);
+    //                            }
+    //                        }
+    //                    },
+    //                    {
+    //                        field: 'productNumber',
+    //                        headerText: 'Product Number',
+    //                        allowEditing: false,
+    //                        width: 180,
+    //                        edit: {
+    //                            create: () => {
+    //                                let numberElem = document.createElement('input');
+    //                                return numberElem;
+    //                            },
+    //                            read: () => {
+    //                                return numberObj.value;
+    //                            },
+    //                            destroy: () => {
+    //                                numberObj.destroy();
+    //                            },
+    //                            write: (args) => {
+    //                                numberObj = new ej.inputs.TextBox();
+    //                                numberObj.value = args.rowData.productNumber;
+    //                                numberObj.readonly = true;
+    //                                numberObj.appendTo(args.element);
+    //                            }
+    //                        }
+    //                    },
+    //                    {
+    //                        field: 'summary',
+    //                        headerText: 'Summary',
+    //                        width: 200,
+    //                        edit: {
+    //                            create: () => {
+    //                                let summaryElem = document.createElement('input');
+    //                                return summaryElem;
+    //                            },
+    //                            read: () => {
+    //                                return summaryObj.value;
+    //                            },
+    //                            destroy: () => {
+    //                                summaryObj.destroy();
+    //                            },
+    //                            write: (args) => {
+    //                                summaryObj = new ej.inputs.TextBox();
+    //                                summaryObj.value = args.rowData.summary;
+    //                                summaryObj.appendTo(args.element);
+    //                            }
+    //                        }
+    //                    },
+    //                ],
+    //                toolbar: [
+    //                    'ExcelExport',
+    //                    { type: 'Separator' },
+    //                    'Add', 'Edit', 'Delete', 'Update', 'Cancel',
+    //                ],
+    //                beforeDataBound: () => { },
+    //                dataBound: () => {  },
+    //                excelExportComplete: () => { },
+    //                rowSelected: () => {
+    //                    if (secondaryGrid.obj.getSelectedRecords().length == 1) {
+    //                        secondaryGrid.obj.toolbarModule.enableItems(['Edit'], true);
+    //                    } else {
+    //                        secondaryGrid.obj.toolbarModule.enableItems(['Edit'], false);
+    //                    }
+    //                },
+    //                rowDeselected: () => {
+    //                    if (secondaryGrid.obj.getSelectedRecords().length == 1) {
+    //                        secondaryGrid.obj.toolbarModule.enableItems(['Edit'], true);
+    //                    } else {
+    //                        secondaryGrid.obj.toolbarModule.enableItems(['Edit'], false);
+    //                    }
+    //                },
+    //                rowSelecting: () => {
+    //                    if (secondaryGrid.obj.getSelectedRecords().length) {
+    //                        secondaryGrid.obj.clearSelection();
+    //                    }
+    //                },
+    //                toolbarClick: (args) => {
+    //                    if (args.item.id === 'SecondaryGrid_excelexport') {
+    //                        secondaryGrid.obj.excelExport();
+    //                    }
+    //                },
+    //                actionBegin: async function (args) {
+    //                    if (args.requestType === 'searching') {
+    //                        const searchText = args.searchString ?? "";
+    //                        // Search logic here
+    //                    }
+    //                },
+
+    //                // 🔥 UNCOMMENTED AND IMPLEMENTED actionComplete
+    //                actionComplete: async (args) => {
+    //                    if (args.requestType === 'save' && args.action === 'add') {
+    //                        // 🔥 TRACK ADDED ROW
+    //                        secondaryGrid.manualBatchChanges.addedRecords.push(args.data);
+    //                        console.log('✅ Row Added:', args.data);
+    //                        console.log('📋 Current Batch Changes:', secondaryGrid.manualBatchChanges);
+    //                    }
+
+    //                    if (args.requestType === 'save' && args.action === 'edit') {
+    //                        // 🔥 TRACK MODIFIED ROW (update if exists, else add)
+    //                        const index = secondaryGrid.manualBatchChanges.changedRecords.findIndex(
+    //                            r => r.id === args.data?.id
+    //                        );
+    //                        if (index > -1) {
+    //                            secondaryGrid.manualBatchChanges.changedRecords[index] = args.data;
+    //                        } else {
+    //                            secondaryGrid.manualBatchChanges.changedRecords.push(args.data);
+    //                        }
+    //                        console.log('🔄 Row Modified:', args.data);
+    //                        console.log('📋 Current Batch Changes:', secondaryGrid.manualBatchChanges);
+    //                    }
+
+    //                    if (args.requestType === 'delete') {
+    //                        // 🔥 TRACK DELETED ROW
+    //                        secondaryGrid.manualBatchChanges.deletedRecords.push(args.data[0]);
+    //                        console.log('❌ Row Deleted:', args.data[0]);
+    //                        console.log('📋 Current Batch Changes:', secondaryGrid.manualBatchChanges);
+    //                    }
+    //                    if (args.requestType === 'add') {
+    //                        // Wait for grid internal focus to finish
+    //                        setTimeout(() => {
+    //                            // Find the PLU input in the newly added row
+    //                            const pluInput = document.querySelector('.e-addedrow .plu-editor input');
+
+    //                            if (pluInput) {
+    //                                // Focus and place cursor at end
+    //                                pluInput.focus();
+    //                                const length = pluInput.value.length;
+    //                                pluInput.setSelectionRange(length, length);
+
+    //                                console.log('🎯 Cursor placed in PLU input');
+    //                            }
+    //                        }, 150); // small delay to override checkbox auto-focus
+    //                    }
+    //                },
+    //                queryCellInfo: (args) => {
+    //                    if (args.column.field === 'details') {
+    //                        debugger;
+    //                        const link = args.cell.querySelector('.view-details');
+
+    //                        if (link) {
+    //                            link.addEventListener('click', (e) => {
+    //                                debugger;
+    //                                e.preventDefault();
+                                    
+    //                                //            const rowIndex = args.element.closest('.e-row').rowIndex;
+    //                                //            const rowObj = secondaryGrid.obj.getRowsObject()[rowIndex];
+    //                                //            const rowData = rowObj.changes ?? rowObj.data;
+    //                                //            const maxQty = parseFloat(rowData.remaingQuantity || 0);
+    //                                //            const val = parseFloat(args.value || 0);
+    //                                //            return val <= maxQty;
+    //                                //        }, 'Received Qty cannot exceed Remaining Qty']
+    //                                //const rowData = args.data;
+    //                                const rowIndex = e.currentTarget.closest('.e-row').rowIndex;
+    //                                const rowObj = secondaryGrid.obj.getRowsObject()[rowIndex];
+    //                                methods.openDetailModal(rowIndex);
+    //                            });
+    //                        }
+    //                    }
+    //                },
+
+    //            });
+    //            secondaryGrid.obj.appendTo(secondaryGridRef.value);
+    //        },
+
+    //        // 🔥 GET ALL BATCH CHANGES
+    //        getBatchChanges: () => {
+    //            return secondaryGrid.manualBatchChanges;
+    //        },
+
+    //        // 🔥 CLEAR BATCH CHANGES (after successful save)
+    //        clearBatchChanges: () => {
+    //            secondaryGrid.manualBatchChanges = {
+    //                addedRecords: [],
+    //                changedRecords: [],
+    //                deletedRecords: []
+    //            };
+    //            console.log('✅ Batch changes cleared');
+    //        },
+
+    //        refresh: () => {
+    //            if (!secondaryGrid.obj) return;
+    //            secondaryGrid.obj.setProperties({ dataSource: state.secondaryData });
+    //        }
+    //    };
 
         // Modals
         const mainModal = {

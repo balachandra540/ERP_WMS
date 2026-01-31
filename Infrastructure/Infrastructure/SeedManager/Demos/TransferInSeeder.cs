@@ -40,7 +40,7 @@ public class TransferInSeeder
 
         var transferOuts = await _transferOutRepository
             .GetQuery()
-            .Where(x => x.Status >= TransferStatus.Confirmed)
+            .Where(x => x.Status >= TransferStatus.Approved)
             .ToListAsync();
 
         foreach (var transferOut in transferOuts)

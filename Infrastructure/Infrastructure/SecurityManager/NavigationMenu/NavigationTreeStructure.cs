@@ -148,6 +148,11 @@ public static class NavigationTreeStructure
                     "IsModule": false
                 },
                 {
+                    "URL": "/Products/ProductDiscountDefinition",
+                    "Name": "Discount Definition",
+                    "IsModule": false
+                },
+                {
                     "URL": "/GoodsReceives/GoodsReceiveList",
                     "Name": "Goods Receive",
                     "IsModule": false
@@ -233,6 +238,11 @@ public static class NavigationTreeStructure
             "Name": "Membership",
             "IsModule": true,
             "Children": [
+             {
+                    "URL": "/Users/UserGroupList",
+                    "Name": "User Group",
+                    "IsModule": false
+                },
                 {
                     "URL": "/Users/UserList",
                     "Name": "Users",
