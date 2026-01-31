@@ -126,7 +126,8 @@
                     cardSalesReturnQtyRef.value.textContent = cardsDashboard.salesReturnTotal || 0;
                     cardPurchaseQtyRef.value.textContent = cardsDashboard.purchaseTotal || 0;
                     cardPurchaseReturnQtyRef.value.textContent = cardsDashboard.purchaseReturnTotal || 0;
-                    cardDeliveryOrderQtyRef.value.textContent = cardsDashboard.deliveryOrderTotal || 0;
+                    //cardDeliveryOrderQtyRef.value.textContent = cardsDashboard.deliveryOrderTotal || 0;
+                    cardDeliveryOrderQtyRef.value.textContent = cardsDashboard.salesTotalValue || 0;
                     cardGoodsReceiveQtyRef.value.textContent = cardsDashboard.goodsReceiveTotal || 0;
                     cardTransferOutQtyRef.value.textContent = cardsDashboard.transferOutTotal || 0;
                     cardTransferInQtyRef.value.textContent = cardsDashboard.transferInTotal || 0;

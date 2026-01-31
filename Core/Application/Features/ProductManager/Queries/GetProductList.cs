@@ -15,6 +15,8 @@ public record GetProductListDto
     public string? Id { get; init; }
     public string? Number { get; init; }
     public string? Name { get; init; }
+    public string? HsnCode { get; init; }
+    public string? TaxType { get; init; }
     public string? Description { get; init; }
     public double? UnitPrice { get; init; }
     public bool? Physical { get; init; }

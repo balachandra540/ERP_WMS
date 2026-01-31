@@ -95,7 +95,7 @@ public class GetCardsDashboardHandler : IRequestHandler<GetCardsDashboardRequest
         }
 
 
-        var salesTotal = await salesQuery.SumAsync(x => (double?)x.Quantity, cancellationToken);
+        var salesTotalQty = await salesQuery.SumAsync(x => (double?)x.Quantity, cancellationToken);
 
         // SALES RETURN
         var salesReturnTotal = await ApplyInventoryFilters(
@@ -131,11 +131,15 @@ public class GetCardsDashboardHandler : IRequestHandler<GetCardsDashboardRequest
         ).SumAsync(x => (double?)x.Movement, cancellationToken);
 
         // DELIVERY ORDER
-        var deliveryOrderTotal = await ApplyInventoryFilters(
-            _context.InventoryTransaction.AsNoTracking()
-            .ApplyIsDeletedFilter(false)
-            .Where(x => x.ModuleName == nameof(DeliveryOrder) && x.Status == InventoryTransactionStatus.Confirmed)
-        ).SumAsync(x => (double?)x.Movement, cancellationToken);
+        //var deliveryOrderTotal = await ApplyInventoryFilters(
+        //    _context.InventoryTransaction.AsNoTracking()
+        //    .ApplyIsDeletedFilter(false)
+        //    .Where(x => x.ModuleName == nameof(DeliveryOrder) && x.Status == InventoryTransactionStatus.Confirmed)
+        //).SumAsync(x => (double?)x.Movement, cancellationToken);
+
+        //total sale value
+        var totalSaleValue = await salesQuery.SumAsync(x => (double?)x.Total, cancellationToken);
+
 
         // GOODS RECEIVE
         var goodsReceiveTotal = await ApplyInventoryFilters(
@@ -164,11 +168,13 @@ public class GetCardsDashboardHandler : IRequestHandler<GetCardsDashboardRequest
             {
                 CardsDashboard = new CardsItem
                 {
-                    SalesTotal = salesTotal,
+                    SalesTotal = salesTotalQty,
                     SalesReturnTotal = salesReturnTotal,
                     PurchaseTotal = purchaseTotal,
                     PurchaseReturnTotal = purchaseReturnTotal,
-                    DeliveryOrderTotal = deliveryOrderTotal,
+                    //DeliveryOrderTotal = deliveryOrderTotal,
+                    SalesTotalValue = totalSaleValue,
+
                     GoodsReceiveTotal = goodsReceiveTotal,
                     TransferOutTotal = transferOutTotal,
                     TransferInTotal = transferInTotal

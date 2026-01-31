@@ -10,4 +10,6 @@ public class CardsItem
     public double? GoodsReceiveTotal { get; init; }
     public double? TransferOutTotal { get; init; }
     public double? TransferInTotal { get; init; }
+    public double? SalesTotalValue { get; init; }
+
 }
