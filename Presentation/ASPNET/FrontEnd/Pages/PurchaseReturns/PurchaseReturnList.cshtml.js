@@ -1305,6 +1305,8 @@
                                 timer: 1500,
                                 showConfirmButton: false
                             });
+                            mainModal.obj.hide();
+
                         } else {
                             Swal.fire({
                                 icon: 'success',

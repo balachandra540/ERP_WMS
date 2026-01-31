@@ -987,9 +987,10 @@
                         secondaryGrid.clearBatchChanges(); // Reset manual tracking
 
                         Swal.fire({ icon: 'success', title: 'Save Successful', timer: 2000 });
-                        if (state.deleteMode) mainModal.obj.hide();
+                        mainModal.obj.hide();
                     } else {
                         Swal.fire({ icon: 'error', title: 'Error', text: response.data.message });
+
                     }
                 } catch (err) {
                     Swal.fire({ icon: 'error', title: 'System Error', text: 'An unexpected error occurred.' });
