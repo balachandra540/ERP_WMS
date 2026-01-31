@@ -52,5 +52,7 @@ public class Product : BaseEntity
 
     public virtual ICollection<ProductPriceDefinition> PriceDefinitions { get; set; }
         = new List<ProductPriceDefinition>();
+    public virtual ICollection<ProductDiscountDefinition> DiscountDefinitions { get; set; }
+    = new List<ProductDiscountDefinition>();
 
 }

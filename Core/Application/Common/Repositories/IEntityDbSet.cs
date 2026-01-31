@@ -25,6 +25,7 @@ public interface IEntityDbSet
     public DbSet<UnitMeasure> UnitMeasure { get; set; }
     public DbSet<ProductGroup> ProductGroup { get; set; }
     public DbSet<Product> Product { get; set; }
+    public DbSet<UserGroup> UserGroup { get; set; }
     public DbSet<ProductPluCodes> ProductPluCodes { get; set; }
 
     public DbSet<CustomerContact> CustomerContact { get; set; }
@@ -55,6 +56,7 @@ public interface IEntityDbSet
     public DbSet<PurchaseOrderItemAttributeCombination> PurchaseOrderItemAttributeCombination { get; set; }//not use this
 
     public DbSet<ProductPriceDefinition> ProductPriceDefinition { get; set; }
+    public DbSet<ProductDiscountDefinition> ProductDiscountDefinition { get; set; }
 
     public DbSet<GoodsReceiveItemDetails> GoodsReceiveItemDetails { get; }
     public DbSet<InventoryTransactionAttributesDetails> InventoryTransactionAttributesDetails { get; set; }

@@ -1,0 +1,130 @@
+﻿@page
+@{
+    ViewData["Title"] = "User Group List";
+}
+
+<div id="app" v-cloak>
+    <div class="row">
+        <div class="col-12">
+            <div class="grid-container">
+                <div ref="mainGridRef"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade"
+         ref="mainModalRef"
+         id="MainModal"
+         tabindex="-1"
+         aria-hidden="true"
+         data-bs-backdrop="static">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content">
+
+                <div class="modal-header">
+                    <h5 class="modal-title" v-text="state.mainTitle"></h5>
+                    <button type="button"
+                            class="btn-close"
+                            data-bs-dismiss="modal"></button>
+                </div>
+
+                <div class="modal-body">
+                    <input type="hidden" v-model="state.id" />
+
+                    <form id="MainForm">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5>Main Info</h5>
+                            </div>
+
+                            <div class="card-body">
+
+                                <div class="row mb-2">
+                                    <div class="col-md-6">
+                                        <label>Name</label>
+                                        <input ref="nameRef" v-model="state.name" />
+                                        <label class="text-danger" v-text="state.errors.name"></label>
+                                    </div>
+                                </div>
+
+                                <div class="row mb-2">
+                                    <div class="col-12">
+                                        <label>Description</label>
+                                        <textarea class="form-control"
+                                                  rows="3"
+                                                  v-model="state.description"></textarea>
+                                    </div>
+                                </div>
+
+                                <!-- CHECKBOXES -->
+                                <div class="row mb-2">
+                                    <div class="col-md-6">
+                                        <div class="form-check">
+                                            <input class="form-check-input"
+                                                   type="checkbox"
+                                                   v-model="state.isActive"
+                                                   id="IsActive" />
+                                            <label class="form-check-label" for="IsActive">
+                                                Is Active
+                                            </label>
+                                        </div>
+                                    </div>
+
+                                    <div class="col-md-6">
+                                        <div class="form-check">
+                                            <input class="form-check-input"
+                                                   type="checkbox"
+                                                   v-model="state.isSpecialDiscount"
+                                                   id="IsSpecialDiscount" />
+                                            <label class="form-check-label" for="IsSpecialDiscount">
+                                                Special Discount
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- MAX SPECIAL DISCOUNT -->
+                                <div class="row mb-2" v-if="state.isSpecialDiscount">
+                                    <div class="col-md-6">
+                                        <label>Max Special Discount (%)</label>
+                                        <input type="number"
+                                               class="form-control"
+                                               min="0"
+                                               max="100"
+                                               step="0.01"
+                                               v-model="state.maxSpecialDiscount"
+                                               placeholder="Enter percentage" />
+                                    </div>
+                                </div>
+
+                            </div>
+                        </div>
+                    </form>
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button"
+                            class="btn btn-secondary"
+                            data-bs-dismiss="modal">
+                        Close
+                    </button>
+
+                    <button type="button"
+                            class="btn"
+                            :class="state.deleteMode ? 'btn-danger' : 'btn-primary'"
+                            @@click ="handler.handleSubmit"
+                            :disabled="state.isSubmitting">
+                        <span v-if="state.isSubmitting"
+                              class="spinner-border spinner-border-sm me-2"></span>
+                        {{ state.deleteMode ? 'Delete' : 'Save' }}
+                    </button>
+                </div>
+
+            </div>
+        </div>
+    </div>
+</div>
+
+@section scripts {
+    <script src="~/FrontEnd/Pages/Users/UserGroupList.cshtml.js"></script>
+}

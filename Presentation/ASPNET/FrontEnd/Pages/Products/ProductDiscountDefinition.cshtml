@@ -1,0 +1,187 @@
+﻿@page
+@{
+    ViewData["Title"] = "Product Discount Definition";
+}
+
+<div id="app" v-cloak>
+
+    <!-- Grid -->
+    <div class="row">
+        <div class="col-12">
+            <div class="grid-container">
+                <div ref="mainGridRef"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal -->
+    <div class="modal fade"
+         ref="mainModalRef"
+         id="MainModal"
+         tabindex="-1"
+         data-bs-backdrop="static"
+         data-bs-focus="false">
+
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content">
+
+                <!-- Header -->
+                <div class="modal-header">
+                    <h5 class="modal-title">{{ state.mainTitle }}</h5>
+                    <button type="button"
+                            class="btn-close"
+                            data-bs-dismiss="modal"></button>
+                </div>
+
+                <!-- Body -->
+                <div class="modal-body">
+                    <input type="hidden" v-model="state.id" />
+
+                    <form id="MainForm">
+
+                        <div class="card">
+                            <div class="card-header">
+                                <h5>Main Info</h5>
+                            </div>
+
+                            <div class="card-body">
+
+                                <!-- Row 1 : Product + Discount Name -->
+                                <div class="row mb-3">
+                                    <div class="col-md-6">
+                                        <label class="form-label">Product</label>
+                                        <div ref="productIdRef"></div>
+                                        <span class="text-danger">
+                                            {{ state.errors.productId }}
+                                        </span>
+                                    </div>
+
+                                    <div class="col-md-6">
+                                        <label class="form-label">Discount Name</label>
+                                        <input v-model="state.discountName"
+                                               class="form-control"
+                                               placeholder="Eg: Festival Offer" />
+                                        <span class="text-danger">
+                                            {{ state.errors.discountName }}
+                                        </span>
+                                    </div>
+                                </div>
+
+                                <!-- Row 2 : Discount Type -->
+                                <div class="row mb-3">
+                                    <div class="col-md-6">
+                                        <label class="form-label">Discount Type</label>
+                                        <select v-model="state.discountType"
+                                                class="form-select">
+                                            <option value="">-- Select --</option>
+                                            <option value="Flat">Flat</option>
+                                            <option value="Upto">Upto</option>
+                                        </select>
+                                        <span class="text-danger">
+                                            {{ state.errors.discountType }}
+                                        </span>
+                                    </div>
+                                </div>
+
+                                <!-- Row 3 : Discount Percentage + Max Amount -->
+                                <div class="row mb-3">
+                                    <div class="col-md-6">
+                                        <label class="form-label">
+                                            Discount Percentage (%)
+                                        </label>
+                                        <input v-model="state.discountPercentage"
+                                               type="number"
+                                               min="0"
+                                               max="100"
+                                               step="0.01"
+                                               class="form-control" />
+                                        <span class="text-danger">
+                                            {{ state.errors.discountPercentage }}
+                                        </span>
+                                    </div>
+
+                                    <div class="col-md-6"
+                                         v-if="state.discountType === 'Upto'">
+                                        <label class="form-label">
+                                            Max Discount Amount
+                                        </label>
+                                        <input v-model="state.maxDiscountAmount"
+                                               type="number"
+                                               step="0.01"
+                                               class="form-control" />
+                                        <span class="text-danger">
+                                            {{ state.errors.maxDiscountAmount }}
+                                        </span>
+                                    </div>
+                                </div>
+
+                                <!-- Row 4 : Effective Dates -->
+                                <div class="row mb-3">
+                                    <div class="col-md-6">
+                                        <label class="form-label">Effective From</label>
+                                        <input v-model="state.effectiveFrom"
+                                               type="date"
+                                               class="form-control" />
+                                        <span class="text-danger">
+                                            {{ state.errors.effectiveFrom }}
+                                        </span>
+                                    </div>
+
+                                    <div class="col-md-6">
+                                        <label class="form-label">Effective To</label>
+                                        <input v-model="state.effectiveTo"
+                                               type="date"
+                                               class="form-control" />
+                                        <span class="text-danger">
+                                            {{ state.errors.effectiveTo }}
+                                        </span>
+                                    </div>
+                                </div>
+
+                                <!-- Row 5 : Is Active -->
+                                <div class="row mb-3">
+                                    <div class="col-md-6">
+                                        <div class="form-check mt-4">
+                                            <input v-model="state.isActive"
+                                                   type="checkbox"
+                                                   class="form-check-input"
+                                                   id="IsActive" />
+                                            <label class="form-check-label"
+                                                   for="IsActive">
+                                                Is Active?
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+
+                            </div>
+                        </div>
+
+                    </form>
+                </div>
+
+                <!-- Footer -->
+                <div class="modal-footer">
+                    <button class="btn btn-secondary"
+                            data-bs-dismiss="modal">
+                        Close
+                    </button>
+
+                    <button class="btn btn-primary"
+                            :disabled="state.isSubmitting"
+                            @@click ="handler.handleSubmit">
+
+                        <span v-if="state.isSubmitting"
+                              class="spinner-border spinner-border-sm me-2"></span>
+                        Save
+                    </button>
+                </div>
+
+            </div>
+        </div>
+    </div>
+</div>
+
+@section scripts {
+    <script src="~/FrontEnd/Pages/Products/ProductDiscountDefinition.cshtml.js"></script>
+}
