@@ -27,16 +27,20 @@
             IMEI2: false,          // ← Added
 
             location: '',          // Warehouse ID / location
-
+            hsnCode: '',
+            taxType: '',
+            
             // Validation errors
             errors: {
                 name: '',
                 unitPrice: '',
+                hsnCode: '',
+                taxType: '',
                 productGroupId: '',
                 unitMeasureId: '',
                 taxId: '',             // ← Usually required, so keep error field
                 attribute1: '',        // ← Optional: add if you want to validate
-                attribute2: ''         // ← Optional: add if you want to validate
+                attribute2: '',         // ← Optional: add if you want to validate
             },
 
             isSubmitting: false
@@ -46,6 +50,8 @@
         const productGroupIdRef = Vue.ref(null);
         const unitMeasureIdRef = Vue.ref(null);
         const nameRef = Vue.ref(null);
+        const hsnRef = Vue.ref(null);
+        const taxTypeRef = Vue.ref(null);
         const numberRef = Vue.ref(null);
         const unitPriceRef = Vue.ref(null);
         const taxIdRef = Vue.ref(null);
@@ -66,6 +72,10 @@
 
             if (!state.name) {
                 state.errors.name = 'Name is required.';
+                isValid = false;
+            }
+            if (!state.hsnCode) {
+                state.errors.hsnCode = 'Hsn code is required.';
                 isValid = false;
             }
             if (!state.unitPrice) {
@@ -102,6 +112,7 @@
             state.id = '';
             state.name = '';
             state.number = '';
+            state.hsnCode = '';
             state.unitPrice = '';
             state.description = '';
             state.productGroupId = null;
@@ -116,11 +127,12 @@
             state.errors = {
                 name: '',
                 unitPrice: '',
+                hsnCode:'',
                 taxId: '',
                 productGroupId: '',
                 unitMeasureId: '',
                 attribute1: '',
-                attribute2: ''
+                attribute2: '',
             };
         };
         const services = {
@@ -134,10 +146,10 @@
                     throw error;
                 }
             },
-            createMainData: async (name, unitPrice, physical, description, productGroupId, unitMeasureId, createdById, warehouseId, taxId, attribute1, attribute2, serviceNo, IMEI1, IMEI2) => {
+            createMainData: async (name, unitPrice, physical, description, productGroupId, unitMeasureId, hsnCode, taxType, createdById, warehouseId, taxId, attribute1, attribute2, serviceNo, IMEI1, IMEI2) => {
                 try {
                     const response = await AxiosManager.post('/Product/CreateProduct', {
-                        name, unitPrice, physical, description, productGroupId, unitMeasureId,
+                        name, unitPrice, physical, description, productGroupId, unitMeasureId, hsnCode, taxType,
                         createdById, warehouseId, taxId,
                         attribute1Id: attribute1,     // ← matches backend Attribute1Id
                         attribute2Id: attribute2,     // ← matches backend Attribute2Id
@@ -148,7 +160,7 @@
                     throw error;
                 }
             },
-            updateMainData: async (id, name, unitPrice, physical, description, productGroupId, unitMeasureId, updatedById, warehouseId, taxId, attribute1, attribute2, serviceNo, IMEI1, IMEI2) => {
+            updateMainData: async (id, name, unitPrice, physical, description, productGroupId, unitMeasureId, hsnCode, taxType, updatedById, warehouseId, taxId, attribute1, attribute2, serviceNo, IMEI1, IMEI2) => {
                 try {
                     const response = await AxiosManager.post('/Product/UpdateProduct', {
                         id,
@@ -158,6 +170,7 @@
                         description,
                         productGroupId,
                         unitMeasureId,
+                        hsnCode, taxType,
                         updatedById,
                         warehouseId,
                         taxId,
@@ -447,6 +460,53 @@
                 }
             }
         };
+        const hsnText = {
+            obj: null,
+            create: () => {
+                hsnText.obj = new ej.inputs.TextBox({
+                    placeholder: 'Enter HSN Code',
+                    floatLabelType: 'Auto'
+                });
+
+                hsnText.obj.appendTo(hsnRef.value);
+
+                // Only allow numbers
+                hsnText.obj.element.addEventListener('input', () => {
+                    hsnText.obj.value = hsnText.obj.value.replace(/\D/g, '');
+                    state.hsnCode = hsnText.obj.value;
+                });
+            },
+            refresh: () => {
+                if (hsnText.obj) {
+                    hsnText.obj.value = state.hsnCode || '';
+                }
+            }
+        };
+        const taxTypeDropdown = {
+            obj: null,
+            create: () => {
+                taxTypeDropdown.obj = new ej.dropdowns.DropDownList({
+                    placeholder: 'Select Tax Type',
+                    floatLabelType: 'Auto',
+                    dataSource: [
+                        { text: 'Tax Included', value: 'Included' },
+                        { text: 'Tax Excluded', value: 'Excluded' }
+                    ],
+                    fields: { text: 'text', value: 'value' },
+                    change: (args) => {
+                        state.taxType = args.value;
+                    }
+                });
+
+                taxTypeDropdown.obj.appendTo(taxTypeRef.value);
+            },
+            refresh: () => {
+                if (taxTypeDropdown.obj) {
+                    taxTypeDropdown.obj.value = state.taxType || null;
+                }
+            }
+        };
+
 
         Vue.watch(
             () => state.name,
@@ -470,7 +530,13 @@
                 unitPriceNumber.refresh();
             }
         );
-
+        Vue.watch(
+            () => state.unitPrice,
+            (newVal, oldVal) => {
+                state.errors.unitPrice = '';
+                unitPriceNumber.refresh();
+            }
+        );
         Vue.watch(
             () => state.productGroupId,
             (newVal, oldVal) => {
@@ -478,7 +544,13 @@
                 productGroupListLookup.refresh();
             }
         );
-
+        Vue.watch(
+            () => state.hsnCode,
+            (newVal, oldVal) => {
+                state.errors.hsnCode = '';
+                hsnText.refresh();
+            }
+        );
         Vue.watch(
             () => state.unitMeasureId,
             (newVal, oldVal) => {
@@ -520,7 +592,7 @@
                     const response = state.id === ''
                         ? await services.createMainData(
                             state.name, state.unitPrice, state.physical, state.description,
-                            state.productGroupId, state.unitMeasureId,
+                            state.productGroupId, state.unitMeasureId, state.hsnCode, state.taxType,
                             StorageManager.getUserId(), state.location, state.taxId,
                             state.attribute1, state.attribute2, state.serviceNo, state.IMEI1, state.IMEI2
                         )
@@ -528,7 +600,7 @@
                             ? await services.deleteMainData(state.id, StorageManager.getUserId())
                             : await services.updateMainData(
                                 state.id, state.name, state.unitPrice, state.physical, state.description,
-                                state.productGroupId, state.unitMeasureId,
+                                state.productGroupId, state.unitMeasureId, state.hsnCode, state.taxType,
                                 StorageManager.getUserId(), state.location, state.taxId,
                                 state.attribute1, state.attribute2, state.serviceNo, state.IMEI1, state.IMEI2
                             );
@@ -541,6 +613,8 @@
                             state.id = response?.data?.content?.data.id ?? '';
                             state.number = response?.data?.content?.data.number ?? '';
                             state.name = response?.data?.content?.data.name ?? '';
+                            state.hsnCode = response?.data?.content?.data.hsnCode ?? '';;
+                            state.taxType = response?.data?.content?.data.taxType;
                             state.unitPrice = response?.data?.content?.data.unitPrice ?? '';
                             state.description = response?.data?.content?.data.description ?? '';
                             state.productGroupId = response?.data?.content?.data.productGroupId ?? '';
@@ -617,7 +691,8 @@
                 unitMeasureListLookup.create();
                 await methods.populateTaxListLookupData();
                 taxListLookup.create();
-
+                hsnText.create();
+                taxTypeDropdown.create();
                 nameText.create();
                 numberText.create();
                 unitPriceNumber.create();
@@ -667,8 +742,39 @@
                         {
                             field: 'id', isPrimaryKey: true, headerText: 'Id', visible: false
                         },
-                        { field: 'number', headerText: 'Number', width: 200, minWidth: 200 },
+                        { field: 'number', headerText: 'Number', width: 200, minWidth: 200, visible: false },
                         { field: 'name', headerText: 'Name', width: 200, minWidth: 200 },
+                        // ✅ HSN CODE COLUMN
+                        {
+                            field: 'hsnCode',
+                            headerText: 'HSN Code',
+                            width: 120,
+                            minWidth: 120,
+                            editType: 'stringedit',
+                            validationRules: { required: true },
+                            edit: {
+                                create: () => {
+                                    const input = document.createElement('input');
+                                    return input;
+                                },
+                                write: (args) => {
+                                    const textbox = new ej.inputs.TextBox({
+                                        value: args.rowData.hsnCode || '',
+                                        placeholder: 'HSN Code'
+                                    });
+                                    textbox.appendTo(args.element);
+
+                                    // Numbers only
+                                    textbox.element.addEventListener('input', () => {
+                                        textbox.value = textbox.value.replace(/\D/g, '');
+                                    });
+                                },
+                                read: (args) => args.element.ej2_instances[0].value,
+                                destroy: (args) => args.element.ej2_instances[0].destroy()
+                            }
+                        },
+                        //{ field: 'taxType', headerText: 'Tax type', width: 100, minWidth: 100 },
+
                         { field: 'productGroupName', headerText: 'Product Group', width: 100, minWidth: 150 },
                         { field: 'unitPrice', headerText: 'Unit Price', width: 100, minWidth: 150, format: 'N2' },
                         { field: 'unitMeasureName', headerText: 'Unit Measure', width: 100, minWidth: 150 },
@@ -733,6 +839,8 @@
                                 state.id = selectedRecord.id ?? '';
                                 state.number = selectedRecord.number ?? '';
                                 state.name = selectedRecord.name ?? '';
+                                state.hsnCode = selectedRecord.hsnCode ?? '';
+                                state.taxType = selectedRecord.taxType;
                                 state.unitPrice = selectedRecord.unitPrice ?? '';
                                 state.description = selectedRecord.description ?? '';
                                 state.productGroupId = selectedRecord.productGroupId ?? '';
@@ -757,6 +865,8 @@
                                 state.id = selectedRecord.id ?? '';
                                 state.number = selectedRecord.number ?? '';
                                 state.name = selectedRecord.name ?? '';
+                                state.hsnCode = selectedRecord.hsnCode ?? '';
+                                state.taxType = selectedRecord.taxType;
                                 state.unitPrice = selectedRecord.unitPrice ?? '';
                                 state.description = selectedRecord.description ?? '';
                                 state.productGroupId = selectedRecord.productGroupId ?? '';
@@ -791,6 +901,8 @@
             productGroupIdRef,
             unitMeasureIdRef,
             nameRef,
+            hsnRef,
+            taxTypeRef,
             numberRef,
             unitPriceRef,
             state,

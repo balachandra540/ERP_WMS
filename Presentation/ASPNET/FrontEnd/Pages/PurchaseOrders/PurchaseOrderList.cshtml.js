@@ -85,9 +85,11 @@
             console.log('Deleted Records:', batchChanges.deletedRecords);
 
             // Initialize data
-            let currentSecondaryData = state.id !== ""
-                ? [...state.secondaryData]
-                : [...(batchChanges.changedRecords || [])];
+            //let currentSecondaryData = state.id !== ""
+            //    ? [...state.secondaryData]
+            //    : [...(batchChanges.changedRecords || [])];
+
+            let currentSecondaryData = [...state.secondaryData];
 
             // Helper function to match records
             const matchRecord = (a, b) => {
@@ -117,10 +119,22 @@
                 );
             }
 
-            // Add new records
+            //// Add new records
+            //const addedRecords = batchChanges.addedRecords || [];
+            //if (addedRecords.length > 0) {
+            //    currentSecondaryData = [...currentSecondaryData, ...addedRecords];
+            //}
+
             const addedRecords = batchChanges.addedRecords || [];
-            if (addedRecords.length > 0) {
-                currentSecondaryData = [...currentSecondaryData, ...addedRecords];
+
+            for (let added of addedRecords) {
+                const exists = currentSecondaryData.some(item => matchRecord(item, added));
+
+                if (!exists) {
+                    currentSecondaryData.push(added);
+                } else {
+                    console.warn("Duplicate prevented for product:", added.productId);
+                }
             }
 
             console.log('Final data for validation:', currentSecondaryData);
@@ -162,7 +176,7 @@
         const resetFormState = () => {
             state.id = '';
             state.number = '';
-            state.orderDate = '';
+            //state.orderDate = '';
             state.description = '';
             state.vendorId = null;
             state.taxId = null;
@@ -493,9 +507,12 @@
                 console.log('Batch Changes:', batchChanges);
 
                 // Initialize with existing data if record exists, otherwise use changed records
-                let currentSecondaryData = state.id !== ""
-                    ? [...state.secondaryData]
-                    : [...(batchChanges.changedRecords || [])];
+                //let currentSecondaryData = state.id !== ""
+                //    ? [...state.secondaryData]
+                //    : [...(batchChanges.changedRecords || [])];
+
+                let currentSecondaryData = [...state.secondaryData];
+                   
 
                 // Helper function to match records by ID or purchaseOrderItemId
                 const matchRecord = (a, b) => {
@@ -538,10 +555,22 @@
                 let deletedRecords = batchChanges.deletedRecords || [];
                 deletedRecords = deletedRecords.flat(Infinity);  // ADD THIS LINE
 
-                // Add newly created records
+                //// Add newly created records
+                //const addedRecords = batchChanges.addedRecords || [];
+                //if (addedRecords.length > 0) {
+                //    currentSecondaryData = [...currentSecondaryData, ...addedRecords];
+                //}
+
                 const addedRecords = batchChanges.addedRecords || [];
-                if (addedRecords.length > 0) {
-                    currentSecondaryData = [...currentSecondaryData, ...addedRecords];
+
+                for (let added of addedRecords) {
+                    const exists = currentSecondaryData.some(item => matchRecord(item, added));
+
+                    if (!exists) {
+                        currentSecondaryData.push(added);
+                    } else {
+                        console.warn("Duplicate prevented for product:", added.productId);
+                    }
                 }
 
                 // Validate and filter final items

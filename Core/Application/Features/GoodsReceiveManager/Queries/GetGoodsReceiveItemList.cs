@@ -476,6 +476,36 @@ public class ResolveInventoryByAttributeHandler
             };
         }
     }
+
+    public record GetGoodsReceiveItemDetailsQuery() : IRequest<List<GoodsReceiveItemDetailDto>>;
+
+    public class GetGoodsReceiveItemDetailsQueryHandler
+    : IRequestHandler<GetGoodsReceiveItemDetailsQuery, List<GoodsReceiveItemDetailDto>>
+    {
+        private readonly IQueryContext _context;
+
+        public GetGoodsReceiveItemDetailsQueryHandler(IQueryContext context)
+        {
+            _context = context;
+        }
+
+        public async Task<List<GoodsReceiveItemDetailDto>> Handle(
+            GetGoodsReceiveItemDetailsQuery request,
+            CancellationToken cancellationToken)
+        {
+            var data = await _context.GoodsReceiveItemDetails   // 🔁 Your table name here
+                .Select(x=> new GoodsReceiveItemDetailDto
+                {
+                    RowIndex = x.RowIndex,
+                    IMEI1 = x.IMEI1,
+                    IMEI2 = x.IMEI2,
+                    ServiceNo = x.ServiceNo
+                })
+                .ToListAsync(cancellationToken);
+
+            return data;
+        }
+    }
 }
 
 

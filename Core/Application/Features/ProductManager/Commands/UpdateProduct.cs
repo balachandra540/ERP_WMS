@@ -222,6 +222,8 @@ public class UpdateProductRequest : IRequest<UpdateProductResult>
 {
     public string? Id { get; init; }
     public string? Number { get; init; }
+    public string? HsnCode { get; init; }
+    public string? TaxType { get; init; }
     public string? Name { get; init; }
     public string? Description { get; init; }
     public double? UnitPrice { get; init; }
@@ -250,6 +252,8 @@ public class UpdateProductValidator : AbstractValidator<UpdateProductRequest>
         RuleFor(x => x.UnitMeasureId).NotEmpty();
         RuleFor(x => x.ProductGroupId).NotEmpty();
         RuleFor(x => x.TaxId).NotEmpty();
+        RuleFor(x => x.HsnCode).NotEmpty();
+        RuleFor(x => x.TaxType).NotEmpty();
     }
 }
 
@@ -293,6 +297,8 @@ public class UpdateProductHandler : IRequestHandler<UpdateProductRequest, Update
 
         // Update base product
         product.Name = request.Name!.Trim();
+        product.HsnCode = request.HsnCode;
+        product.TaxType = request.TaxType;
         product.Description = request.Description;
         product.UnitPrice = request.UnitPrice ?? 0;
         product.Physical = request.Physical;

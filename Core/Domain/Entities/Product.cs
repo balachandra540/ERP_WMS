@@ -11,7 +11,9 @@ public class Product : BaseEntity
     public string? Description { get; set; }
     public double? UnitPrice { get; set; }
     public bool? Physical { get; set; } = true;                    // Made non-nullable (default true)
+    public string? HsnCode { get; set; }     // NEW
 
+    public string? TaxType { get; set; }     // Included / Excluded
     public string? UnitMeasureId { get; set; }
     public UnitMeasure? UnitMeasure { get; set; }
 

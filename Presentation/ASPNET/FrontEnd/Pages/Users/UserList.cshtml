@@ -46,7 +46,7 @@
                                         <input ref="emailRef" v-model="state.email">
                                         <label class="text-danger">{{ state.errors.email }}</label>
                                     </div>
-                                    <div class="col-md-6">
+                                    @* <div class="col-md-6">
                                         <label for="Warehouse">Location</label>
                                         <select v-model="state.wareHouse" class="form-control" id="Warehouse" name="wareHouse">
                                             <option value="">Select Location</option>
@@ -66,7 +66,7 @@
                                         <!--  Validation error -->
                                         <label class="text-danger">{{ state.errors.wareHouse }}</label>
 
-                                    </div>
+                                    </div> *@
                                 </div>
                                 <div class="row mb-2">
                                     <div class="col-md-4">
@@ -107,6 +107,20 @@
                                         <input v-model="state.confirmPassword" id="ConfirmPassword" name="ConfirmPassword" type="password" class="form-control" placeholder="Confirm Password">
                                         <label class="text-danger">{{ state.errors.confirmPassword }}</label>
                                     </div>
+                                </div>
+                            </div>
+                        </div>
+                         <div id="UserLocationCard" class="card">
+                            <div class="card-header">
+                                <h5>User Locations</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="row mb-2">
+                                        <div class="col-12">
+                                            <div class="grid-container">
+                                                <div ref="userLocationGridRef"></div>
+                                            </div>
+                                     </div>
                                 </div>
                             </div>
                         </div>
@@ -220,17 +234,24 @@
                 <div class="modal-body">
                     <form id="LocationForm">
                         <div class="row mb-3">
-                            <div class="col-md-6">
+                            <div class="col-md-5">
                                 <label>User ID</label>
-                                <input type="text" class="form-control" v-model="state.userId" id="UserId" name="UserId" disabled />
+                                <input type="text"
+                                       class="form-control"
+                                       v-model="state.email"
+                                       id="UserId"
+                                       name="UserId"
+                                       disabled />
                             </div>
 
-                            <div class="col-md-6">
+                            <div class="col-md-5">
                                 <label for="Warehouse">Location</label>
-                                <select v-model="state.wareHouse" class="form-control" id="Warehouse" name="wareHouse">
+                                <select v-model="state.wareHouse"
+                                        class="form-control"
+                                        id="Warehouse"
+                                        name="wareHouse">
                                     <option value="">Select Location</option>
 
-                                    <!--  Check if warehouses list is available and not empty -->
                                     <option v-if="Array.isArray(state.warehouses) && state.warehouses.length"
                                             v-for="warehouse in state.warehouses"
                                             :key="warehouse.id"
@@ -238,67 +259,39 @@
                                         {{ warehouse.name }}
                                     </option>
 
-                                    <!-- Optional: fallback if no warehouses are loaded -->
                                     <option v-else disabled>No warehouses available</option>
                                 </select>
 
-                                <!--  Validation error -->
                                 <label class="text-danger">{{ state.errors.wareHouse }}</label>
-
                             </div>
                         </div>
 
-                       
+                        <!-- ✅ Default Location Checkbox -->
+                        <div class="row mb-3">
+                            <div class="col-md-5">
+                                <div class="form-check mt-2">
+                                    <input class="form-check-input"
+                                           type="checkbox"
+                                           id="IsDefaultLocation"
+                                           v-model="state.isDefaultLocation" />
+                                    <label class="form-check-label" for="IsDefaultLocation">
+                                        Set as Default Location
+                                    </label>
+                                </div>
+                                <label class="text-danger">{{ state.errors.isDefaultLocation }}</label>
+                            </div>
+                        </div>
+
                     </form>
+                </div>
 
-                   
-                </div>
-                <div id="ComplexDiv" :style="{ display: state.showComplexDiv ? 'block' : 'none' }">
-                    <div class="row mt-3">
-                        <div class="col-md-12">
-                            <div class="card">
-                                <div class="card-header">
-                                    <h5>Delivery Item</h5>
-                                </div>
-                                <div class="card-body">
-                                    <div class="row">
-                                        <div class="col-md-12">
-                                            <div class="grid-container">
-                                                <div ref="LocationGridRef"></div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="row mt-4">
-                        <div class="col-md-12">
-                            <div class="card shadow-sm">
-                                <div class="card-header text-white">
-                                    <h5 class="mb-0">Summary</h5>
-                                </div>
-                                <div class="card-body">
-                                    <div class="row justify-content-end">
-                                        <div class="col-md-6">
-                                            <div class="d-flex justify-content-between py-2">
-                                                <span class="fw-bold">Total Movement</span>
-                                                <span id="TotalMovement" class="fw-bold text-success">{{ state.totalMovementFormatted }}</span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
                     <button type="button"
-                            id="MainSaveButton"
+                            id="LocationSaveButton"
                             class="btn"
                             v-bind:class="state.deleteMode ? 'btn-danger' : 'btn-primary'"
-                            v-on:click="handler.handleSubmit"
+                            v-on:click="handler.LocationSubmit"
                             v-bind:disabled="state.isSubmitting">
                         <span class="spinner-border spinner-border-sm me-2" v-if="state.isSubmitting" role="status" aria-hidden="true"></span>
                         <span v-if="!state.isSubmitting">{{ state.deleteMode ? 'Delete' : 'Submit' }}</span>

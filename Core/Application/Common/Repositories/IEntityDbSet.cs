@@ -1,4 +1,5 @@
-﻿using Domain.Entities;
+﻿using Application.Common.Services.SecurityManager;
+using Domain.Entities;
 using Microsoft.EntityFrameworkCore;
 
 namespace Application.Common.Repositories;
@@ -59,8 +60,9 @@ public interface IEntityDbSet
 
     public DbSet<GoodsReceiveItemDetails> GoodsReceiveItemDetails { get; }
     public DbSet<InventoryTransactionAttributesDetails> InventoryTransactionAttributesDetails { get; set; }
-
+    //public DbSet<UserWarehouse> UserWarehouse  { get; set; }
     public DbSet<SalesOrderItemDetails> SalesOrderItemDetails { get; }
 
-}
+
+    }
 

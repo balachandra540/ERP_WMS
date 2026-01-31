@@ -18,6 +18,8 @@ namespace Application.Features.ProductManager.Commands
     {
         public string? Number { get; init; }
         public string? Name { get; init; }
+        public string? HsnCode { get; init; }
+        public string? TaxType { get; init; }
         public string? Description { get; init; }
         public double? UnitPrice { get; init; }
         public bool Physical { get; init; } = true;
@@ -45,6 +47,8 @@ namespace Application.Features.ProductManager.Commands
             RuleFor(x => x.ProductGroupId).NotEmpty();
             RuleFor(x => x.TaxId).NotEmpty();
             RuleFor(x => x.WarehouseId).NotEmpty();
+            RuleFor(x => x.HsnCode).NotEmpty();
+            RuleFor(x => x.TaxType).NotEmpty();
         }
     }
 
@@ -86,6 +90,8 @@ namespace Application.Features.ProductManager.Commands
                     ? _numberSequenceService.GenerateNumber(nameof(Product), "", "ART")
                     : request.Number,
                 Name = request.Name!,
+                HsnCode =request.HsnCode,
+                TaxType = request.TaxType,
                 Description = request.Description,
                 UnitPrice = request.UnitPrice ?? 0,
                 Physical = request.Physical,

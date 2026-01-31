@@ -23,6 +23,7 @@
             wareHouse: '',   // Bound to the dropdown
             warehouses: [], 
             userlocations: [],
+            isDefaultLocation:false,
             //AssignLocations:null,
             errors: {
                 firstName: '',
@@ -31,10 +32,15 @@
                 password: '',
                 confirmPassword: '',
                 newPassword: '',
-                wareHouse: ''
+                wareHouse: '',
+                isDefaultLocation:''
+
             },
             isSubmitting: false,
             isChangePasswordSubmitting: false,
+            userAccessLocations: [],
+            selectedLocation: null,
+            editMode: false,
         });
 
         const mainGridRef = Vue.ref(null);
@@ -46,7 +52,7 @@
         const lastNameRef = Vue.ref(null);
         const emailRef = Vue.ref(null);
         const LocationRef = Vue.ref(null);
-        const LocationGridRef = Vue.ref(null);
+        const userLocationGridRef = Vue.ref(null);
 
         const firstNameText = {
             obj: null,
@@ -143,11 +149,11 @@
                 isValid = false;
             }
 
-            //  Validate warehouse selection
-            if (!state.wareHouse) {
-                state.errors.wareHouse = 'Location is required.';
-                isValid = false;
-            }
+            ////  Validate warehouse selection
+            //if (!state.wareHouse) {
+            //    state.errors.wareHouse = 'Location is required.';
+            //    isValid = false;
+            //}
 
             if (!state.id) {
                 if (!state.password) {
@@ -183,6 +189,16 @@
             return isValid;
         };
 
+        const validateLocationForm = function() {
+            if (!state.wareHouse && !state.deleteMode) {
+                state.errors.wareHouse = "Please select a location";
+                return false;
+            }
+
+            return true;
+        }
+
+
         const resetFormState = () => {
             state.id = '';
             state.firstName = '';
@@ -194,14 +210,22 @@
             state.password = '';
             state.confirmPassword = '';
             state.wareHouse = '';
-            state.errors = {
-                firstName: '',
-                lastName: '',
-                email: '',
-                password: '',
-                confirmPassword: '',
-                wareHouse:'',
-            };
+            isDefaultLocation: false,   // 🔥 add this
+
+                state.errors = {
+                    firstName: '',
+                    lastName: '',
+                    email: '',
+                    password: '',
+                    confirmPassword: '',
+                    wareHouse: '',
+                    isDefaultLocation: ''
+                };
+            if (LocationGrid && LocationGrid.obj) {
+                LocationGrid.obj.clearSelection();
+                LocationGrid.obj.setProperties({ dataSource: [] }); // 🔥 empties grid
+            }
+
         };
 
         const resetChangePasswordFormState = () => {
@@ -212,7 +236,7 @@
         };
 
         const resetSecondaryFormState = () => {
-            state.userId = '';
+            //state.userId = '';
             state.secondaryData = [];
             state.changeRoleTitle = 'Change Roles';
 
@@ -222,13 +246,27 @@
             }
         };
         const resetLocationFormState = () => {
-            state.userId = '';
             state.userlocations = [];
+            state.editMode = false;
+            state.deleteMode = false;
+            state.selectedLocation = null;
+            state.wareHouse = '';
             state.locationTitle = 'Location Access';
 
             if (LocationGrid.obj) {
                 LocationGrid.obj.clearSelection();
                 LocationGrid.refresh();
+            }
+
+            //const mainModal = document.getElementById("MainModal");
+            //if (mainModal.classList.contains("show")) {
+            //    document.body.classList.add("modal-open");
+            //}
+        };
+        const handleLocationModalHidden = () => {
+            const mainModalEl = document.getElementById('MainModal'); // 🔁 your main modal id
+            if (mainModalEl.classList.contains("show")) {
+                document.body.classList.add("modal-open");
             }
         };
 
@@ -248,21 +286,21 @@
             }
         };
         //getUserAccessLocations
-        const getUserAccessLocations = async () => {
-            try {
-                const response = await AxiosManager.get('/Security/GetUserAccessLocations');
+        //const getUserAccessLocations = async () => {
+        //    try {
+        //        const response = await AxiosManager.get('/Security/GetUserAccessLocations');
 
-                if (response.data.code === 200) {
-                    state.userlocations = response.data.content.data || [];
-                } else {
-                    console.error('Failed to load warehouses:', response.data.message);
-                    state.userlocations = [];
-                }
-            } catch (error) {
-                console.error('Error fetching warehouses:', error);
-                state.userlocations = [];
-            }
-        };
+        //        if (response.data.code === 200) {
+        //            state.userlocations = response.data.content.data || [];
+        //        } else {
+        //            console.error('Failed to load warehouses:', response.data.message);
+        //            state.userlocations = [];
+        //        }
+        //    } catch (error) {
+        //        console.error('Error fetching warehouses:', error);
+        //        state.userlocations = [];
+        //    }
+        //};
         const services = {
             getMainData: async () => {
                 try {
@@ -356,6 +394,54 @@
                     throw error;
                 }
             },
+            getUserWarehouseList: async (userId) => {
+                try {
+                    const response = await AxiosManager.get('/Security/GetUserWarehouse?UserId=' + userId+'');
+                    return response;
+                } catch (error) {
+                    throw error;
+                }
+            },
+
+            createUserWarehouse: async (userId, warehouseId, isDefaultLocation, createdById) => {
+                try {
+                    const response = await AxiosManager.post('/Security/CreateUserWarehouse', {
+                        userId,
+                        warehouseId,
+                        isDefaultLocation,
+                        createdById
+                    });
+                    return response;
+                } catch (error) {
+                    throw error;
+                }
+            },
+            updateUserWarehouse: async (id, warehouseId, isDefaultLocation, updatedById) => {
+                try {
+                    const response = await AxiosManager.post('/Security/UpdateUserWarehouse', {
+                        id,
+                        warehouseId,
+                        isDefaultLocation,
+                        updatedById
+                    });
+                    return response;
+                } catch (error) {
+                    throw error;
+                }
+            },
+            deleteUserWarehouse: async (id, deletedById) => {
+                try {
+                    const response = await AxiosManager.post('/Security/DeleteUserWarehouse', {
+                        id,
+                        deletedById
+                    });
+                    return response;
+                } catch (error) {
+                    throw error;
+                }
+            },
+
+
         };
 
         const methods = {
@@ -397,6 +483,7 @@
             },
             populateLocationData: async (userId) => {
                 try {
+                    debugger;
                     //const locations = await services.getLocations();
                     const locations = await getLocations();
 
@@ -414,9 +501,25 @@
                     state.LocationData = result;
                 } catch (error) {
                     console.error("Error populating secondary data:", error);
-                    state.secondaryData = [];
+                    state.LocationData = [];
                 }
             },
+            populateUserLocationData: async (userId) => {
+                try {
+                    const response = await services.getUserWarehouseList(userId);
+
+                    if (response.data.code === 200) {
+                        state.userlocations = response.data.content.data || [];
+                    } else {
+                        state.userlocations = [];
+                    }
+
+                } catch (error) {
+                    console.error("Error loading user locations", error);
+                    state.userlocations = [];
+                }
+            }
+
         };
 
         const handler = {
@@ -558,7 +661,86 @@
                 } finally {
                     state.isChangePasswordSubmitting = false;
                 }
+            },
+            LocationSubmit: async function () {
+                try {
+                    state.isSubmitting = true;
+                    await new Promise(resolve => setTimeout(resolve, 300));
+
+                    if (!validateLocationForm()) {
+                        return;
+                    }
+
+                    let response;
+
+                    // ================= CREATE =================
+                    if (!state.editMode && !state.deleteMode) {
+                        if (state.id) {
+                            response = await services.createUserWarehouse(
+                                state.id,                    // comes from main modal
+                                state.wareHouse,
+                                state.isDefaultLocation,
+                                StorageManager.getUserId()
+                            );
+                        }
+                        else {
+
+                        }
+                    }
+                    // ================= DELETE =================
+                    else if (state.deleteMode) {
+                        response = await services.deleteUserWarehouse(
+                            state.selectedLocation.id,
+                            StorageManager.getUserId()
+                        );
+                    }
+                    // ================= UPDATE =================
+                    else {
+                        response = await services.updateUserWarehouse(
+                            state.selectedLocation.id,
+                            state.wareHouse,
+                            state.isDefaultLocation,
+                            StorageManager.getUserId()
+                        );
+                    }
+
+                    if (response.data.code === 200 || response.data.success === true) {
+
+                        await methods.populateUserLocationData(state.id);
+                        LocationGrid.refresh();
+
+                        Swal.fire({
+                            icon: 'success',
+                            title: state.deleteMode ? 'Delete Successful' : 'Save Successful',
+                            timer: 1500,
+                            showConfirmButton: false
+                        });
+
+                        setTimeout(() => {
+                            LocationModal.obj.hide();
+                        }, 1500);
+
+                    } else {
+                        Swal.fire({
+                            icon: 'error',
+                            title: state.deleteMode ? 'Delete Failed' : 'Save Failed',
+                            text: response.data.message ?? 'Please check your data.',
+                            confirmButtonText: 'Try Again'
+                        });
+                    }
+
+                } catch (error) {
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'An Error Occurred',
+                        text: error.response?.data?.message ?? 'Please try again.',
+                        confirmButtonText: 'OK'
+                    });
+                } finally {
+                    state.isSubmitting = false;
+                }
             }
+
         };
 
         Vue.onMounted(async () => {
@@ -578,11 +760,11 @@
                 changePasswordModal.create();
                 changeRoleModal.create();
                 LocationModal.create();
-                try { 
-                    await LocationGrid.create(state.LocationData);
-                } catch (ex) {
-                    console.log(ex);
-                }
+                //try { 
+                //    await LocationGrid.create(state.LocationData);
+                //} catch (ex) {
+                //    console.log(ex);
+                //}
 
                 mainModalRef.value?.addEventListener('hidden.bs.modal', () => {
                     resetFormState();
@@ -594,7 +776,7 @@
                     resetSecondaryFormState();
                 });
                 LocationRef.value?.addEventListener('hidden.bs.modal', () => {
-                    resetLocationFormState();
+                    handleLocationModalHidden();
                 });
             } catch (e) {
                 console.error('page init error:', e);
@@ -653,7 +835,7 @@
                         { type: 'Separator' },
                         { text: 'Change Password', tooltipText: 'Change Password', id: 'ChangePasswordCustom' },
                         { text: 'Change Role', tooltipText: 'Change Role', id: 'ChangeRoleCustom' },
-                        { tooltipText: 'Locations', text: 'Locations',id:'ChangeLocations'},
+                        { tooltipText: 'Locations', text: 'Locations', id: 'ChangeLocations', visible: false },
                     ],
                     beforeDataBound: () => { },
                     dataBound: function () {
@@ -689,6 +871,14 @@
                             state.deleteMode = false;
                             state.mainTitle = 'Add User';
                             resetFormState();
+                            state.userlocations = [];
+                            //await methods.populateUserLocationData(state.userId);
+                            if (LocationGrid.obj) {
+                                LocationGrid.refresh();
+                            }
+                            else {
+                                LocationGrid.create(state.userlocations);
+                            }
                             mainModal.obj.show();
                         }
 
@@ -706,6 +896,13 @@
                                 state.isDeleted = selectedRecord.isDeleted ?? false;
                                 const selectedWarehouse = state.warehouses.find(w => w.name === selectedRecord.wareHouse);
                                 state.wareHouse = selectedWarehouse?.id ?? '';
+
+                                await methods.populateUserLocationData(state.id);
+                                if (LocationGrid.obj) {
+                                    LocationGrid.refresh();
+                                }
+                                else
+                                    LocationGrid.create(state.userlocations);
                                 mainModal.obj.show();
                             }
                         }
@@ -753,7 +950,7 @@
                                 state.locationTitle = 'Location Access';
                                 state.userId = selectedRecord.id ?? '';
                                 await methods.populateLocationData(state.userId);
-                                LocationGrid.refresh();
+                                //LocationGrid.refresh();
                                 LocationModal.obj.show();
                             }
                         }
@@ -931,11 +1128,17 @@
 
         const LocationGrid = {
             obj: null,
+
             create: async (dataSource) => {
                 LocationGrid.obj = new ej.grids.Grid({
                     height: 400,
-                    dataSource: dataSource,
-                    editSettings: { allowEditing: true, allowAdding: false, allowDeleting: false, showDeleteConfirmDialog: true, mode: 'Normal', allowEditOnDblClick: true },
+                    dataSource: dataSource || [],
+                    editSettings: {
+                        allowEditing: false,
+                        allowAdding: false,
+                        allowDeleting: false,
+                        mode: 'Normal'
+                    },
                     allowFiltering: false,
                     allowSorting: true,
                     allowSelection: true,
@@ -945,118 +1148,230 @@
                     allowPaging: false,
                     allowExcelExport: true,
                     filterSettings: { type: 'CheckBox' },
-                    sortSettings: { columns: [{ field: 'roleName', direction: 'Descending' }] },
-                    pageSettings: { currentPage: 1, pageSize: 50, pageSizes: ["10", "20", "50", "100", "200", "All"] },
-                    selectionSettings: { persistSelection: true, type: 'Single' },
+                    sortSettings: { columns: [{ field: 'createdAtUtc', direction: 'Descending' }] },
+                    selectionSettings: {
+                        persistSelection: true,
+                        type: 'Single',
+                        checkboxOnly: true   // 🔥 REQUIRED
+                    },
                     autoFit: true,
                     showColumnMenu: false,
                     gridLines: 'Horizontal',
-                    columns: [
-                        { type: 'checkbox', width: 60 },
-                        {
-                            field: 'id', isPrimaryKey: true, headerText: 'Id', visible: false
-                        },
-                        { field: 'roleName', headerText: 'Role', allowEditing: false, width: 200, minWidth: 200 },
-                        { field: 'accessGranted', headerText: 'Access Granted', textAlign: 'Center', width: 150, minWidth: 150, editType: 'booleanedit', displayAsCheckBox: true, type: 'boolean', allowEditing: true },
-                    ],
-                    //toolbar: [
-                    //    'ExcelExport',
-                    //    { type: 'Separator' },
-                    //    'Edit', 'Update', 'Cancel',
-                    //],
-                    toolbar: [
-                        'ExcelExport', 'Search',
-                        { type: 'Separator' },
-                        { text: 'Edit', tooltipText: 'Edit', prefixIcon: 'e-edit', id: 'EditRoleCustom' },
-                        { text: 'Update', tooltipText: 'Update', id: 'UpdateRoleCustom' },
-                        { text: 'Cancel', tooltipText: 'Cancel', id: 'CancelRoleCustom' },
-                    ],
                     beforeDataBound: () => { },
                     dataBound: function () {
-                        LocationGrid.obj.autoFitColumns(['roleName', 'accessGranted']);
-                        // Disable Edit button initially
-                        LocationGrid.obj.toolbarModule.enableItems(['EditRoleCustom', 'UpdateRoleCustom', 'CancelRoleCustom'], false);
-                    },
-                    excelExportComplete: () => { },
-                    rowSelected: () => {
-                        if (LocationGrid.obj.getSelectedRecords().length == 1) {
-                            LocationGrid.obj.toolbarModule.enableItems(['EditRoleCustom', 'CancelRoleCustom'], true);
-                        } else {
-                            LocationGrid.obj.toolbarModule.enableItems(['EditRoleCustom', 'CancelRoleCustom'], false);
+                        LocationGrid.obj.toolbarModule.enableItems(['EditLocation', 'DeleteLocation'], false);
+
+                        const data = LocationGrid.obj?.currentViewData;
+
+                        if (data && data.length > 0) {
+                            LocationGrid.obj.autoFitColumns(['locationId', 'isDeleted', 'createdAtUtc']);
                         }
                     },
+                    rowSelected: (args) => {
+                        if (LocationGrid.obj.getSelectedRecords().length == 1) {
+                            LocationGrid.obj.toolbarModule.enableItems(['EditLocation', 'DeleteLocation'], true);
+                        } else
+                            LocationGrid.obj.toolbarModule.enableItems(['EditLocation', 'DeleteLocation'], false);
+
+                    },
+
                     rowDeselected: () => {
                         if (LocationGrid.obj.getSelectedRecords().length == 1) {
-                            LocationGrid.obj.toolbarModule.enableItems(['EditRoleCustom', 'CancelRoleCustom'], true);
-                        } else {
-                            LocationGrid.obj.toolbarModule.enableItems(['EditRoleCustom', 'CancelRoleCustom'], false);
+                            LocationGrid.obj.toolbarModule.enableItems(['EditLocation', 'DeleteLocation'], true);
                         }
+                        else
+                            LocationGrid.obj.toolbarModule.enableItems(['EditLocation', 'DeleteLocation'], false);
+
                     },
+
                     rowSelecting: () => {
                         if (LocationGrid.obj.getSelectedRecords().length) {
                             LocationGrid.obj.clearSelection();
                         }
                     },
+
+                    columns: [
+                        { type: 'checkbox', width: 60 },
+                        { field: 'id', isPrimaryKey: true, visible: false },
+                        { field: 'locationId', visible: false },
+                        { field: 'locationName', headerText: 'Location', width: 180 },
+                        { field: 'isDefaultLocation', headerText: 'IsDefault', type: 'boolean', displayAsCheckBox: true },
+                        { field: 'createdAtUtc', headerText: 'Created At', format: 'yyyy-MM-dd HH:mm' },
+                        { field: 'isDeleted', headerText: 'Is Deleted', type: 'boolean', displayAsCheckBox: true },
+
+                    ],
+
+                    toolbar: [
+                        'ExcelExport', 'Search',
+                        { type: 'Separator' },
+                        { text: 'Add', tooltipText: 'Add', prefixIcon: 'e-add', id: 'AddLocation' },
+                        { text: 'Edit', tooltipText: 'Edit', prefixIcon: 'e-edit', id: 'EditLocation' },
+                        { text: 'Delete', tooltipText: 'Delete', prefixIcon: 'e-delete', id: 'DeleteLocation' },
+                        { tooltipText: 'Locations', text: 'Locations', id: 'ChangeLocations', visible:false },
+                    ],
+
+                    
+
+
                     toolbarClick: async (args) => {
-                        if (args.item.id === 'SecondaryGrid_excelexport') {
-                            LocationGrid.obj.excelExport();
+
+                        // ================= ADD =================
+                        if (args.item.id === 'AddLocation') {
+                            state.editMode = false;
+                            state.selectedLocation = null;
+
+                            // Reset form
+                            state.wareHouse = '';
+                            state.isDefaultLocation = false;
+
+                            LocationModal.obj.show();
+                            return;
                         }
-                        else if (args.item.id === 'EditRoleCustom') {
-                            if (LocationGrid.obj.getSelectedRecords().length) {
-                                const selectedRecord = LocationGrid.obj.getSelectedRecords()[0];
-                                LocationGrid.obj.toolbarModule.enableItems(['UpdateRoleCustom', 'CancelRoleCustom'], true);
-                                LocationGrid.obj.toolbarModule.enableItems(['EditRoleCustom'], false);
+
+                        // ================= EDIT =================
+                        if (args.item.id === 'EditLocation') {
+
+                            const selected = LocationGrid.obj.getSelectedRecords();
+
+                            if (selected.length !== 1) {
+                                Swal.fire({
+                                    icon: 'warning',
+                                    title: 'Select One Record',
+                                    text: 'Please select one location to edit.'
+                                });
+                                return;
                             }
-                        }
-                       
-                        else if (args.item.id === 'CancelRoleCustom') {
-                            resetSecondaryFormState();
+
+                            const row = selected[0];
+
+                            state.editMode = true;
+                            state.selectedLocation = row;
+
+                            // 🔥 IMPORTANT: Bind values to form model
+                            /*state.wareHouse = row.locationId;*/              // dropdown select
+                            const selectedWarehouse = state.warehouses.find(w => w.id === row.locationId);
+                            state.wareHouse = selectedWarehouse?.id ?? '';
+                            state.isDefaultLocation = row.isDefaultLocation; // checkbox
+
+                            LocationModal.obj.show();
+                            return;
                         }
 
+                        // ================= DELETE =================
+                        if (args.item.id === 'DeleteLocation') {
 
-                    },
-                    actionComplete: async (args) => {
-                        if (args.requestType === 'save' && args.action === 'edit') {
+                            const selected = LocationGrid.obj.getSelectedRecords();
+
+                            if (!selected.length) {
+                                Swal.fire({
+                                    icon: 'warning',
+                                    title: 'No Selection',
+                                    text: 'Please select location(s) to delete.'
+                                });
+                                return;
+                            }
+
+                            const confirm = await Swal.fire({
+                                icon: 'warning',
+                                title: 'Are you sure?',
+                                text: 'Selected locations will be removed from this user.',
+                                showCancelButton: true,
+                                confirmButtonText: 'Yes, Delete',
+                                cancelButtonText: 'Cancel'
+                            });
+
+                            if (!confirm.isConfirmed) return;
+
                             try {
-                                const roleName = args?.data?.roleName;
-                                const accessGranted = args?.data?.accessGranted;
-                                const response = await services.updateUserRoleData(state.userId, roleName, accessGranted);
-
-                                if (response.data.code === 200) {
-                                    await methods.populateSecondaryData(state.userId);
-                                    LocationGrid.refresh();
-                                    LocationGrid.obj.clearSelection();
-                                    Swal.fire({
-                                        icon: 'success',
-                                        title: 'Save Successful',
-                                        timer: 1000,
-                                        showConfirmButton: false
-                                    });
-                                } else {
-                                    Swal.fire({
-                                        icon: 'error',
-                                        title: 'Save Failed',
-                                        text: response.data.message ?? 'Please check your data.',
-                                        confirmButtonText: 'Try Again'
-                                    });
+                                for (const row of selected) {
+                                    await services.deleteUserWarehouse(row.id, state.id);
                                 }
+
+                                Swal.fire({
+                                    icon: 'success',
+                                    title: 'Deleted',
+                                    timer: 1200,
+                                    showConfirmButton: false
+                                });
+
+                                await methods.populateLocationData(state.id);
+                                LocationGrid.refresh();
+
                             } catch (error) {
+                                console.error(error);
                                 Swal.fire({
                                     icon: 'error',
-                                    title: 'An Error Occurred',
-                                    text: error.response?.data?.message ?? 'Please try again.',
-                                    confirmButtonText: 'OK'
+                                    title: 'Delete Failed',
+                                    text: error.response?.data?.message ?? 'Please try again.'
                                 });
                             }
+
+                            return;
+                        }
+
+                        // ================= CHANGE LOCATIONS =================
+                        if (args.item.id === 'ChangeLocations') {
+
+                            const selectedUsers = mainGrid.obj.getSelectedRecords();
+
+                            if (!selectedUsers.length) {
+                                Swal.fire({
+                                    icon: 'warning',
+                                    title: 'No User Selected',
+                                    text: 'Please select a user first.'
+                                });
+                                return;
+                            }
+
+                            const selectedUser = selectedUsers[0];
+                            state.locationTitle = 'Location Access';
+                            state.userId = selectedUser.id ?? '';
+
+                            try {
+                                await methods.populateLocationData(state.userId);
+                                LocationGrid.refresh();
+                                LocationModal.obj.show();
+
+                            } catch (error) {
+                                console.error(error);
+                                Swal.fire({
+                                    icon: 'error',
+                                    title: 'Failed to Load Locations',
+                                    text: 'Please try again.'
+                                });
+                            }
+
+                            return;
                         }
                     }
                 });
-                LocationGrid.obj.appendTo(LocationGridRef.value);
+
+                LocationGrid.obj.appendTo(userLocationGridRef.value);
             },
+
             refresh: () => {
-                LocationGrid.obj.setProperties({ dataSource: state.LocationData });
+                if (LocationGrid.obj) {
+                    LocationGrid.obj.setProperties({ dataSource: state.userlocations || [] });
+                }
+            },
+            destroy: () => {
+                if (LocationGrid.obj) {
+                    LocationGrid.obj.destroy();   // removes DOM, events, instances
+                    LocationGrid.obj = null;
+                }
+            },
+            clear: () => {
+                if (LocationGrid.obj) {
+                    LocationGrid.obj.setProperties({ dataSource: [] });
+                }
             }
+
+
+
         };
+
+        
+
         const mainModal = {
             obj: null,
             create: () => {
@@ -1108,7 +1423,7 @@
             handler,
             LocationRef,
             LocationGrid,
-            LocationGridRef
+            userLocationGridRef
 
         };
     }

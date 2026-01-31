@@ -52,7 +52,7 @@
         const resetFormState = () => {
             state.id = '';
             state.number = '';
-            state.adjustmentDate = '';
+            //state.adjustmentDate = '';
             state.description = '';
             state.status = null;
             state.errors = {

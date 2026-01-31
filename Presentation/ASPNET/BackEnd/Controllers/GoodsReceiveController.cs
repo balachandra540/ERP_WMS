@@ -197,6 +197,23 @@ public class GoodsReceiveController : BaseApiController
         });
     }
 
+    
+    [HttpGet("GetGoodsReceiveItemDetails")]
+    [ProducesResponseType(typeof(ApiSuccessResult<List<GoodsReceiveItemDetailDto>>), StatusCodes.Status200OK)]
+    public async Task<ActionResult<ApiSuccessResult<List<GoodsReceiveItemDetailDto>>>>
+    GetGoodsReceiveItemDetailsAsync(CancellationToken cancellationToken)
+    {
+        var response = await _sender.Send(new GetGoodsReceiveItemDetailsQuery(), cancellationToken);
+
+        return Ok(new ApiSuccessResult<List<GoodsReceiveItemDetailDto>>
+        {
+            Code = StatusCodes.Status200OK,
+            Message = "Success fetching goods receive item details",
+            Content = response
+        });
+    }
+
+
 }
 
 

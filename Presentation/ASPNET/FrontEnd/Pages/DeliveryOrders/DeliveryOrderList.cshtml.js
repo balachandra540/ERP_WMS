@@ -62,7 +62,7 @@
         const resetFormState = () => {
             state.id = '';
             state.number = '';
-            state.deliveryDate = '';
+            //state.deliveryDate = '';
             state.description = '';
             state.salesOrderId = null;
             state.status = null;

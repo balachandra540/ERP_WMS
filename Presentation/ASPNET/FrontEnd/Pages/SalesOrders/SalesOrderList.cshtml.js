@@ -1306,7 +1306,7 @@ const App = {
         const resetFormState = () => {
             state.id = '';
             state.number = '';
-            state.orderDate = '';
+            //state.orderDate = '';
             state.description = '';
             state.customerId = null;
             state.taxId = null;
@@ -2238,7 +2238,7 @@ const App = {
                     <input type="text" 
                            class="form-control detail-input"
                            data-index="${i}"
-                           data-field="${field}"
+                           data-field="${field.toLowerCase()}"
                            value="${val}">
                 </td>
             `;
@@ -2372,7 +2372,7 @@ const App = {
                 // ---------------------------
                 // IMEI VALIDATION
                 // ---------------------------
-                if (field === "IMEI1" || field === "IMEI2") {
+                if (field.toLowerCase() === "imei1" || field.toLowerCase() === "imei2") {
 
                     if (value.length > 0 && value.length < 15) {
                         methods.showInlineError(input, `${field} must be 15 digits`);
@@ -2397,10 +2397,11 @@ const App = {
                 let imei2Value = '';
                 let serviceNoValue = '';
 
-                if (field === "IMEI1") imei1Value = value;
-                if (field === "IMEI2") imei2Value = value;
-                if (field === "ServiceNo") serviceNoValue = value;
+                if (field.toLowerCase() === "imei1") imei1Value = value;
+                if (field.toLowerCase() === "imei2") imei2Value = value;
+                if (field.toLowerCase() ===  "serviceno") serviceNoValue = value;
 
+                
                 try {
                     const response = await services.GetProductStockByProductId(
                         {
@@ -2467,26 +2468,26 @@ const App = {
             autoBindRemainingFieldsFromApi: async (index, matched, matchedField) => {
 
                 const fieldMap = {
-                    IMEI1: matched.imeI1,
-                    IMEI2: matched.imeI2,
-                    ServiceNo: matched.serviceNo
+                    imeI1: matched.imeI1,
+                    imeI2: matched.imeI2,
+                    serviceNo: matched.serviceNo
                 };
 
                 Object.keys(fieldMap).forEach(field => {
 
-                    if (field === matchedField) return;
+                    if (field.toLowerCase() === matchedField.toLowerCase()) return;
 
                     const val = fieldMap[field];
                     if (!val) return;
 
-                    if (state.activeDetailRow.detailEntries[index][field]) return;
+                    //if (state.activeDetailRow.detailEntries[index][field]) return;
 
                     // Save to state
                     state.activeDetailRow.detailEntries[index][field] = val;
 
                     // Bind to UI
                     const input = document.querySelector(
-                        `.detail-input[data-index="${index}"][data-field="${field}"]`
+                        `.detail-input[data-index="${index}"][data-field="${field.toLowerCase()}"]`
                     );
 
                     if (input) {
@@ -2498,11 +2499,11 @@ const App = {
 
                 // Lock the entered field also
                 const matchedInput = document.querySelector(
-                    `.detail-input[data-index="${index}"][data-field="${matchedField}"]`
+                    `.detail-input[data-index="${index}"][data-field="${matchedField.toLowerCase()}"]`
                 );
 
                 if (matchedInput) {
-                    matchedInput.readOnly = true;
+                    //matchedInput.readOnly = true;
                     matchedInput.classList.add("auto-filled");
                 }
             },

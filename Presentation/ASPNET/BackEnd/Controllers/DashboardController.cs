@@ -18,10 +18,10 @@ public class DashboardController : BaseApiController
     [Authorize]
     [HttpGet("GetCardsDashboard")]
     public async Task<ActionResult<ApiSuccessResult<GetCardsDashboardResult>>> GetCardsDashboardAsync(
-        CancellationToken cancellationToken
+        [FromQuery] GetCardsDashboardRequest request, CancellationToken cancellationToken
         )
     {
-        var request = new GetCardsDashboardRequest { };
+        //var request = new GetCardsDashboardRequest {  };
         var response = await _sender.Send(request, cancellationToken);
 
         return Ok(new ApiSuccessResult<GetCardsDashboardResult>
@@ -36,10 +36,10 @@ public class DashboardController : BaseApiController
     [Authorize]
     [HttpGet("GetSalesDashboard")]
     public async Task<ActionResult<ApiSuccessResult<GetSalesDashboardResult>>> GetSalesDashboardAsync(
-        CancellationToken cancellationToken
+       [FromQuery] GetSalesDashboardRequest request, CancellationToken cancellationToken
         )
     {
-        var request = new GetSalesDashboardRequest { };
+        //var request = new GetSalesDashboardRequest { };
         var response = await _sender.Send(request, cancellationToken);
 
         return Ok(new ApiSuccessResult<GetSalesDashboardResult>
@@ -54,10 +54,10 @@ public class DashboardController : BaseApiController
     [Authorize]
     [HttpGet("GetPurchaseDashboard")]
     public async Task<ActionResult<ApiSuccessResult<GetPurchaseDashboardResult>>> GetPurchaseDashboardAsync(
-        CancellationToken cancellationToken
+       [FromQuery] GetPurchaseDashboardRequest request, CancellationToken cancellationToken
         )
     {
-        var request = new GetPurchaseDashboardRequest { };
+        //var request = new GetPurchaseDashboardRequest { };
         var response = await _sender.Send(request, cancellationToken);
 
         return Ok(new ApiSuccessResult<GetPurchaseDashboardResult>
@@ -72,10 +72,10 @@ public class DashboardController : BaseApiController
     [Authorize]
     [HttpGet("GetInventoryDashboard")]
     public async Task<ActionResult<ApiSuccessResult<GetInventoryDashboardResult>>> GetInventoryDashboardAsync(
-        CancellationToken cancellationToken
+        [FromQuery] GetInventoryDashboardRequest request, CancellationToken cancellationToken
         )
     {
-        var request = new GetInventoryDashboardRequest { };
+        //var request = new GetInventoryDashboardRequest { };
         var response = await _sender.Send(request, cancellationToken);
 
         return Ok(new ApiSuccessResult<GetInventoryDashboardResult>

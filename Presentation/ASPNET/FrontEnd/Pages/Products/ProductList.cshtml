@@ -40,6 +40,30 @@
                                                 <input ref="numberRef" v-model="state.number" readonly>
                                             </div>
                                         </div>
+                                        <!-- NEW ROW -->
+                                        <div class="row mb-2">
+                                            <!-- HSN Code -->
+                                            <div class="col-md-6">
+                                                <label for="HsnCode">HSN Code</label>
+                                                <input ref="hsnRef"
+                                                       v-model="state.hsnCode"
+                                                       maxlength="8"
+                                                       placeholder="Enter HSN Code">
+                                                <label class="text-danger">{{ state.errors.hsnCode }}</label>
+                                            </div>
+
+                                            <!-- Tax Type -->
+                                            <div class="col-md-6">
+                                                <label for="TaxType">Tax Type</label>
+                                                <select ref="taxTypeRef"
+                                                        v-model="state.taxType">
+@*                                                     <option disabled value="">Select Tax Type</option>
+ *@                                                    <option value="Included">Tax Included</option>
+                                                       <option value="Excluded">Tax Excluded</option>
+                                                </select>
+                                                <label class="text-danger">{{ state.errors.taxType }}</label>
+                                            </div>
+                                        </div>
                                         <div class="row mb-2">
                                             <div class="col-md-6">
                                                 <label for="UnitPrice">Unit Price</label>

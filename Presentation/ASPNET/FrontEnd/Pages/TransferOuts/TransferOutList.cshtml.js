@@ -143,7 +143,7 @@
         const resetFormState = () => {
             state.id = '';
             state.number = '';
-            state.transferReleaseDate = '';
+            //state.transferReleaseDate = '';
             state.description = '';
             //state.warehouseFromId = null;
             state.warehouseToId = null;
@@ -217,13 +217,13 @@
             }
         };
 
-        Vue.watch(
-            () => state.transferReleaseDate,
-            (newVal, oldVal) => {
-                transferReleaseDatePicker.refresh();
-                state.errors.transferReleaseDate = '';
-            }
-        );
+        //Vue.watch(
+        //    () => state.transferReleaseDate,
+        //    (newVal, oldVal) => {
+        //        transferReleaseDatePicker.refresh();
+        //        state.errors.transferReleaseDate = '';
+        //    }
+        //);
         const setDefaultDate = () => {
             if (!state.transferReleaseDate) {
                 state.transferReleaseDate = new Date();
@@ -1617,7 +1617,7 @@
                             state.mainTitle = 'Add Transfer Out';
                             state.isAddMode = true;
                             resetFormState();
-                            setDefaultDate();
+                            //setDefaultDate();
                             state.showComplexDiv = true;
                             mainModal.obj.show();
                         }

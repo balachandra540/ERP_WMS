@@ -1,9 +1,12 @@
-﻿using Application.Common.Services.EmailManager;
+﻿using Application.Common.Repositories;
+using Application.Common.Services.EmailManager;
 using Application.Common.Services.SecurityManager;
+using Application.Features.SecurityManager.Queries;
 using Application.Features.WarehouseManager;
 using Application.Features.WarehouseManager.Commands;
 using Domain.Entities;
 using Infrastructure.DataAccessManager.EFCore.Contexts;
+using Infrastructure.DataAccessManager.EFCore.Repositories;
 using Infrastructure.SecurityManager.NavigationMenu;
 using Infrastructure.SecurityManager.Roles;
 using Infrastructure.SecurityManager.Tokens;
@@ -33,6 +36,7 @@ namespace Infrastructure.SecurityManager.AspNetIdentity;
         private readonly RoleManager<IdentityRole> _roleManager;
         private readonly IConfiguration _configuration;
         private readonly UpdateWarehouseLogoHandler _warehouseconfiguration;
+        private readonly ICommandRepository<UserWarehouse> _userWareHouse;
 
     public SecurityService(
         UserManager<ApplicationUser> userManager,
@@ -44,7 +48,9 @@ namespace Infrastructure.SecurityManager.AspNetIdentity;
         IHttpContextAccessor httpContextAccessor,
         RoleManager<IdentityRole> roleManager,
         IConfiguration configuration,
-        UpdateWarehouseLogoHandler warehouseconfiguration // Injecting WarehouseService
+        UpdateWarehouseLogoHandler warehouseconfiguration ,// Injecting WarehouseService
+        ICommandRepository<UserWarehouse> userwareHouse//,
+
         )
     {
         _userManager = userManager;
@@ -57,7 +63,8 @@ namespace Infrastructure.SecurityManager.AspNetIdentity;
         _roleManager = roleManager;
         _configuration = configuration;
         _warehouseconfiguration = warehouseconfiguration; // Initializing WarehouseService
-    }
+        _userWareHouse = userwareHouse;
+       }
 
     public async Task<LoginResultDto> LoginAsync(
         string email,
@@ -462,6 +469,212 @@ namespace Infrastructure.SecurityManager.AspNetIdentity;
 
         return users;
     }
+
+    public async Task<List<GetUserLocationsListDto>> GetUserLocationListAsync(GetUserWarehouseListRequest request,
+    CancellationToken cancellationToken)
+    {
+        //var userlocations = await _context.UserWarehouses
+        //    .AsNoTracking()
+        //    .Select(x => new GetUserLocationsListDto
+        //    {
+        //        Id = x.Id,
+        //        UserId = x.UserId,
+        //        LocationId = x.WarehouseId,
+        //        IsDeleted = x.IsDeleted,
+        //        CreatedAtUtc = x.CreatedAtUtc,
+        //        CreatedById = x.CreatedById
+        //    })
+        //    .ToListAsync(cancellationToken);
+
+        //return userlocations;
+       // var query = _context.UserWarehouses
+       //.AsNoTracking()
+       //.Where(x => !x.IsDeleted);   // usually you don’t want deleted rows
+
+       // //Apply filter only when userId is provided
+       // if (!string.IsNullOrEmpty(request.UserId))
+       // {
+       //     query = query.Where(x => x.UserId == request.UserId);
+       // }
+
+       // var userlocations = await query
+       //     .Select(x => new GetUserLocationsListDto
+       //     {
+       //         Id = x.Id,
+       //         UserId = x.UserId,
+       //         LocationId = x.WarehouseId,
+       //         IsDeleted = x.IsDeleted,
+       //         CreatedAtUtc = x.CreatedAtUtc,
+       //         CreatedById = x.CreatedById
+       //     })
+       //     .ToListAsync(cancellationToken);
+
+        var query = _context.UserWarehouses
+    .Where(x => !x.IsDeleted);
+
+        if (!string.IsNullOrEmpty(request.UserId))
+        {
+            query = query.Where(x => x.UserId == request.UserId);
+        }
+
+        var userlocations = await query
+            .Join(_context.Warehouse,
+                uw => uw.WarehouseId,
+                w => w.Id,
+                (uw, w) => new GetUserLocationsListDto
+                {
+                    Id = uw.Id,
+                    UserId = uw.UserId,
+                    LocationId = uw.WarehouseId,     // keep for internal use
+                    LocationName = w.Name,           // display this in grid
+                    IsDefaultLocation =uw.IsDefaultLocation,
+                    IsDeleted = uw.IsDeleted,
+                    CreatedAtUtc = uw.CreatedAtUtc,
+                    CreatedById = uw.CreatedById
+                })
+            .ToListAsync(cancellationToken);
+
+
+
+        return userlocations;
+    }
+
+    public async Task<CreateUserLocationsListDto> CreateUserWarehouseAsync(
+    string userId,
+    string locationId,
+    bool isDefaultLocation,
+    string createdById = "",
+    CancellationToken cancellationToken = default)
+    {
+        var exists = await _context.UserWarehouses
+            .AnyAsync(x => x.UserId == userId
+                        && x.WarehouseId == locationId
+                        && !x.IsDeleted, cancellationToken);
+
+        if (exists)
+            throw new Exception("Location already assigned to this user.");
+
+        var entity = new UserWarehouse
+        {
+           UserId = userId,
+            WarehouseId = locationId,
+            IsDefaultLocation = isDefaultLocation,
+            IsDeleted = false,
+            CreatedAtUtc = DateTime.UtcNow,
+            CreatedById = createdById
+        };
+
+        await _userWareHouse.CreateAsync(entity);
+        var result = await _context.SaveChangesAsync(cancellationToken);
+        Console.WriteLine("Rows affected: " + result);
+
+
+        return new CreateUserLocationsListDto
+        {
+            UserId = entity.UserId,
+            LocationId = entity.WarehouseId,
+            IsDefaultLocation = entity.IsDefaultLocation,
+            IsDeleted = entity.IsDeleted,
+            CreatedAtUtc = entity.CreatedAtUtc,
+            CreatedById = entity.CreatedById
+        };
+    }
+    public async Task<UpdateUserLocationsListDto> UpdateUserWarehouseAsync(
+    string id,
+    string locationId,
+    bool isDefaultLocation,
+    string updatedById = "",
+    CancellationToken cancellationToken = default)
+    {
+        var entity = await _context.UserWarehouses
+            .FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
+
+        if (entity == null)
+            throw new Exception($"UserLocation not found with id: {id}");
+
+        if (entity.IsDeleted)
+            throw new Exception("Cannot update a deleted user location.");
+
+        // 🔥 If this location is being set as default,
+        // unset any other default location for this user
+        if (isDefaultLocation)
+        {
+            var previousDefaults = await _context.UserWarehouses
+                .Where(x => x.UserId == entity.UserId
+                            && x.Id != entity.Id
+                            && x.IsDefaultLocation
+                            && !x.IsDeleted)
+                .ToListAsync(cancellationToken);
+
+            foreach (var item in previousDefaults)
+            {
+                item.IsDefaultLocation = false;
+                item.UpdatedAtUtc = DateTime.UtcNow;
+                item.UpdatedById = updatedById;
+            }
+        }
+        if (isDefaultLocation)
+        {
+            await _context.UserWarehouses
+                .Where(x => x.UserId == entity.UserId
+                            && x.Id != entity.Id
+                            && x.IsDefaultLocation
+                            && !x.IsDeleted)
+                .ExecuteUpdateAsync(setters => setters
+                    .SetProperty(x => x.IsDefaultLocation, false)
+                    .SetProperty(x => x.UpdatedById, updatedById),
+                    cancellationToken);
+        }
+
+
+        // Update current entity
+        entity.WarehouseId = locationId;
+        entity.UpdatedAtUtc = DateTime.UtcNow;
+        entity.UpdatedById = updatedById;
+        entity.IsDefaultLocation = isDefaultLocation;
+
+        _userWareHouse.Update(entity);
+
+        await _context.SaveChangesAsync(cancellationToken);
+
+        return new UpdateUserLocationsListDto
+        {
+            Id = entity.Id,
+            UserId = entity.UserId,
+            LocationId = entity.WarehouseId,
+            IsDefaultLocation = entity.IsDefaultLocation,
+            IsDeleted = entity.IsDeleted,
+            CreatedAtUtc = entity.CreatedAtUtc,
+            CreatedById = entity.CreatedById
+        };
+    }
+
+    public async Task<bool> DeleteUserWarehouseAsync(
+    string id,
+    string deletedById = "",
+    CancellationToken cancellationToken = default)
+    {
+        var entity = await _context.UserWarehouses
+            .AsTracking()
+            .FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
+
+        if (entity == null)
+            throw new Exception($"UserLocation not found with id: {id}");
+
+        if (entity.IsDeleted)
+            return true;
+
+        entity.IsDeleted = true;
+        entity.UpdatedById = deletedById;
+
+        _context.UserWarehouses.Update(entity);   // 🔥 Force EF to mark Modified
+
+        var rows = await _context.SaveChangesAsync(cancellationToken);
+
+        return rows > 0;
+    }
+
+
 
     public async Task<CreateUserResultDto> CreateUserAsync(
         string email,

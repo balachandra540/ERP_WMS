@@ -1039,7 +1039,7 @@ const App = {
         const resetFormState = () => {
             state.id = '';
             state.number = '';
-            state.receiveDate = '';
+            //state.receiveDate = '';
             state.description = '';
             state.purchaseOrderId = null;
             state.status = null;
@@ -1422,9 +1422,19 @@ const App = {
                     throw error;
                 }
             },
+
+            //getGoodsReceiveItemDetailsListLookupData: async () => {
+            //    try {
+            //        const response = await AxiosManager.get('/GoodsReceive/GetAllAttributeValues', {});
+            //        return response;
+            //    } catch (error) {
+            //        throw error;
+            //    }
+            //},
+
             getGoodsReceiveItemDetailsListLookupData: async () => {
                 try {
-                    const response = await AxiosManager.get('/GoodsReceive/GetAllAttributeValues', {});
+                    const response = await AxiosManager.get('/GoodsReceive/GetGoodsReceiveItemDetails', {});
                     return response;
                 } catch (error) {
                     throw error;
@@ -1593,14 +1603,23 @@ const App = {
                 const response = await services.getGoodsReceiveStatusListLookupData();
                 state.goodsReceiveStatusListLookupData = response?.data?.content?.data;
             },
+            //populateGoodsReceiveItemDetailsListLookupData: async () => {
+            //    const response = await services.getGoodsReceiveItemDetailsListLookupData();
+            //    //state.goodsReceiveItemDetailsLookupData = response?.data?.content?.data;
+            //    state.globalAttributes  = response?.data?.content || {
+            //        allIMEI1: [],
+            //        allIMEI2: [],
+            //        allServiceNo: []
+            //    };
+            //},
             populateGoodsReceiveItemDetailsListLookupData: async () => {
                 const response = await services.getGoodsReceiveItemDetailsListLookupData();
-                //state.goodsReceiveItemDetailsLookupData = response?.data?.content?.data;
-                state.globalAttributes  = response?.data?.content || {
-                    allIMEI1: [],
-                    allIMEI2: [],
-                    allServiceNo: []
-                };
+                state.globalAttributes = response?.data?.content;
+                //state.globalAttributes = response?.data?.content || {
+                //    allIMEI1: [],
+                //    allIMEI2: [],
+                //    allServiceNo: []
+                //};
             },
             populateProductListLookupData: async () => {
                 const response = await services.getProductListLookupData();
@@ -2382,229 +2401,171 @@ const App = {
 
                 console.log("Saved:", entries);
             },
-            collectDetailAttributes: (row) => {
-                const Attributes = [];
-                const errors = [];
-
-                // -------------------------------
-                // Ensure product exists
-                // -------------------------------
-                const product = state.productListLookupData.find(p => p.id === row.productId);
-                if (!product) {
-                    errors.push(`Product not found for row with productId = ${row.productId}`);
-                    return { Attributes, errors };
-                }
-                const global = state.globalAttributes;
-
-                if (product.imei1 || product.imei2 || product.serviceNo) {
-                    if (!row.detailEntries || row.detailEntries.length === 0) {
-                        errors.push(`Please enter required product attributes (IMEI / Service No) for product`);
-                        return { Attributes, errors };
-                    }
-                }
-                // Local duplicates inside same GR item
-                // -------------------------------
-                const localIMEI1 = new Set();
-                const localIMEI2 = new Set();
-                const localServiceNo = new Set();
-
-                // -------------------------------
-                // Iterate detail rows
-                // -------------------------------
-                row.detailEntries.forEach((entry, index) => {
-                    const imei1 = (entry.IMEI1 || "").trim();
-                    const imei2 = (entry.IMEI2 || "").trim();
-                    const serviceNo = (entry.ServiceNo || "").trim();
-
-                    // -------------------------------
-                    // REQUIRED FIELD VALIDATION
-                    // -------------------------------
-                    if (product.imei1) {
-                        if (!imei1) errors.push(`IMEI1 missing at row ${index + 1} for product ${row.productId}`);
-                        else if (!/^\d{15}$/.test(imei1)) errors.push(`IMEI1 must be 15 digits at row ${index + 1}`);
-                    }
-
-                    if (product.imei2) {
-                        if (!imei2) errors.push(`IMEI2 missing at row ${index + 1}`);
-                        else if (!/^\d{15}$/.test(imei2)) errors.push(`IMEI2 must be 15 digits at row ${index + 1}`);
-                    }
-
-                    if (product.serviceNo) {
-                        if (!serviceNo) errors.push(`Service No missing at row ${index + 1}`);
-                    }
-
-                    // -------------------------------
-                    // IMEI1 != IMEI2 validation
-                    // -------------------------------
-                    if (product.imei1 && product.imei2) {
-                        if (imei1 && imei2 && imei1 === imei2) {
-                            errors.push(`IMEI1 and IMEI2 cannot be same at row ${index + 1}`);
-                        }
-                    }
-
-                    // -------------------------------
-                    // LOCAL DUPLICATE CHECK
-                    // -------------------------------
-                    if (imei1 && localIMEI1.has(imei1))
-                        errors.push(`Duplicate IMEI1 (${imei1}) within same item at row ${index + 1}`);
-
-                    if (imei2 && localIMEI2.has(imei2))
-                        errors.push(`Duplicate IMEI2 (${imei2}) within same item at row ${index + 1}`);
-
-                    if (serviceNo && localServiceNo.has(serviceNo))
-                        errors.push(`Duplicate Service No (${serviceNo}) within same item at row ${index + 1}`);
-
-                    localIMEI1.add(imei1);
-                    localIMEI2.add(imei2);
-                    localServiceNo.add(serviceNo);
-
-                    // -------------------------------
-                    // 3️⃣ Global Duplicate Check (Database)
-                    // -------------------------------
-                    if (imei1 && global.allIMEI1.includes(imei1))
-                        errors.push(`IMEI1 (${imei1}) already exists in system`);
-
-                    if (imei2 && global.allIMEI2.includes(imei2))
-                        errors.push(`IMEI2 (${imei2}) already exists in system`);
-
-                    if (serviceNo && global.allServiceNo.includes(serviceNo))
-                        errors.push(`Service No (${serviceNo}) already exists in system`);
-
-                    // -------------------------------
-                    // ADD TO RETURN PAYLOAD
-                    // -------------------------------
-                    Attributes.push({
-                        RowIndex: index,
-                        IMEI1: imei1 ,
-                        IMEI2: imei2,
-                        ServiceNo: serviceNo,
-                    });
-                });
-                if (row.detailEntries.length !== row.receivedQuantity) {
-                    errors.push("Received Quantity not matching with Attributes length");
-                }
-               
-                return { Attributes, errors };
-            },
-
             //collectDetailAttributes: (row) => {
             //    const Attributes = [];
+            //    const errors = [];
 
+            //    // -------------------------------
+            //    // Ensure product exists
+            //    // -------------------------------
             //    const product = state.productListLookupData.find(p => p.id === row.productId);
+            //    if (!product) {
+            //        errors.push(`Product not found for row with productId = ${row.productId}`);
+            //        return { Attributes, errors };
+            //    }
+            //    const global = state.globalAttributes;
 
-            //        if (!row.detailEntries) return; // skip empty
+            //    if (product.imei1 || product.imei2 || product.serviceNo) {
+            //        if (!row.detailEntries || row.detailEntries.length === 0) {
+            //            errors.push(`Please enter required product attributes (IMEI / Service No) for product`);
+            //            return { Attributes, errors };
+            //        }
+            //    }
+            //    // Local duplicates inside same GR item
+            //    // -------------------------------
+            //    const localIMEI1 = new Set();
+            //    const localIMEI2 = new Set();
+            //    const localServiceNo = new Set();
 
-            //    const globalIMEI1 = new Set();
-            //    const globalIMEI2 = new Set();
-            //    const globalServiceNo = new Set()
+            //    // -------------------------------
+            //    // Iterate detail rows
+            //    // -------------------------------
             //    row.detailEntries.forEach((entry, index) => {
             //        const imei1 = (entry.IMEI1 || "").trim();
             //        const imei2 = (entry.IMEI2 || "").trim();
-            //        const serviceNo = (entry.ServiceNo || "").trim()
-            //        if (product.imei1) {
-            //            if (!imei1) {
-            //                errors.push(`IMEI1 missing at row ${index + 1} for product ${row.productId}`);
-            //            }
-            //        }
-            //        if (product.imei2) {
-            //            if (!imei2) {
-            //                errors.push(`IMEI2 missing at row ${index + 1}`);
-            //            }
-            //        }
-            //        if (product.serviceNo) {
-            //            if (!serviceNo) {
-            //                errors.push(`Service No missing at row ${index + 1}`);
-            //            }
+            //        const serviceNo = (entry.ServiceNo || "").trim();
 
+            //        // -------------------------------
+            //        // REQUIRED FIELD VALIDATION
+            //        // -------------------------------
+            //        if (product.imei1) {
+            //            if (!imei1) errors.push(`IMEI1 missing at row ${index + 1} for product ${row.productId}`);
+            //            else if (!/^\d{15}$/.test(imei1)) errors.push(`IMEI1 must be 15 digits at row ${index + 1}`);
             //        }
+
+            //        if (product.imei2) {
+            //            if (!imei2) errors.push(`IMEI2 missing at row ${index + 1}`);
+            //            else if (!/^\d{15}$/.test(imei2)) errors.push(`IMEI2 must be 15 digits at row ${index + 1}`);
+            //        }
+
+            //        if (product.serviceNo) {
+            //            if (!serviceNo) errors.push(`Service No missing at row ${index + 1}`);
+            //        }
+
+            //        // -------------------------------
+            //        // IMEI1 != IMEI2 validation
+            //        // -------------------------------
             //        if (product.imei1 && product.imei2) {
             //            if (imei1 && imei2 && imei1 === imei2) {
             //                errors.push(`IMEI1 and IMEI2 cannot be same at row ${index + 1}`);
             //            }
             //        }
-            //        if (localIMEI1.has(imei1)) {
-            //            errors.push(`Duplicate IMEI1 (${imei1}) inside same item`);
-            //        }
-            //        if (localIMEI2.has(imei2)) {
-            //            errors.push(`Duplicate IMEI2 (${imei2}) inside same item`);
-            //        }
-            //        if (localServiceNo.has(serviceNo)) {
-            //            errors.push(`Duplicate Service No (${serviceNo}) inside same item`);
-            //        }
+
+            //        // -------------------------------
+            //        // LOCAL DUPLICATE CHECK
+            //        // -------------------------------
+            //        if (imei1 && localIMEI1.has(imei1))
+            //            errors.push(`Duplicate IMEI1 (${imei1}) within same item at row ${index + 1}`);
+
+            //        if (imei2 && localIMEI2.has(imei2))
+            //            errors.push(`Duplicate IMEI2 (${imei2}) within same item at row ${index + 1}`);
+
+            //        if (serviceNo && localServiceNo.has(serviceNo))
+            //            errors.push(`Duplicate Service No (${serviceNo}) within same item at row ${index + 1}`);
 
             //        localIMEI1.add(imei1);
             //        localIMEI2.add(imei2);
             //        localServiceNo.add(serviceNo);
 
             //        // -------------------------------
-            //        // GLOBAL DUPLICATE CHECK (across all products)
+            //        // 3️⃣ Global Duplicate Check (Database)
             //        // -------------------------------
-            //        if (globalIMEI1.has(imei1)) {
-            //            errors.push(`IMEI1 (${imei1}) already used in another product`);
-            //        }
-            //        if (globalIMEI2.has(imei2)) {
-            //            errors.push(`IMEI2 (${imei2}) already used in another product`);
-            //        }
-            //        if (globalServiceNo.has(serviceNo)) {
-            //            errors.push(`Service No (${serviceNo}) already used in another product`);
-            //        }
+            //        if (imei1 && global.allIMEI1.includes(imei1))
+            //            errors.push(`IMEI1 (${imei1}) already exists in system`);
 
-            //        globalIMEI1.add(imei1);
-            //        globalIMEI2.add(imei2);
-            //        globalServiceNo.add(serviceNo);
-            //            Attributes.push({
-            //                RowIndex: i,
-            //                IMEI1: entry.IMEI1 || null,
-            //                IMEI2: entry.IMEI2 || null,
-            //                //SerialNo: entry.SerialNo || null,
-            //                ServiceNo: entry.ServiceNo || null,
-            //            });
+            //        if (imei2 && global.allIMEI2.includes(imei2))
+            //            errors.push(`IMEI2 (${imei2}) already exists in system`);
+
+            //        if (serviceNo && global.allServiceNo.includes(serviceNo))
+            //            errors.push(`Service No (${serviceNo}) already exists in system`);
+
+            //        // -------------------------------
+            //        // ADD TO RETURN PAYLOAD
+            //        // -------------------------------
+            //        Attributes.push({
+            //            RowIndex: index,
+            //            IMEI1: imei1 ,
+            //            IMEI2: imei2,
+            //            ServiceNo: serviceNo,
             //        });
+            //    });
+            //    if (row.detailEntries.length !== row.receivedQuantity) {
+            //        errors.push("Received Quantity not matching with Attributes length");
+            //    }
 
-            //    return Attributes;
+            //    return { Attributes, errors };
             //},
-            validateDetailEntries: (row) => {
+
+
+            collectDetailAttributes: (row) => {
+                const Attributes = [];
                 const errors = [];
 
-                // -------------------------------
-                // Product must be loaded
-                // -------------------------------
                 const product = state.productListLookupData.find(p => p.id === row.productId);
                 if (!product) {
-                    errors.push(`Product not found for ProductId: ${row.productId}`);
-                }
-                const global = state.globalAttributes;
-
-                // -------------------------------
-                // Detail entries check
-                // -------------------------------
-                if (product.imei1 || product.imei2 || product.serviceNo) {
-                    if (!row.detailEntries || row.detailEntries.length === 0) {
-                        errors.push(`Please enter required product attributes (IMEI / Service No) for product`);
-                    }
+                    errors.push(`Product not found for row with productId = ${row.productId}`);
+                    return { Attributes, errors };
                 }
 
-                // -------------------------------
-                // Local duplicate sets (within same item)
-                // -------------------------------
+                const detailEntries = row.detailEntries || [];
+
+                if ((product.imei1 || product.imei2 || product.serviceNo) && detailEntries.length === 0) {
+                    errors.push(`Please enter required product attributes (IMEI / Service No) for product`);
+                    return { Attributes, errors };
+                }
+
+                // --------------------------------------------------
+                // BUILD GLOBAL SETS FROM TABLE DATA
+                // --------------------------------------------------
+                const globalList = state.globalAttributes || [];
+
+                const globalIMEI1Set = new Set(globalList.map(x => (x.imei1 || "").trim()).filter(Boolean));
+                const globalIMEI2Set = new Set(globalList.map(x => (x.imei2 || "").trim()).filter(Boolean));
+                const globalServiceSet = new Set(globalList.map(x => (x.serviceNo || "").trim()).filter(Boolean));
+
+                // --------------------------------------------------
+                // EXCLUDE ORIGINAL VALUES OF THIS ROW (EDIT MODE FIX)
+                // --------------------------------------------------
+                const original = (detailEntries || []).map(x => ({
+                    imei1: (x.IMEI1 || "").trim(),
+                    imei2: (x.IMEI2 || "").trim(),
+                    serviceNo: (x.ServiceNo || "").trim()
+                }));
+
+                original.forEach(x => {
+                    globalIMEI1Set.delete(x.imei1);
+                    globalIMEI2Set.delete(x.imei2);
+                    globalServiceSet.delete(x.serviceNo);
+                });
+
+                // --------------------------------------------------
+                // LOCAL DUPLICATE TRACKING (WITHIN SAME GR LINE)
+                // --------------------------------------------------
                 const localIMEI1 = new Set();
                 const localIMEI2 = new Set();
                 const localServiceNo = new Set();
 
-
-                // -------------------------------
-                // LOOP ITEMS
-                // -------------------------------
-                row.detailEntries.forEach((entry, index) => {
+                // --------------------------------------------------
+                // PROCESS EACH ENTRY
+                // --------------------------------------------------
+                detailEntries.forEach((entry, index) => {
                     const imei1 = (entry.IMEI1 || "").trim();
                     const imei2 = (entry.IMEI2 || "").trim();
                     const serviceNo = (entry.ServiceNo || "").trim();
 
-                    // ================================
-                    // REQUIRED FIELD VALIDATION (based on product flags)
-                    // ================================
+                    // Required validations
                     if (product.imei1) {
-                        if (!imei1) errors.push(`IMEI1 missing at row ${index + 1} for product ${row.productId}`);
+                        if (!imei1) errors.push(`IMEI1 missing at row ${index + 1}`);
                         else if (!/^\d{15}$/.test(imei1)) errors.push(`IMEI1 must be 15 digits at row ${index + 1}`);
                     }
 
@@ -2613,26 +2574,19 @@ const App = {
                         else if (!/^\d{15}$/.test(imei2)) errors.push(`IMEI2 must be 15 digits at row ${index + 1}`);
                     }
 
-                    if (product.serviceNo) {
-                        if (!serviceNo) errors.push(`Service No missing at row ${index + 1}`);
+                    if (product.serviceNo && !serviceNo) {
+                        errors.push(`Service No missing at row ${index + 1}`);
                     }
 
-                    // ================================
-                    // IMEI1 ≠ IMEI2
-                    // ================================
                     if (imei1 && imei2 && imei1 === imei2) {
                         errors.push(`IMEI1 and IMEI2 cannot be same at row ${index + 1}`);
                     }
 
-                    // ================================
-                    // LOCAL DUPLICATES (same item)
-                    // ================================
+                    // Local duplicates
                     if (imei1 && localIMEI1.has(imei1))
                         errors.push(`Duplicate IMEI1 (${imei1}) within same item at row ${index + 1}`);
-
                     if (imei2 && localIMEI2.has(imei2))
                         errors.push(`Duplicate IMEI2 (${imei2}) within same item at row ${index + 1}`);
-
                     if (serviceNo && localServiceNo.has(serviceNo))
                         errors.push(`Duplicate Service No (${serviceNo}) within same item at row ${index + 1}`);
 
@@ -2640,37 +2594,251 @@ const App = {
                     localIMEI2.add(imei2);
                     localServiceNo.add(serviceNo);
 
-
-                    // -------------------------------
-                    // 3️⃣ Global Duplicate Check (Database)
-                    // -------------------------------
-                    if (imei1 && global.allIMEI1.includes(imei1))
+                    // Global duplicates (database-level)
+                    if (imei1 && globalIMEI1Set.has(imei1))
                         errors.push(`IMEI1 (${imei1}) already exists in system`);
-
-                    if (imei2 && global.allIMEI2.includes(imei2))
+                    if (imei2 && globalIMEI2Set.has(imei2))
                         errors.push(`IMEI2 (${imei2}) already exists in system`);
+                    if (serviceNo && globalServiceSet.has(serviceNo))
+                        errors.push(`Service No (${serviceNo}) already exists in system`);
 
-                    if (serviceNo && global.allServiceNo.includes(serviceNo))
+                    // Add to payload
+                    Attributes.push({
+                        RowIndex: index + 1,
+                        IMEI1: imei1,
+                        IMEI2: imei2,
+                        ServiceNo: serviceNo
+                    });
+                });
+
+                if (detailEntries.length !== row.receivedQuantity) {
+                    errors.push("Received Quantity not matching with Attributes length");
+                }
+
+                return { Attributes, errors };
+            },
+
+            
+            //validateDetailEntries: (row) => {
+            //    const errors = [];
+
+            //    // -------------------------------
+            //    // Product must be loaded
+            //    // -------------------------------
+            //    const product = state.productListLookupData.find(p => p.id === row.productId);
+            //    if (!product) {
+            //        errors.push(`Product not found for ProductId: ${row.productId}`);
+            //    }
+            //    const global = state.globalAttributes;
+
+            //    // -------------------------------
+            //    // Detail entries check
+            //    // -------------------------------
+            //    if (product.imei1 || product.imei2 || product.serviceNo) {
+            //        if (!row.detailEntries || row.detailEntries.length === 0) {
+            //            errors.push(`Please enter required product attributes (IMEI / Service No) for product`);
+            //        }
+            //    }
+
+            //    // -------------------------------
+            //    // Local duplicate sets (within same item)
+            //    // -------------------------------
+            //    const localIMEI1 = new Set();
+            //    const localIMEI2 = new Set();
+            //    const localServiceNo = new Set();
+
+
+            //    // -------------------------------
+            //    // LOOP ITEMS
+            //    // -------------------------------
+            //    row.detailEntries.forEach((entry, index) => {
+            //        const imei1 = (entry.IMEI1 || "").trim();
+            //        const imei2 = (entry.IMEI2 || "").trim();
+            //        const serviceNo = (entry.ServiceNo || "").trim();
+
+            //        // ================================
+            //        // REQUIRED FIELD VALIDATION (based on product flags)
+            //        // ================================
+            //        if (product.imei1) {
+            //            if (!imei1) errors.push(`IMEI1 missing at row ${index + 1} for product ${row.productId}`);
+            //            else if (!/^\d{15}$/.test(imei1)) errors.push(`IMEI1 must be 15 digits at row ${index + 1}`);
+            //        }
+
+            //        if (product.imei2) {
+            //            if (!imei2) errors.push(`IMEI2 missing at row ${index + 1}`);
+            //            else if (!/^\d{15}$/.test(imei2)) errors.push(`IMEI2 must be 15 digits at row ${index + 1}`);
+            //        }
+
+            //        if (product.serviceNo) {
+            //            if (!serviceNo) errors.push(`Service No missing at row ${index + 1}`);
+            //        }
+
+            //        // ================================
+            //        // IMEI1 ≠ IMEI2
+            //        // ================================
+            //        if (imei1 && imei2 && imei1 === imei2) {
+            //            errors.push(`IMEI1 and IMEI2 cannot be same at row ${index + 1}`);
+            //        }
+
+            //        // ================================
+            //        // LOCAL DUPLICATES (same item)
+            //        // ================================
+            //        if (imei1 && localIMEI1.has(imei1))
+            //            errors.push(`Duplicate IMEI1 (${imei1}) within same item at row ${index + 1}`);
+
+            //        if (imei2 && localIMEI2.has(imei2))
+            //            errors.push(`Duplicate IMEI2 (${imei2}) within same item at row ${index + 1}`);
+
+            //        if (serviceNo && localServiceNo.has(serviceNo))
+            //            errors.push(`Duplicate Service No (${serviceNo}) within same item at row ${index + 1}`);
+
+            //        localIMEI1.add(imei1);
+            //        localIMEI2.add(imei2);
+            //        localServiceNo.add(serviceNo);
+
+
+            //        // -------------------------------
+            //        // 3️⃣ Global Duplicate Check (Database)
+            //        // -------------------------------
+            //        if (imei1 && global.allIMEI1.includes(imei1))
+            //            errors.push(`IMEI1 (${imei1}) already exists in system`);
+
+            //        if (imei2 && global.allIMEI2.includes(imei2))
+            //            errors.push(`IMEI2 (${imei2}) already exists in system`);
+
+            //        if (serviceNo && global.allServiceNo.includes(serviceNo))
+            //            errors.push(`Service No (${serviceNo}) already exists in system`);
+            //    });
+
+            //    if (row.detailEntries.length !== row.receivedQuantity) {
+            //        errors.push("Received Quantity not matching with Attributes length");
+            //    }
+            //    if (errors.length > 0) {
+            //        Swal.fire({
+            //            icon: "error",
+            //            title: "Validation Failed",
+            //            html: errors.join("<br>")
+            //        });
+
+            //        return false;
+            //    }
+
+            //    return true ;
+            //},
+
+            validateDetailEntries: (row) => {
+                const errors = [];
+
+                const product = state.productListLookupData.find(p => p.id === row.productId);
+                if (!product) {
+                    errors.push(`Product not found for ProductId: ${row.productId}`);
+                    return false;
+                }
+
+                const detailEntries = row.detailEntries || [];
+
+                // Require detail rows if tracking is enabled
+                if ((product.imei1 || product.imei2 || product.serviceNo) && detailEntries.length === 0) {
+                    errors.push(`Please enter required product attributes (IMEI / Service No)`);
+                }
+
+                // --------------------------------------------------
+                // BUILD GLOBAL SETS FROM TABLE DATA
+                // --------------------------------------------------
+                const globalList = state.globalAttributes || [];
+
+                const globalIMEI1Set = new Set(globalList.map(x => (x.imei1 || "").trim()).filter(Boolean));
+                const globalIMEI2Set = new Set(globalList.map(x => (x.imei2 || "").trim()).filter(Boolean));
+                const globalServiceSet = new Set(globalList.map(x => (x.serviceNo || "").trim()).filter(Boolean));
+
+                // --------------------------------------------------
+                // EXCLUDE ORIGINAL VALUES OF THIS ROW (EDIT MODE FIX)
+                // --------------------------------------------------
+                const original = (row.originalDetailEntries || []).map(x => ({
+                    imei1: (x.IMEI1 || "").trim(),
+                    imei2: (x.IMEI2 || "").trim(),
+                    serviceNo: (x.ServiceNo || "").trim()
+                }));
+
+                original.forEach(x => {
+                    globalIMEI1Set.delete(x.imei1);
+                    globalIMEI2Set.delete(x.imei2);
+                    globalServiceSet.delete(x.serviceNo);
+                });
+
+                // --------------------------------------------------
+                // LOCAL DUPLICATE TRACKING
+                // --------------------------------------------------
+                const localIMEI1 = new Set();
+                const localIMEI2 = new Set();
+                const localServiceNo = new Set();
+
+                // --------------------------------------------------
+                // LOOP ENTRIES
+                // --------------------------------------------------
+                detailEntries.forEach((entry, index) => {
+                    const imei1 = (entry.IMEI1 || "").trim();
+                    const imei2 = (entry.IMEI2 || "").trim();
+                    const serviceNo = (entry.ServiceNo || "").trim();
+
+                    // Required validations
+                    if (product.imei1) {
+                        if (!imei1) errors.push(`IMEI1 missing at row ${index + 1}`);
+                        else if (!/^\d{15}$/.test(imei1)) errors.push(`IMEI1 must be 15 digits at row ${index + 1}`);
+                    }
+
+                    if (product.imei2) {
+                        if (!imei2) errors.push(`IMEI2 missing at row ${index + 1}`);
+                        else if (!/^\d{15}$/.test(imei2)) errors.push(`IMEI2 must be 15 digits at row ${index + 1}`);
+                    }
+
+                    if (product.serviceNo && !serviceNo) {
+                        errors.push(`Service No missing at row ${index + 1}`);
+                    }
+
+                    // IMEI1 != IMEI2
+                    if (imei1 && imei2 && imei1 === imei2) {
+                        errors.push(`IMEI1 and IMEI2 cannot be same at row ${index + 1}`);
+                    }
+
+                    // Local duplicates
+                    if (imei1 && localIMEI1.has(imei1))
+                        errors.push(`Duplicate IMEI1 (${imei1}) within same item at row ${index + 1}`);
+                    if (imei2 && localIMEI2.has(imei2))
+                        errors.push(`Duplicate IMEI2 (${imei2}) within same item at row ${index + 1}`);
+                    if (serviceNo && localServiceNo.has(serviceNo))
+                        errors.push(`Duplicate Service No (${serviceNo}) within same item at row ${index + 1}`);
+
+                    localIMEI1.add(imei1);
+                    localIMEI2.add(imei2);
+                    localServiceNo.add(serviceNo);
+
+                    // Global duplicates
+                    if (imei1 && globalIMEI1Set.has(imei1))
+                        errors.push(`IMEI1 (${imei1}) already exists in system`);
+                    if (imei2 && globalIMEI2Set.has(imei2))
+                        errors.push(`IMEI2 (${imei2}) already exists in system`);
+                    if (serviceNo && globalServiceSet.has(serviceNo))
                         errors.push(`Service No (${serviceNo}) already exists in system`);
                 });
 
-                if (row.detailEntries.length !== row.receivedQuantity) {
+                // Quantity match check
+                if (detailEntries.length !== row.receivedQuantity) {
                     errors.push("Received Quantity not matching with Attributes length");
                 }
+
                 if (errors.length > 0) {
                     Swal.fire({
                         icon: "error",
                         title: "Validation Failed",
                         html: errors.join("<br>")
                     });
-
                     return false;
                 }
 
-                return true ;
+                return true;
             },
 
-            
 
     };
 
@@ -3125,7 +3293,7 @@ const App = {
                         if (args.item.id === 'AddCustom') {
                             resetFormState();
                             // ✅ Set TODAY as default
-                            setDefaultDate();
+                            //setDefaultDate();
 
                             state.deleteMode = false;
                             state.mainTitle = 'Add Goods Receive Items';
