@@ -55,12 +55,13 @@
                                             <!-- Tax Type -->
                                             <div class="col-md-6">
                                                 <label for="TaxType">Tax Type</label>
-                                                <select ref="taxTypeRef"
+                                                @* <select ref="taxTypeRef"
                                                         v-model="state.taxType">
-@*                                                     <option disabled value="">Select Tax Type</option>
- *@                                                    <option value="Included">Tax Included</option>
+                                                   <option disabled value="">Select Tax Type</option>
+                                                   <option value="Included">Tax Included</option>
                                                        <option value="Excluded">Tax Excluded</option>
-                                                </select>
+                                                </select> *@
+                                                <div ref="taxTypeRef"></div>
                                                 <label class="text-danger">{{ state.errors.taxType }}</label>
                                             </div>
                                         </div>
