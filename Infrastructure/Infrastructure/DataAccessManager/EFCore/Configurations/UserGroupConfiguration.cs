@@ -32,28 +32,18 @@ public class UserGroupConfiguration : BaseEntityConfiguration<UserGroup>
             .IsRequired()
             .HasDefaultValue(true);
 
-        builder.Property(x => x.IsSpecialDiscount)
-            .IsRequired()
-            .HasDefaultValue(false);
-
-        // PostgreSQL: use numeric instead of decimal
-        builder.Property(x => x.MaxSpecialDiscount)
-            .HasColumnType("numeric(5,2)")
-            .IsRequired(false);
-
+        
         // ===============================
         // INDEXES
         // ===============================
 
         builder.HasIndex(x => x.Name);
         builder.HasIndex(x => x.IsActive);
-        builder.HasIndex(x => x.IsSpecialDiscount);
 
         // Composite index (useful for filtering)
         builder.HasIndex(x => new
         {
             x.IsActive,
-            x.IsSpecialDiscount
         });
     }
 }

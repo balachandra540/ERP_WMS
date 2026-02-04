@@ -14,9 +14,7 @@
             description: '',
 
             isActive: true,
-            isSpecialDiscount: false,
-            maxSpecialDiscount: null,   // ⭐ NEW
-
+            
             errors: {
                 name: ''
             },
@@ -39,10 +37,6 @@
                     name: state.name,
                     description: state.description,
                     isActive: state.isActive,
-                    isSpecialDiscount: state.isSpecialDiscount,
-                    maxSpecialDiscount: state.isSpecialDiscount
-                        ? state.maxSpecialDiscount
-                        : null,
                     createdById: StorageManager.getUserId()
                 }),
 
@@ -52,10 +46,6 @@
                     name: state.name,
                     description: state.description,
                     isActive: state.isActive,
-                    isSpecialDiscount: state.isSpecialDiscount,
-                    maxSpecialDiscount: state.isSpecialDiscount
-                        ? state.maxSpecialDiscount
-                        : null,
                     updatedById: StorageManager.getUserId()
                 }),
 
@@ -114,21 +104,7 @@
                         isValid = false;
                     }
 
-                    if (state.isSpecialDiscount) {
-                        if (
-                            state.maxSpecialDiscount == null ||
-                            state.maxSpecialDiscount <= 0 ||
-                            state.maxSpecialDiscount > 100
-                        ) {
-                            Swal.fire(
-                                'Validation Error',
-                                'Max Special Discount must be between 1 and 100.',
-                                'warning'
-                            );
-                            isValid = false;
-                        }
-                    }
-
+                   
                     if (!isValid) return;
 
                     const response = state.id === ''
@@ -208,20 +184,7 @@
                             type: 'boolean',
                             displayAsCheckBox: true,
                             width: 100
-                        },
-                        {
-                            field: 'isSpecialDiscount',
-                            headerText: 'Special Discount',
-                            type: 'boolean',
-                            displayAsCheckBox: true,
-                            width: 160
-                        },
-                        {
-                            field: 'maxSpecialDiscount',
-                            headerText: 'Max Special Discount (%)',
-                            width: 200,
-                            textAlign: 'Right'
-                        }
+                        },                        
                     ],
                     toolbar: [
                         'Search',

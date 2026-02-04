@@ -22,11 +22,7 @@ public class CreateUserGroupRequest : IRequest<CreateUserGroupResult>
     public string? Description { get; init; }
 
     public bool IsActive { get; init; }
-    public bool IsSpecialDiscount { get; init; }
-
-    // Nullable overall, but REQUIRED when IsSpecialDiscount = true
-    public decimal? MaxSpecialDiscount { get; init; }
-
+   
     public string? CreatedById { get; init; }
 }
 
@@ -41,13 +37,6 @@ public class CreateUserGroupValidator : AbstractValidator<CreateUserGroupRequest
         RuleFor(x => x.Name)
             .NotEmpty();
 
-        // Explicitly REQUIRED + range validation when Special Discount is ON
-        RuleFor(x => x.MaxSpecialDiscount)
-            .NotNull()
-            .GreaterThan(0)
-            .LessThanOrEqualTo(100)
-            .When(x => x.IsSpecialDiscount)
-            .WithMessage("Max Special Discount must be between 1 and 100.");
     }
 }
 
@@ -79,13 +68,8 @@ public class CreateUserGroupHandler
             Description = request.Description,
 
             IsActive = request.IsActive,
-            IsSpecialDiscount = request.IsSpecialDiscount,
 
-            // Clear value when feature is OFF
-            MaxSpecialDiscount = request.IsSpecialDiscount
-                ? request.MaxSpecialDiscount
-                : null,
-
+            
             CreatedById = request.CreatedById
         };
 

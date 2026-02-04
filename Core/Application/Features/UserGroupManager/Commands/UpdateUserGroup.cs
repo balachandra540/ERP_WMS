@@ -24,10 +24,7 @@ public class UpdateUserGroupRequest : IRequest<UpdateUserGroupResult>
     public string? Description { get; init; }
 
     public bool IsActive { get; init; }
-    public bool IsSpecialDiscount { get; init; }
-
-    // Nullable in model, REQUIRED when IsSpecialDiscount = true
-    public decimal? MaxSpecialDiscount { get; init; }
+    
 
     public string? UpdatedById { get; init; }
 }
@@ -46,13 +43,6 @@ public class UpdateUserGroupValidator : AbstractValidator<UpdateUserGroupRequest
         RuleFor(x => x.Name)
             .NotEmpty();
 
-        // Explicit NOT NULL + range validation
-        RuleFor(x => x.MaxSpecialDiscount)
-            .NotNull()
-            .GreaterThan(0)
-            .LessThanOrEqualTo(100)
-            .When(x => x.IsSpecialDiscount)
-            .WithMessage("Max Special Discount must be between 1 and 100.");
     }
 }
 
@@ -88,13 +78,7 @@ public class UpdateUserGroupHandler
         entity.Description = request.Description;
 
         entity.IsActive = request.IsActive;
-        entity.IsSpecialDiscount = request.IsSpecialDiscount;
-
-        // Clear value safely when feature is OFF
-        entity.MaxSpecialDiscount = request.IsSpecialDiscount
-            ? request.MaxSpecialDiscount
-            : null;
-
+       
         entity.UpdatedById = request.UpdatedById;
 
         _repository.Update(entity);

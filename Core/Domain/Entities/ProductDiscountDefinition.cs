@@ -1,5 +1,6 @@
 ﻿using Domain.Common;
 using System;
+using System.Collections.Generic;
 
 namespace Domain.Entities
 {
@@ -17,18 +18,19 @@ namespace Domain.Entities
         public string DiscountType { get; set; } = null!;
 
         /// <summary>
-        /// Percentage discount (used for both Flat & Upto)
+        /// General percentage used primarily when DiscountType is "Flat"
         /// </summary>
         public decimal DiscountPercentage { get; set; }
-
-        /// <summary>
-        /// Max discount amount (only for Upto)
-        /// </summary>
-        public decimal? MaxDiscountAmount { get; set; }
 
         public DateTime? EffectiveFrom { get; set; }
         public DateTime? EffectiveTo { get; set; }
 
         public bool IsActive { get; set; } = true;
+
+        /// <summary>
+        /// Collection of User Group specific limits used when DiscountType is "Upto"
+        /// </summary>
+        public virtual ICollection<ProductDiscountDetail> ProductDiscountDetails { get; set; }
+            = new List<ProductDiscountDetail>();
     }
 }

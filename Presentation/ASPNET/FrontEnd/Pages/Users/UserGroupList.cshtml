@@ -70,33 +70,10 @@
                                         </div>
                                     </div>
 
-                                    <div class="col-md-6">
-                                        <div class="form-check">
-                                            <input class="form-check-input"
-                                                   type="checkbox"
-                                                   v-model="state.isSpecialDiscount"
-                                                   id="IsSpecialDiscount" />
-                                            <label class="form-check-label" for="IsSpecialDiscount">
-                                                Special Discount
-                                            </label>
-                                        </div>
-                                    </div>
+                                   
                                 </div>
 
-                                <!-- MAX SPECIAL DISCOUNT -->
-                                <div class="row mb-2" v-if="state.isSpecialDiscount">
-                                    <div class="col-md-6">
-                                        <label>Max Special Discount (%)</label>
-                                        <input type="number"
-                                               class="form-control"
-                                               min="0"
-                                               max="100"
-                                               step="0.01"
-                                               v-model="state.maxSpecialDiscount"
-                                               placeholder="Enter percentage" />
-                                    </div>
-                                </div>
-
+                                
                             </div>
                         </div>
                     </form>

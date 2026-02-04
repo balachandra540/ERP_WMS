@@ -2,6 +2,7 @@
 using Domain.Entities;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
+using System.Linq; // Ensure this is included for the .Where inside Include
 
 namespace Application.Features.ProductManager.Queries;
 
@@ -9,6 +10,7 @@ namespace Application.Features.ProductManager.Queries;
 
 public class GetProductDiscountDefinitionListResult
 {
+    // The collection will now contain the filtered ProductDiscountDetails list
     public List<ProductDiscountDefinition>? Data { get; set; }
 }
 
@@ -39,7 +41,10 @@ public class GetProductDiscountDefinitionListHandler
         GetProductDiscountDefinitionListRequest request,
         CancellationToken cancellationToken)
     {
+        // Use Filtered Include to ensure only non-deleted details are fetched
         var items = await _context.ProductDiscountDefinition
+            .Include(x => x.ProductDiscountDetails.Where(d => !d.IsDeleted)) // ✅ Fix: Filters the child collection
+            .Where(x => !x.IsDeleted) // Filters the parent entities
             .OrderByDescending(x => x.CreatedAtUtc)
             .ToListAsync(cancellationToken);
 

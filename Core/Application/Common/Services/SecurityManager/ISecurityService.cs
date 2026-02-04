@@ -86,18 +86,19 @@ public interface ISecurityService
     public Task<bool> DeleteUserWarehouseAsync(string id, string deletedById, CancellationToken ct);
 
     public Task<CreateUserResultDto> CreateUserAsync(
-        string email,
-        string password,
-        string confirmPassword,
-        string firstName,
-        string lastName,
-        string wareHouse ="",
-        bool emailConfirmed = true,
-        bool isBlocked = false,
-        bool isDeleted = false,
-        string createdById = "",
-        CancellationToken cancellationToken = default
-        );
+    string email,
+    string password,
+    string confirmPassword,
+    string firstName,
+    string lastName,
+    string wareHouse = "",
+    bool emailConfirmed = true,
+    bool isBlocked = false,
+    bool isDeleted = false,
+    string createdById = "",
+    string userGroupId = "", // Placed before CancellationToken
+    CancellationToken cancellationToken = default
+    );
 
     public Task<UpdateUserResultDto> UpdateUserAsync(
         string userId,
@@ -108,9 +109,9 @@ public interface ISecurityService
         bool isBlocked = false,
         bool isDeleted = false,
         string updatedById = "",
-         CancellationToken cancellationToken = default
+        string userGroupId = "", // Placed before CancellationToken
+        CancellationToken cancellationToken = default
         );
-
     public Task<DeleteUserResultDto> DeleteUserAsync(
         string userId,
         string deletedById = "",

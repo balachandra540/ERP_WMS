@@ -42,6 +42,10 @@
 
                                 <div class="row mb-2">
                                     <div class="col-md-6">
+                                        <label for="UserGroupId">User Group</label>
+                                        <div ref="userGroupRef"></div> <label class="text-danger">{{ state.errors.userGroupId }}</label>
+                                    </div>
+                                    <div class="col-md-6">
                                         <label for="Email">Email</label>
                                         <input ref="emailRef" v-model="state.email">
                                         <label class="text-danger">{{ state.errors.email }}</label>
