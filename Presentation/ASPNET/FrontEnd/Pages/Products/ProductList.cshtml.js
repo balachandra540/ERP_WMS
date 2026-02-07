@@ -393,6 +393,7 @@
                     taxListLookup.obj = new ej.dropdowns.DropDownList({
                         dataSource: state.taxListLookupData,
                         fields: { value: 'id', text: 'name' },
+                        value: state.taxId || null, 
                         placeholder: 'Select a Tax',
                         change: async (e) => {
                             state.taxId = e.value;
@@ -493,8 +494,10 @@
                         { text: 'Tax Excluded', value: 'Excluded' }
                     ],
                     fields: { text: 'text', value: 'value' },
+                    value: state.taxType || null,   // ⭐ SET INITIAL VALUE HERE
                     change: (args) => {
                         state.taxType = args.value;
+                        state.errors.taxType = '';
                     }
                 });
 
@@ -840,7 +843,7 @@
                                 state.number = selectedRecord.number ?? '';
                                 state.name = selectedRecord.name ?? '';
                                 state.hsnCode = selectedRecord.hsnCode ?? '';
-                                state.taxType = selectedRecord.taxType;
+                                state.taxType = (selectedRecord.taxType || '').trim(); // ⭐ trim important
                                 state.unitPrice = selectedRecord.unitPrice ?? '';
                                 state.description = selectedRecord.description ?? '';
                                 state.productGroupId = selectedRecord.productGroupId ?? '';
@@ -854,6 +857,15 @@
                                 state.IMEI1 = selectedRecord.imei1 ?? false;               // or imei1 if lowercase in API
                                 state.IMEI2 = selectedRecord.imei2 ?? false;               // or imei2
                                 mainModal.obj.show();
+
+                                Vue.nextTick(() => {
+                                    if (taxTypeDropdown.obj) {
+                                        taxTypeDropdown.obj.value = state.taxType || null;
+                                    }
+                                    if (taxListLookup.obj) {
+                                        taxListLookup.obj.value = state.taxId;
+                                    }
+                                });
                             }
                         }
 

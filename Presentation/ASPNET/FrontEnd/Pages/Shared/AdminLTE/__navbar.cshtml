@@ -10,7 +10,7 @@
     </ul>
 
     <!-- CENTER DATE FILTER DROPDOWN -->
-    <ul class="navbar-nav mx-auto" id="dateFilterContainer" style="display:none;">
+    <!--<ul class="navbar-nav mx-auto" id="dateFilterContainer" style="display:none;">
         <li class="nav-item dropdown">
             <a class="nav-link dropdown-toggle btn btn-light btn-sm px-3"
                href="#"
@@ -43,7 +43,7 @@
                 <a class="dropdown-item date-filter-item text-primary" data-value="Custom">Custom Range</a>
             </div>
         </li>
-    </ul>
+    </ul>-->
 
 
     <!-- Right navbar links -->
@@ -51,7 +51,38 @@
     <span class="mt-0" id="topbarContent"> </span>@* Currency: *@
     <ul class="navbar-nav ml-auto align-items-center">
 
+        <li class="nav-item dropdown mr-3" id="dateFilterContainer" style="display:none;">
+            <a class="nav-link dropdown-toggle btn btn-light btn-sm px-3"
+               href="#"
+               id="dateFilterDropdownBtn"
+               role="button"
+               data-toggle="dropdown"
+               aria-haspopup="true"
+               aria-expanded="false">
+                <span id="selectedDateText">Today</span>
+            </a>
 
+            <div class="dropdown-menu dropdown-menu-center" aria-labelledby="dateFilterDropdownBtn" style="min-width:220px;">
+                <a class="dropdown-item date-filter-item" data-value="Today">Today</a>
+                <a class="dropdown-item date-filter-item" data-value="Yesterday">Yesterday</a>
+                <div class="dropdown-divider"></div>
+                <a class="dropdown-item date-filter-item" data-value="ThisWeek">This Week</a>
+                <a class="dropdown-item date-filter-item" data-value="LastWeek">Last Week</a>
+                <a class="dropdown-item date-filter-item" data-value="Last7Days">Last 7 Days</a>
+                <div class="dropdown-divider"></div>
+                <a class="dropdown-item date-filter-item" data-value="ThisMonth">This Month</a>
+                <a class="dropdown-item date-filter-item" data-value="LastMonth">Last Month</a>
+                <a class="dropdown-item date-filter-item" data-value="Last30Days">Last 30 Days</a>
+                <div class="dropdown-divider"></div>
+                <a class="dropdown-item date-filter-item" data-value="ThisQuarter">This Quarter</a>
+                <a class="dropdown-item date-filter-item" data-value="LastQuarter">Last Quarter</a>
+                <div class="dropdown-divider"></div>
+                <a class="dropdown-item date-filter-item" data-value="ThisFY">This Financial Year</a>
+                <a class="dropdown-item date-filter-item" data-value="LastFY">Last Financial Year</a>
+                <div class="dropdown-divider"></div>
+                <a class="dropdown-item date-filter-item text-primary" data-value="Custom">Custom Range</a>
+            </div>
+        </li>
 
 
         <!-- Location Dropdown -->
@@ -99,6 +130,37 @@
         </li>
     </ul>
 </nav>
+<div id="dashboardLoader" class="dashboard-loader d-none">
+    <div class="loader-spinner"></div>
+</div>
+<style>
+.dashboard-loader {
+    position: fixed;
+    inset: 0;
+    background: rgba(255,255,255,0.65);
+    backdrop-filter: blur(2px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+}
+
+.loader-spinner {
+    width: 48px;
+    height: 48px;
+    border: 5px solid #e0e0e0;
+    border-top: 5px solid #4f46e5;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+
+@@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+.d-none { display: none !important; }
+</style>
+
 <script>
     // document.addEventListener('DOMContentLoaded', async function () {
     //     debugger;
@@ -311,8 +373,20 @@
             notifyDashboardToReload();
         }
     });
-                 document.querySelectorAll(".date-filter-item").forEach(item => {
-        item.addEventListener("click", function () {
+        //          document.querySelectorAll(".date-filter-item").forEach(item => {
+        // item.addEventListener("click", function () {
+
+        //     const value = this.dataset.value;
+        //     const text = this.innerText;
+
+        //     document.getElementById("selectedDateText").innerText = text;
+        //     localStorage.setItem("selectedDateFilter", value);
+
+        //     notifyDashboardToReload();
+        // });
+
+            document.querySelectorAll(".date-filter-item").forEach(item => {
+        item.addEventListener("click", async function () {
 
             const value = this.dataset.value;
             const text = this.innerText;
@@ -320,10 +394,17 @@
             document.getElementById("selectedDateText").innerText = text;
             localStorage.setItem("selectedDateFilter", value);
 
-            notifyDashboardToReload();
-        });
+            showDashboardLoader();   // Show loader
 
+            try {
+                await notifyDashboardToReload();  // Make sure this returns a Promise
+            } finally {
+                hideDashboardLoader(); //  Always hide
+            }
+        });
     });
+
+
 
     //         function notifyDashboardToReload() {
 
@@ -334,7 +415,7 @@
     //         window.dispatchEvent(new Event("dashboardFiltersChanged"));
     //     }
     // }
-        function notifyDashboardToReload() {
+     function notifyDashboardToReload() {
 
         const locationId = StorageManager.getLocation();
         const dateFilter = localStorage.getItem("selectedDateFilter");
@@ -367,6 +448,15 @@
             window.dispatchEvent(new Event("dashboardFiltersChanged"));
         }
     }
+
+    function showDashboardLoader() {
+        document.getElementById("dashboardLoader")?.classList.remove("d-none");
+    }
+
+    function hideDashboardLoader() {
+        document.getElementById("dashboardLoader")?.classList.add("d-none");
+    }
+
 
 
     

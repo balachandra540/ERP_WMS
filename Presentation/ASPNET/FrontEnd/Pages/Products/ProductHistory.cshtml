@@ -126,8 +126,43 @@
                         <div class="timeline-icon"></div>
 
                         <div class="timeline-content">
-                            <strong>{{ item.moduleName }}</strong>
+                            <strong>
+                                {{ item.moduleName }}
+                                <span class="badge bg-secondary ms-2">{{ item.movementDirection }}</span>
+                            </strong>
+
                             <div class="text-muted">
+                                {{ item.moduleCode }} •
+                                {{ new Date(item.movementDate).toLocaleString() }}
+                            </div>
+
+                            <div class="mt-2">
+                                <div> Warehouse: {{ item.warehouseName }}</div>
+
+                                <div v-if="item.warehouseFromName || item.warehouseToName">
+                                    From → To:
+                                    {{ item.warehouseFromName || '—' }}
+                                    →
+                                    {{ item.warehouseToName || '—' }}
+                                </div>
+
+@*                                 <div> User: {{ item.CreatedUserId || 'System' }}</div>
+ *@                            </div>
+
+                            <hr class="my-2" />
+
+                            <div>
+                                Movement:
+                                <span :class="item.movementDirection === 'IN' ? 'text-success fw-bold' :
+                  item.movementDirection === 'OUT' ? 'text-danger fw-bold' : ''">
+                                    {{ item.movement }}
+                                </span>
+                            </div>
+
+                            <div>
+                                Stock : {{ item.stock }}
+                            </div>
+                            @* <div class="text-muted">
                                 {{ item.moduleCode }} •
                                 {{ new Date(item.movementDate).toLocaleString() }}
                             </div>
@@ -137,7 +172,7 @@
                             </div>
                             <div>
                                 Stock: {{ item.stock }}
-                            </div>
+                            </div> *@
                         </div>
                     </div>
 

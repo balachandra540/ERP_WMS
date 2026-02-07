@@ -660,7 +660,7 @@
                             disableHtmlEncode: false,
                             valueAccessor: (field, data, column) => {
                                 const product = state.productListLookupData.find(item => item.id === data[field]);
-                                return product ? `${product.numberName}` : '';
+                                return product ? `${product.name}` : '';
                             },
                             editType: 'dropdownedit',
                             edit: {

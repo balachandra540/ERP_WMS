@@ -16,13 +16,7 @@
 
             transactionHistory: [] // GRN / Sale / Transfer / Return / Scrap
         });
-//        const services = {
-//            getAttributesData: async (value) => {
-//                const response = await AxiosManager.post("/GoodsReceive/searchAttribute?InputValue=" + value);
-//                return response;
-//            }
-//,
-        //        }
+
         const services = {
             getAttributesData: async (value) => {
                 return await AxiosManager.post("/GoodsReceive/searchAttribute",

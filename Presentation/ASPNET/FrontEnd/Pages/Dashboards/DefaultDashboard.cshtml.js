@@ -7,6 +7,10 @@
             inventoryData: {},
             
         });
+        let salesOrderGridObj = null;
+        let purchaseOrderGridObj = null;
+        let inventoryTransGridObj = null;
+
         const locationId = StorageManager.getLocation() ?? '';
         const params = new URLSearchParams(window.location.search);
         const dateFilterType = params.get("dateFilterType") ?? "Today";
@@ -135,9 +139,19 @@
                     console.error('CardsDashboard data is not available.');
                 }
             },
+
             populateSalesOrderGrid: () => {
                 const salesOrderDashboard = state.salesData?.salesOrderDashboard ?? [];
-                new ej.grids.Grid({
+
+                if (salesOrderGridObj) {
+                    // 🔁 Just update data
+                    salesOrderGridObj.dataSource = salesOrderDashboard;
+                    salesOrderGridObj.refresh();
+                    return;
+                }
+
+                // 🆕 Create only once
+                salesOrderGridObj = new ej.grids.Grid({
                     dataSource: salesOrderDashboard,
                     allowFiltering: false,
                     allowSorting: true,
@@ -147,26 +161,32 @@
                     allowResizing: false,
                     allowPaging: true,
                     allowExcelExport: false,
-                    sortSettings: { columns: [{ field: 'orderDate', direction: 'Descending' }] },
+                    sortSettings: { columns: [{ field: 'salesOrder.orderDate', direction: 'Descending' }] },
                     pageSettings: { currentPage: 1, pageSize: 10 },
                     autoFit: false,
                     showColumnMenu: false,
                     gridLines: 'Horizontal',
                     columns: [
-                        {
-                            field: 'id', isPrimaryKey: true, headerText: 'Id', visible: false
-                        },
+                        { field: 'id', isPrimaryKey: true, headerText: 'Id', visible: false },
                         { field: 'salesOrder.orderDate', headerText: 'Order Date', width: 70, type: 'dateTime', format: 'yyyy-MM-dd', textAlign: 'Left' },
                         { field: 'salesOrder.number', headerText: '#Number', width: 90 },
                         { field: 'product.name', headerText: 'Product', width: 150 },
-                        { field: 'total', headerText: 'Total', width: 70, type: 'number', format: 'N2', textAlign: 'Right' },
+                        { field: 'total', headerText: 'Total', width: 70, type: 'number', format: 'N2', textAlign: 'Right' }
                     ],
                     emptyRecordTemplate: 'No sales orders available'
-                }, salesOrderGridRef.value);
+                });
+
+                salesOrderGridObj.appendTo(salesOrderGridRef.value);
             },
             populateInventoryTransactionGrid: () => {
                 const inventoryTransactionDashboard = state.inventoryData?.inventoryTransactionDashboard ?? [];
-                new ej.grids.Grid({
+                if (inventoryTransGridObj) {
+                    // 🔁 Just update data
+                    inventoryTransGridObj.dataSource = inventoryTransactionDashboard;
+                    inventoryTransGridObj.refresh();
+                    return;
+                }
+                inventoryTransGridObj = new ej.grids.Grid({
                     dataSource: inventoryTransactionDashboard,
                     allowFiltering: false,
                     allowSorting: true,
@@ -196,11 +216,19 @@
                         { field: 'warehouseFrom.name', headerText: 'Warehouse From', width: 150 },
                         { field: 'warehouseTo.name', headerText: 'Warehouse To', width: 150 },
                     ],
-                }, inventoryTransactionGridRef.value);
+                });
+                inventoryTransGridObj.appendTo(inventoryTransactionGridRef.value);
+
             },
             populatePurchaseOrderGrid: () => {
                 const purchaseOrderDashboard = state.purchaseData?.purchaseOrderDashboard ?? [];
-                new ej.grids.Grid({
+                if (purchaseOrderGridObj) {
+                    // 🔁 Just update data
+                    purchaseOrderGridObj.dataSource = purchaseOrderDashboard;
+                    purchaseOrderGridObj.refresh();
+                    return;
+                }
+                purchaseOrderGridObj = new ej.grids.Grid({
                     dataSource: purchaseOrderDashboard,
                     allowFiltering: false,
                     allowSorting: true,
@@ -210,7 +238,7 @@
                     allowResizing: false,
                     allowPaging: true,
                     allowExcelExport: false,
-                    sortSettings: { columns: [{ field: 'orderDate', direction: 'Descending' }] },
+                    sortSettings: { columns: [{ field: 'purchaseOrder.orderDate', direction: 'Descending' }] },
                     pageSettings: { currentPage: 1, pageSize: 10 },
                     autoFit: false,
                     showColumnMenu: false,
@@ -224,7 +252,9 @@
                         { field: 'product.name', headerText: 'Product', width: 150 },
                         { field: 'total', headerText: 'Total', width: 70, type: 'number', format: 'N2', textAlign: 'Right' },
                     ],
-                }, purchaseOrderGridRef.value);
+                });
+                purchaseOrderGridObj.appendTo(purchaseOrderGridRef.value);
+
             },
             populateSalesByCustomerGroupChart: () => {
                 const salesByCustomerGroupDashboard = state.salesData?.salesByCustomerGroupDashboard ?? [];

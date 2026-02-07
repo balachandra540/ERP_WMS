@@ -386,19 +386,37 @@ namespace Application.Features.GoodsReceiveManager.Queries
         public List<TransactionHistoryDto> History { get; set; } = new();
     }
 
-    
+
 
     public class TransactionHistoryDto
     {
-        public string? ModuleName { get; set; } = string.Empty;
-        public string? ModuleCode { get; set; } = string.Empty;
+        public string? ModuleName { get; set; }
+        public string? ModuleCode { get; set; }
         public DateTime? MovementDate { get; set; }
-        public double? Movement { get; set; } 
+
+        public string? WarehouseId { get; set; }
+        public string? WarehouseName { get; set; }
+
+        public string? WarehouseFromId { get; set; }
+        public string? WarehouseFromName { get; set; }
+
+        public string? WarehouseToId { get; set; }
+        public string? WarehouseToName { get; set; }
+
+        public string? CreatedUserId { get; set; }
+
+        public string? CreatedUserName { get; set; }
+
+        //public ApplicationUser? CreatedBy { get; set; }  
+
+        public double? Movement { get; set; }
         public double? Stock { get; set; }
+
+        public string? MovementDirection { get; set; }   // ⭐ NEW
     }
 
 
-public class ResolveInventoryByAttributeHandler
+    public class ResolveInventoryByAttributeHandler
     : IRequestHandler<
         ResolveInventoryByAttributeRequest,
         ResolveInventoryByAttributeResponse?>
@@ -455,8 +473,26 @@ public class ResolveInventoryByAttributeHandler
                     ModuleName = t.ModuleName,
                     ModuleCode = t.ModuleCode,
                     MovementDate = t.MovementDate,
+
+                    WarehouseId = t.WarehouseId,
+                    WarehouseName = t.Warehouse != null ? t.Warehouse.Name : null,
+
+                    WarehouseFromId = t.WarehouseFromId,
+                    WarehouseFromName = t.WarehouseFrom != null ? t.WarehouseFrom.Name : null,
+
+                    WarehouseToId = t.WarehouseToId,
+                    WarehouseToName = t.WarehouseTo != null ? t.WarehouseTo.Name : null,
+
+                    CreatedUserId = t.CreatedById,
+                    //CreatedUserName = t.CreatedBy != null ? t.CreatedBy.UserName : null,
+
                     Movement = t.Movement,
-                    Stock = t.Stock
+                    Stock = t.Stock,
+
+                    // ⭐ Direction Logic
+                    MovementDirection = t.Movement > 0 ? "IN"
+                      : t.Movement < 0 ? "OUT"
+                      : "N/A"
                 })
                 .ToListAsync(ct);
 

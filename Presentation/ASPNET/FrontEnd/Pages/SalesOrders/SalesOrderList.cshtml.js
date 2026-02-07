@@ -1617,12 +1617,27 @@ const App = {
                 } catch (error) {
                     throw error;
                 }
-            }
+            },
+            calculateSaleRate: (unitPrice, quantity, discountPercent, taxPercent) => {
+                const discountPerUnit = (unitPrice * (discountPercent ?? 0)) / 100;
+                const discountedRate = unitPrice - discountPerUnit;
 
+                const taxPerUnit = (discountedRate * (taxPercent ?? 0)) / 100;
+                const rateAfterTax = discountedRate + taxPerUnit;
+
+                const totalAfterTax = rateAfterTax * (quantity ?? 1);
+
+                return {
+                    discountPerUnit,
+                    discountedRate,
+                    taxPerUnit,
+                    rateAfterTax,
+                    totalAfterTax
+                };
+            },
 
 
            };
-
         //// Customer Text Inputs
         //const nameText = createTextInput(nameRef, customerState, 'name', 'Enter Name');
         //const CustomernumberText = createTextInput(CustomernumberRef, customerState, 'number', '[auto]', true);
@@ -2896,7 +2911,7 @@ const App = {
                 numberText.obj.appendTo(numberRef.value);
             }
         };
-
+        
         // Watchers
         //Vue.watch(
         //    () => state.orderDate,
@@ -3586,7 +3601,8 @@ const App = {
         //    }
         //};
         let gridObj;
-        
+       
+        let isProgrammaticPriceUpdate = false;
 
         const secondaryGrid = {
             obj: null,
@@ -3897,9 +3913,9 @@ const App = {
                                 }
                             }
                         },
-                        {
+                         {
                             field: 'unitPrice',
-                            headerText: 'Unit Price',
+                            headerText: 'Rate',
                             width: 200, validationRules: { required: true },
                             allowEditing: false,
                             disableHtmlEncode: false,
@@ -4029,7 +4045,7 @@ const App = {
                                     quantityObj.appendTo(args.element);
                                 }
                             }
-                        }
+                        }                  
 ,
                         {
                             field: 'details',
@@ -4086,7 +4102,7 @@ const App = {
                                     });
 
                                     discountAmountObj.appendTo(args.element);
-                                }
+                                 }
                             }
                         },
 
