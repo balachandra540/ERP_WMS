@@ -16,8 +16,6 @@ public record GetUserGroupListDto
     public string? Description { get; init; }
 
     public bool IsActive { get; init; }                 // ✅
-    public bool IsSpecialDiscount { get; init; }        // ⭐
-    public decimal? MaxSpecialDiscount { get; init; }   // 📊
 
     public DateTime? CreatedAtUtc { get; init; }
 }

@@ -1048,33 +1048,33 @@ const App = {
             }
         });
 
-        // 1. Initialize SignalR Connection
-        //const connection = new signalR.HubConnectionBuilder()
-        //    .withUrl("/approvalHub")
-        //    .withAutomaticReconnect()
-        //    .build();
+        // 🔥 Wrap SignalR init in a check to prevent script crashes
+        let connection = null;
+        if (typeof signalR !== 'undefined') {
+            connection = new signalR.HubConnectionBuilder()
+                .withUrl("/approvalHub")
+                .withAutomaticReconnect()
+                .build();
 
-        // 2. Listen for "Approved" event from the Manager
-        //connection.on("DiscountApproved", (data) => {
-        //    const gridData = secondaryGrid.obj.dataSource;
-        //    // Find row by tempRowId (which we sent as PLU or ID)
-        //    const row = gridData.find(r => (r.id === data.tempRowId || r.pluCode === data.tempRowId));
+            connection.on("DiscountApproved", (data) => {
+                const gridData = secondaryGrid.obj.dataSource;
+                const row = gridData.find(r => (r.id === data.tempRowId || r.pluCode === data.tempRowId));
 
-        //    if (row) {
-        //        row.approvalStatus = "Approved"; // Update status immediately
-        //        secondaryGrid.obj.refresh();
-
-        //        Swal.fire({
-        //            icon: 'success',
-        //            title: 'Approved!',
-        //            text: `${data.productName} discount is now ${row.upToDiscount}%`,
-        //            timer: 2000
-        //        });
-
-        //        methods.calculateLiveTotals(); // Recalculate summary totals
-        //    }
-        //});
-
+                if (row) {
+                    row.approvalStatus = "Approved";
+                    secondaryGrid.obj.refresh();
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Approved!',
+                        text: `${data.productName} discount is now ${row.upToDiscount}%`,
+                        timer: 2000
+                    });
+                    methods.calculateLiveTotals();
+                }
+            });
+        } else {
+            console.error("❌ SignalR library not found. Please include the signalr.min.js script.");
+        }
         // 3. Start Connection on Mount
         Vue.onMounted(async () => {
             try {
