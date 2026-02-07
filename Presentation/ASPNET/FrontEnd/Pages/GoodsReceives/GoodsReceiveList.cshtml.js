@@ -2529,10 +2529,9 @@ const App = {
                 // --------------------------------------------------
                 const globalList = state.globalAttributes || [];
 
-                const globalIMEI1Set = new Set(globalList.map(x => (x.imei1 || "").trim()).filter(Boolean));
-                const globalIMEI2Set = new Set(globalList.map(x => (x.imei2 || "").trim()).filter(Boolean));
-                const globalServiceSet = new Set(globalList.map(x => (x.serviceNo || "").trim()).filter(Boolean));
-
+                const globalIMEI1Set = new Set(globalList.map(x => (x.imei1 || x.imeI1 || "").trim()).filter(Boolean));
+                const globalIMEI2Set = new Set(globalList.map(x => (x.imei2 || x.imeI2 || "").trim()).filter(Boolean));
+                const globalServiceSet = new Set(globalList.map(x => (x.serviceNo || x.serviceno || "").trim()).filter(Boolean));
                 // --------------------------------------------------
                 // EXCLUDE ORIGINAL VALUES OF THIS ROW (EDIT MODE FIX)
                 // --------------------------------------------------
@@ -2747,9 +2746,9 @@ const App = {
                 // --------------------------------------------------
                 const globalList = state.globalAttributes || [];
 
-                const globalIMEI1Set = new Set(globalList.map(x => (x.imei1 || "").trim()).filter(Boolean));
-                const globalIMEI2Set = new Set(globalList.map(x => (x.imei2 || "").trim()).filter(Boolean));
-                const globalServiceSet = new Set(globalList.map(x => (x.serviceNo || "").trim()).filter(Boolean));
+                const globalIMEI1Set = new Set(globalList.map(x => (x.imei1 || x.imeI1||"").trim()).filter(Boolean));
+                const globalIMEI2Set = new Set(globalList.map(x => (x.imei2 || x.imeI2 || "").trim()).filter(Boolean));
+                const globalServiceSet = new Set(globalList.map(x => (x.serviceNo || x.serviceno || "").trim()).filter(Boolean));
 
                 // --------------------------------------------------
                 // EXCLUDE ORIGINAL VALUES OF THIS ROW (EDIT MODE FIX)
@@ -3417,7 +3416,7 @@ const App = {
                     allowTextWrap: true,
                     selectionSettings: { persistSelection: true, type: 'Single' },
                     columns: [
-                        { type: 'checkbox', width: 50 },
+                        { type: 'checkbox', width: 30 },
                         { field: 'id', visible: false },
                         { field: 'purchaseOrderItemId', isPrimaryKey: true, visible: false },
 
@@ -3437,25 +3436,25 @@ const App = {
                         {
                             field: 'actualQuantity',
                             headerText: 'Order Quantity',
-                            width: 120,
+                            width: 100,
                             textAlign: 'Right',
-                            format: 'N2',
+                            format: 'N0',
                             allowEditing: false
                         },
                         {
                             field: 'remaingQuantity',
                             headerText: 'Remaining Quantity',
-                            width: 120,
+                            width: 100,
                             textAlign: 'Right',
-                            format: 'N2',
+                            format: 'N0',
                             allowEditing: false
                         },
                         {
                             field: 'receivedQuantity',
                             headerText: 'Received Quantity',
-                            width: 120,
+                            width: 100,
                             textAlign: 'Right',
-                            format: 'N2',
+                            format: 'N0',
                             editType: 'numericedit',
                             edit: { params: { decimals: 2, min: 0, step: 0.01 } },
                             validationRules: {
@@ -3474,7 +3473,7 @@ const App = {
                         {
                             field: 'attribute1DetailId',
                             headerText: 'Attribute 1',
-                            width: 150,
+                            width: 120,
                             allowEditing: false,
                             valueAccessor: (field, data) => {
                                 const list = data.attribute1List || [];
@@ -3487,7 +3486,7 @@ const App = {
                         {
                             field: 'attribute2DetailId',
                             headerText: 'Attribute 2',
-                            width: 150,
+                            width: 120,
                             allowEditing: false,
                             valueAccessor: (field, data) => {
                                 const list = data.attribute2List || [];
@@ -3516,7 +3515,7 @@ const App = {
                         },
                         {
                             field: 'unitPrice',
-                            headerText: 'Unit Price',
+                            headerText: 'Rate',
                             width: 100,
                             textAlign: 'Right',
                             format: 'N2',
@@ -3532,7 +3531,7 @@ const App = {
                         },
                         {
                             field: 'FinalPrice',
-                            headerText: 'Final Price Per Unit',
+                            headerText: 'Final Rate Per Unit',
                             width: 130,
                             textAlign: 'Right',
                             type: 'number',
@@ -3542,7 +3541,7 @@ const App = {
                         {
                             field: 'MRP',
                             headerText: 'MRP',
-                            width: 120,
+                            width: 100,
                             textAlign: 'Right',
                             type: 'number',
                             format: 'N2',

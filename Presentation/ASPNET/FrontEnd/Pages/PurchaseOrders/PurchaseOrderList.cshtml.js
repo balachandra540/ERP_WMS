@@ -363,7 +363,7 @@
                 }
             },
             getAttributeDetails: async (attributeId) => {
-                debugger
+                debugger;
                 try {
                     const requestBody = {
                         attributeId: attributeId,
@@ -375,6 +375,43 @@
                     throw error;
                 }
             },
+            calculateTax: (rowData, unitPrice, taxPercent, quantity) => {
+                const taxType = rowData.taxType || 'Excluded';
+
+                let basePrice = unitPrice;
+                let taxAmount = 0;
+                let unitPriceAfterTax = unitPrice;
+
+                if (taxPercent > 0) {
+                    if (taxType == 'Included') {
+                        // Extract tax from inclusive price
+                        taxAmount = services.round2((unitPrice * taxPercent) / (100 + taxPercent));
+                        basePrice = services.round2(unitPrice - taxAmount);
+                        unitPriceAfterTax = services.round2(unitPrice);
+                    } else {
+                        // Add tax on top
+                        taxAmount = services.round2((unitPrice * taxPercent) / 100);
+                        basePrice = services.round2(unitPrice);
+                        unitPriceAfterTax = services.round2(unitPrice + taxAmount);
+                    }
+                } else {
+                    basePrice = services.round2(unitPrice);
+                    unitPriceAfterTax = services.round2(unitPrice);
+                }
+
+                const total = services.round2(unitPriceAfterTax * quantity);
+
+                return {
+                    basePrice,
+                    taxAmount,
+                    unitPriceAfterTax,
+                    total
+                };
+            },
+            round2: (value) => {
+                return Math.round((value + Number.EPSILON) * 100) / 100;
+            }
+
 
             //,
             //getAttributesAndValuesByProductGroupId: async (productGroupId) => {
@@ -1202,6 +1239,8 @@
                 mainGrid.obj.setProperties({ dataSource: state.mainData });
             }
         };
+
+        let isProgrammaticPriceUpdate = false;
         const secondaryGrid = {
             obj: null,
             manualBatchChanges: {
@@ -1231,7 +1270,7 @@
                     showColumnMenu: false,
                     gridLines: 'Horizontal',
                     columns: [
-                        { type: 'checkbox', width: 60 },
+                        { type: 'checkbox', width: 40 },
                         {
                             field: 'id', isPrimaryKey: true, headerText: 'Id', visible: false
                         },
@@ -1285,7 +1324,8 @@
                                                 // Initialize to empty arrays first
                                                 args.rowData.attribute1List = [];
                                                 args.rowData.attribute2List = [];
-
+                                                args.rowData.taxType = selectedProduct.taxType; 
+                
                                                 if (selectedProduct.attribute1Id) {
                                                     try {
                                                         const resp1 = await services.getAttributeDetails(selectedProduct.attribute1Id);
@@ -1318,6 +1358,32 @@
                                                 if (attribute2Obj) {
                                                     attribute2Obj.setProperties({ dataSource: args.rowData.attribute2List });
                                                 }
+
+                                                const taxPercent = taxObj?.value
+                                                    ? (state.taxListLookupData.find(t => t.id === taxObj.value)?.percentage || 0)
+                                                    : 0;
+
+                                                const quantity = quantityObj?.value ?? 1;
+                                                const unitPrice = selectedProduct.unitPrice ?? 0;
+
+                                                const calc = services.calculateTax(args.rowData, unitPrice, taxPercent, quantity);
+
+                                                args.rowData.taxAmount = calc.taxAmount;
+                                                args.rowData.totalAfterTax = calc.unitPriceAfterTax;
+                                                args.rowData.total = calc.total;
+                                                args.rowData.unitPrice = calc.basePrice;      
+
+                                                /*if (taxAmountObj) taxAmountObj.value = calc.taxAmount;*/
+                                                //if (totalAfterTaxObj) totalAfterTaxObj.value = calc.unitPriceAfterTax;
+                                                if (totalObj) totalObj.value = calc.total;
+                                                //if (priceObj) priceObj.value = calc.basePrice;
+                                                isProgrammaticPriceUpdate = true;
+                                                if (priceObj) priceObj.value = calc.basePrice;
+                                                if (totalAfterTaxObj) totalAfterTaxObj.value = calc.unitPriceAfterTax;
+                                                if (taxAmountObj) taxAmountObj.value = calc.taxAmount;
+                                                isProgrammaticPriceUpdate = false;
+
+                                               
                                             }
                                         },
                                         placeholder: 'Select a Product',
@@ -1330,7 +1396,7 @@
                         {
                             field: 'attribute1DetailId',
                             headerText: 'Attribute 1',
-                            width: 180,
+                            width: 150,
                             editType: 'dropdownedit',
                             valueAccessor: (field, data) => {
                                 const list = data.attribute1List || [];
@@ -1376,7 +1442,7 @@
                         {
                             field: 'attribute2DetailId',
                             headerText: 'Attribute 2',
-                            width: 180,
+                            width: 150,
                             editType: 'dropdownedit',
                             valueAccessor: (field, data) => {
                                 const list = data.attribute2List || [];
@@ -1421,159 +1487,16 @@
                         },
                         
                         {
-                            field: 'unitPrice',
-                            headerText: 'Unit Price',
-                            width: 200, validationRules: { required: true }, type: 'number', format: 'N2', textAlign: 'Right',
-                            edit: {
-                                create: () => {
-                                    let priceElem = document.createElement('input');
-                                    return priceElem;
-                                },
-                                read: () => {
-                                    return priceObj.value;
-                                },
-                                destroy: () => {
-                                    priceObj.destroy();
-                                },
-                                write: (args) => {
-                                    priceObj = new ej.inputs.NumericTextBox({
-                                        value: args.rowData.unitPrice ?? 0,
-                                        change: (e) => {
-                                            if (quantityObj && totalObj) {
-                                                const total = e.value * quantityObj.value;
-                                                totalObj.value = total;
-                                            }
-                                            const taxPercent = taxObj?.value
-                                                ? (state.taxListLookupData.find(t => t.id === taxObj.value)?.percentage || 0)
-                                                : 0;
-                                            const unitPrice = e.value ?? 0;
-                                            const quantity = quantityObj?.value ?? 1;
-
-                                            let taxAmount;
-                                            let totalAfterTax;
-                                            if (taxPercent === 0) {
-                                                taxAmount = 0;
-                                                totalAfterTax = unitPrice;
-                                            } else {
-                                                taxAmount = (unitPrice * taxPercent) / 100;
-                                                totalAfterTax = unitPrice + taxAmount;
-                                            }
-                                            const total = totalAfterTax * quantity;
-
-                                            args.rowData.taxId = e.value;
-                                            args.rowData.taxAmount = taxAmount;
-                                            args.rowData.totalAfterTax = totalAfterTax;
-                                            args.rowData.total = total;
-
-                                            if (taxAmountObj) taxAmountObj.value = taxAmount;
-                                            if (totalAfterTaxObj) totalAfterTaxObj.value = totalAfterTax;
-                                            if (totalObj) totalObj.value = total;
-                                        }
-                                    });
-                                    priceObj.appendTo(args.element);
-                                }
-                            }
-                        },
-                        {
-                            field: 'taxId',
-                            headerText: 'Tax',
-                            width: 160,
-                            editType: 'dropdownedit',
-                            valueAccessor: (field, data) => {
-                                const tax = state.taxListLookupData.find(item => item.id === data[field]);
-                                return tax ? `${tax.name} (${tax.percentage}%)` : '';
-                            },
-                            edit: {
-                                create: () => document.createElement('input'),
-                                read: () => taxObj.value,
-                                destroy: () => taxObj.destroy(),
-                                write: (args) => {
-                                    taxObj = new ej.dropdowns.DropDownList({
-                                        dataSource: state.taxListLookupData,
-                                        fields: { value: 'id', text: 'name' },
-                                        value: args.rowData.taxId,
-                                        placeholder: 'Select Tax',
-                                        change: (e) => {
-                                            const selectedTax = state.taxListLookupData.find(t => t.id === e.value);
-                                            const unitPrice = priceObj?.value ?? 0;
-                                            const taxPercent = selectedTax?.percentage ?? 0;
-                                            const quantity = quantityObj?.value ?? 1;
-
-                                            let taxAmount;
-                                            let totalAfterTax;
-                                            if (taxPercent === 0) {
-                                                taxAmount = 0;
-                                                totalAfterTax = unitPrice;
-                                            } else {
-                                                taxAmount = (unitPrice * taxPercent) / 100;
-                                                totalAfterTax = unitPrice + taxAmount;
-                                            }
-                                            const total = totalAfterTax * quantity;
-
-                                            args.rowData.taxId = e.value;
-                                            args.rowData.taxAmount = taxAmount;
-                                            args.rowData.totalAfterTax = totalAfterTax;
-                                            args.rowData.total = total;
-
-                                            if (taxAmountObj) taxAmountObj.value = taxAmount;
-                                            if (totalAfterTaxObj) totalAfterTaxObj.value = totalAfterTax;
-                                            if (totalObj) totalObj.value = total;
-                                        }
-                                    });
-                                    taxObj.appendTo(args.element);
-                                }
-                            }
-                        },
-                        {
-                            field: 'taxAmount',
-                            headerText: 'Tax Amount',
-                            width: 150,
-                            type: 'number', format: 'N2', textAlign: 'Right',
-                            allowEditing: false,
-                            edit: {
-                                create: () => document.createElement('input'),
-                                read: () => taxAmountObj.value,
-                                destroy: () => taxAmountObj.destroy(),
-                                write: (args) => {
-                                    taxAmountObj = new ej.inputs.NumericTextBox({
-                                        value: args.rowData.taxAmount ?? 0,
-                                        readonly: true
-                                    });
-                                    taxAmountObj.appendTo(args.element);
-                                }
-                            }
-                        },
-                        {
-                            field: 'totalAfterTax',
-                            headerText: 'Unit Price After Tax',
-                            width: 180,
-                            type: 'number', format: 'N2', textAlign: 'Right',
-                            allowEditing: false,
-                            edit: {
-                                create: () => document.createElement('input'),
-                                read: () => totalAfterTaxObj.value,
-                                destroy: () => totalAfterTaxObj.destroy(),
-                                write: (args) => {
-                                    totalAfterTaxObj = new ej.inputs.NumericTextBox({
-                                        value: args.rowData.totalAfterTax ?? 0,
-                                        readonly: true
-                                    });
-                                    totalAfterTaxObj.appendTo(args.element);
-                                }
-                            }
-                        },
-
-                        {
                             field: 'quantity',
                             headerText: 'Quantity',
-                            width: 200,
+                            width: 100,
                             validationRules: {
                                 required: true,
                                 custom: [(args) => {
                                     return args['value'] > 0;
                                 }, 'Must be a positive number and not zero']
                             },
-                            type: 'number', format: 'N2', textAlign: 'Right',
+                            type: 'number', format: 'N0', textAlign: 'Right',
                             edit: {
                                 create: () => {
                                     let quantityElem = document.createElement('input');
@@ -1615,9 +1538,201 @@
                             }
                         },
                         {
+                            field: 'unitPrice',
+                            headerText: 'Rate',
+                            width: 150, validationRules: { required: true }, type: 'number', format: 'N2', textAlign: 'Right',
+                            edit: {
+                                create: () => {
+                                    let priceElem = document.createElement('input');
+                                    return priceElem;
+                                },
+                                read: () => {
+                                    return priceObj.value;
+                                },
+                                destroy: () => {
+                                    priceObj.destroy();
+                                },
+                                write: (args) => {
+                                    priceObj = new ej.inputs.NumericTextBox({
+                                        value: args.rowData.unitPrice ?? 0,
+                                        //value: (args) => {
+                                        //    const taxPercent = taxObj?.value
+                                        //        ? (state.taxListLookupData.find(t => t.id === taxObj.value)?.percentage || 0)
+                                        //        : 0;
+                                        //    const unitPrice = e.value ?? 0;
+                                        //    const quantity = quantityObj?.value ?? 1;
+
+                                        //    const calc = services.calculateTax(args.rowData, unitPrice, taxPercent, quantity);
+                                        //    return calc.basePrice;
+                                        //},
+                                        change: (e) => {
+                                            if (isProgrammaticPriceUpdate) return; // ⭐ STOP LOOP
+                                            //if (quantityObj && totalObj) {
+                                            //    const total = e.value * quantityObj.value;
+                                            //    totalObj.value = total;
+                                            //}
+
+                                            //let taxAmount;
+                                            //let totalAfterTax;
+                                            //if (taxPercent === 0) {
+                                            //    taxAmount = 0;
+                                            //    totalAfterTax = unitPrice;
+                                            //} else {
+                                            //    taxAmount = (unitPrice * taxPercent) / 100;
+                                            //    totalAfterTax = unitPrice + taxAmount;
+                                            //}
+                                            //const total = totalAfterTax * quantity;
+
+                                            //args.rowData.taxId = e.value;
+                                            //args.rowData.taxAmount = taxAmount;
+                                            //args.rowData.totalAfterTax = totalAfterTax;
+                                            //args.rowData.total = total;
+
+                                            //if (taxAmountObj) taxAmountObj.value = taxAmount;
+                                            //if (totalAfterTaxObj) totalAfterTaxObj.value = totalAfterTax;
+                                            //if (totalObj) totalObj.value = total;
+                                            const taxPercent = taxObj?.value
+                                                ? (state.taxListLookupData.find(t => t.id === taxObj.value)?.percentage || 0)
+                                                : 0;
+                                            const unitPrice = e.value ?? 0;
+                                            const quantity = quantityObj?.value ?? 1;
+
+                                            const calc = services.calculateTax(args.rowData, unitPrice, taxPercent, quantity);
+
+                                            args.rowData.taxAmount = calc.taxAmount;
+                                            args.rowData.totalAfterTax = calc.unitPriceAfterTax;
+                                            args.rowData.total = calc.total;
+                                            args.rowData.taxId = e.value;
+
+                                            //if (taxAmountObj) taxAmountObj.value = calc.taxAmount;
+                                            //if (totalAfterTaxObj) totalAfterTaxObj.value = calc.unitPriceAfterTax;
+                                            if (totalObj) totalObj.value = calc.total;
+                                            //if (priceObj) priceObj.value = calc.basePrice;
+
+
+                                        },
+                                    });
+                                    priceObj.appendTo(args.element);
+                                }
+                            }
+                        },
+                        {
+                            field: 'taxId',
+                            headerText: 'Tax',
+                            width: 100,
+                            editType: 'dropdownedit',
+                            valueAccessor: (field, data) => {
+                                const tax = state.taxListLookupData.find(item => item.id === data[field]);
+                                return tax ? `${tax.name} (${tax.percentage}%)` : '';
+                            },
+                            edit: {
+                                create: () => document.createElement('input'),
+                                read: () => taxObj.value,
+                                destroy: () => taxObj.destroy(),
+                                write: (args) => {
+                                    taxObj = new ej.dropdowns.DropDownList({
+                                        dataSource: state.taxListLookupData,
+                                        fields: { value: 'id', text: 'name' },
+                                        value: args.rowData.taxId,
+                                        placeholder: 'Select Tax',
+                                        change: (e) => {
+                                            //const selectedTax = state.taxListLookupData.find(t => t.id === e.value);
+                                            //const unitPrice = priceObj?.value ?? 0;
+                                            //const taxPercent = selectedTax?.percentage ?? 0;
+                                            //const quantity = quantityObj?.value ?? 1;
+
+                                            //let taxAmount;
+                                            //let totalAfterTax;
+                                            //if (taxPercent === 0) {
+                                            //    taxAmount = 0;
+                                            //    totalAfterTax = unitPrice;
+                                            //} else {
+                                            //    taxAmount = (unitPrice * taxPercent) / 100;
+                                            //    totalAfterTax = unitPrice + taxAmount;
+                                            //}
+                                            //const total = totalAfterTax * quantity;
+
+                                            //args.rowData.taxId = e.value;
+                                            //args.rowData.taxAmount = taxAmount;
+                                            //args.rowData.totalAfterTax = totalAfterTax;
+                                            //args.rowData.total = total;
+
+                                            //if (taxAmountObj) taxAmountObj.value = taxAmount;
+                                            //if (totalAfterTaxObj) totalAfterTaxObj.value = totalAfterTax;
+                                            //if (totalObj) totalObj.value = total;
+                                            const selectedTax = state.taxListLookupData.find(t => t.id === e.value);
+                                            const taxPercent = selectedTax?.percentage ?? 0;
+                                            const unitPrice = priceObj?.value ?? 0;
+                                            const quantity = quantityObj?.value ?? 1;
+
+                                            const calc = services.calculateTax(args.rowData, unitPrice, taxPercent, quantity);
+
+                                            args.rowData.taxId = e.value;
+                                            args.rowData.taxAmount = calc.taxAmount;
+                                            args.rowData.totalAfterTax = calc.unitPriceAfterTax;
+                                            args.rowData.total = calc.total;
+
+                                            ///if (taxAmountObj) taxAmountObj.value = calc.taxAmount;
+                                            //if (totalAfterTaxObj) totalAfterTaxObj.value = calc.unitPriceAfterTax;
+                                            if (totalObj) totalObj.value = calc.total;
+                                            //if (priceObj) priceObj.value = calc.basePrice;
+                                            isProgrammaticPriceUpdate = true;
+                                            if (priceObj) priceObj.value = calc.basePrice;
+                                            if (totalAfterTaxObj) totalAfterTaxObj.value = calc.unitPriceAfterTax;
+                                            if (taxAmountObj) taxAmountObj.value = calc.taxAmount;
+                                            isProgrammaticPriceUpdate = false;
+
+
+                                        }
+                                    });
+                                    taxObj.appendTo(args.element);
+                                }
+                            }
+                        },
+                        {
+                            field: 'taxAmount',
+                            headerText: 'Tax Amount',
+                            width: 120,
+                            type: 'number', format: 'N2', textAlign: 'Right',
+                            allowEditing: false,
+                            edit: {
+                                create: () => document.createElement('input'),
+                                read: () => taxAmountObj.value,
+                                destroy: () => taxAmountObj.destroy(),
+                                write: (args) => {
+                                    taxAmountObj = new ej.inputs.NumericTextBox({
+                                        value: args.rowData.taxAmount ?? 0,
+                                        readonly: true
+                                    });
+                                    taxAmountObj.appendTo(args.element);
+                                }
+                            }
+                        },
+                        {
+                            field: 'totalAfterTax',
+                            headerText: 'Rate After Tax',
+                            width: 150,
+                            type: 'number', format: 'N2', textAlign: 'Right',
+                            allowEditing: false,
+                            edit: {
+                                create: () => document.createElement('input'),
+                                read: () => totalAfterTaxObj.value,
+                                destroy: () => totalAfterTaxObj.destroy(),
+                                write: (args) => {
+                                    totalAfterTaxObj = new ej.inputs.NumericTextBox({
+                                        value: args.rowData.totalAfterTax ?? 0,
+                                        readonly: true
+                                    });
+                                    totalAfterTaxObj.appendTo(args.element);
+                                }
+                            }
+                        },
+
+                      
+                        {
                             field: 'total',
                             headerText: 'Total',
-                            width: 200, validationRules: { required: false }, type: 'number', format: 'N2', textAlign: 'Right',
+                            width: 150, validationRules: { required: false }, type: 'number', format: 'N2', textAlign: 'Right',
                             edit: {
                                 create: () => {
                                     let totalElem = document.createElement('input');
@@ -1642,7 +1757,7 @@
                             field: 'productNumber',
                             headerText: 'Product Number',
                             allowEditing: false,
-                            width: 180,
+                            width: 100,
                             edit: {
                                 create: () => {
                                     let numberElem = document.createElement('input');
@@ -1665,7 +1780,7 @@
                         {
                             field: 'summary',
                             headerText: 'Summary',
-                            width: 200,
+                            width: 150,
                             edit: {
                                 create: () => {
                                     let summaryElem = document.createElement('input');

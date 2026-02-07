@@ -257,6 +257,7 @@ using FluentValidation;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 using System.Text.RegularExpressions;
+using System.Threading;
 
 namespace Application.Features.GoodsReceiveManager.Commands
 {
@@ -436,8 +437,11 @@ namespace Application.Features.GoodsReceiveManager.Commands
 
         public async Task<CreateGoodsReceiveResult> Handle(CreateGoodsReceiveRequest request, CancellationToken cancellationToken)
         {
-            // ✅ Step 1: Load Purchase Order
-            var po = await _purchaseOrderReadRepository.GetQuery()
+            //await using var transaction =  await _unitOfWork.BeginTransactionAsync();
+            try
+            {
+                // ✅ Step 1: Load Purchase Order
+                var po = await _purchaseOrderReadRepository.GetQuery()
                 .ApplyIsDeletedFilter(false)
                 .Include(x => x.PurchaseOrderItemList)
                     .ThenInclude(i => i.Product)
@@ -722,6 +726,7 @@ namespace Application.Features.GoodsReceiveManager.Commands
             }
 
             await _unitOfWork.SaveAsync(cancellationToken);
+            //await transaction.CommitAsync(cancellationToken);
 
             return new CreateGoodsReceiveResult
             {
@@ -729,6 +734,14 @@ namespace Application.Features.GoodsReceiveManager.Commands
                 Items = createdItems,
                 CreatedInventoryTransactions = createdInventoryTransactions
             };
+
         }
+    catch
+    {
+
+        throw; // rethrow so API gets the error
+    }
+
+}
     }
 }

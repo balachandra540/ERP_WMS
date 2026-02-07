@@ -16,6 +16,11 @@ public record GetSalesOrderItemBySalesOrderIdListDto
     public int? PluCode { get; init; }           // ⭐ ADDED
     public string? ProductId { get; init; }
     public string? ProductName { get; init; }
+    public int? TaxId { get; init; }
+    public double? TaxAmount { get; init; }
+
+    public double? TotalAfterTax { get; init; }
+
     public string? ProductNumber { get; init; }
     public string? Summary { get; init; }
     public double? UnitPrice { get; init; }

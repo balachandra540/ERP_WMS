@@ -252,7 +252,7 @@ const App = {
                             field: 'productId', headerText: 'ProductId', width: 200,
                             valueAccessor: (field, data, column) => {
                                 const product = state.productListLookupData.find(item => item.id === data[field]);
-                                return product ? `${product.numberName}` : '';
+                                return product ? `${product.name}` : '';
                             },
                         },
                         { field: 'pluCode', headerText: 'PluCode', width: 200, allowSearching: true },

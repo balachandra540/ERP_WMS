@@ -1,5 +1,7 @@
 ﻿using Application.Common.Repositories;
 using Infrastructure.DataAccessManager.EFCore.Contexts;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 
 namespace Infrastructure.DataAccessManager.EFCore.Repositories;
 
@@ -15,6 +17,10 @@ public class UnitOfWork : IUnitOfWork
     public async Task SaveAsync(CancellationToken cancellationToken = default)
     {
         await _context.SaveChangesAsync(cancellationToken);
+    }
+    public async Task<IDbContextTransaction> BeginTransactionAsync()
+    {
+        return await _context.Database.BeginTransactionAsync();
     }
 
     public void Save()
