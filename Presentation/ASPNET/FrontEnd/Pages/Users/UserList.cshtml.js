@@ -499,6 +499,7 @@
         const methods = {
             populateMainData: async () => {
                 try {
+                    debugger;
                     const response = await services.getMainData();
                     const groupResponse = await services.getUserGroupList();
                     state.userGroupData = groupResponse?.data?.content?.data ?? []; // Assign to the state

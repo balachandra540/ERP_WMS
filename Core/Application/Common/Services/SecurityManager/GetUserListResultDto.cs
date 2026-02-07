@@ -10,5 +10,7 @@ public record GetUserListResultDto
     public bool? IsDeleted { get; init; }
     public DateTime? CreatedAt { get; init; }
     public string? wareHouse { get; init; }
+    public string? UserGroupId { get; init; }
+
 }
 

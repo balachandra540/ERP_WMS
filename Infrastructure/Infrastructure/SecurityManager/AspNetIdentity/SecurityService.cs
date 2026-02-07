@@ -135,6 +135,7 @@ namespace Infrastructure.SecurityManager.AspNetIdentity;
             Roles = roles.ToList(),
             Avatar = user.ProfilePictureName,
             Location = user.wareHouse,
+            UserGroupId=user.UserGroupId
 
         };
     }
@@ -353,7 +354,8 @@ namespace Infrastructure.SecurityManager.AspNetIdentity;
             RefreshToken = newRefreshToken,
             MenuNavigation = NavigationTreeStructure.GetCompleteMenuNavigationTreeNode(),
             Roles = roles.ToList(),
-            Avatar = user.ProfilePictureName
+            Avatar = user.ProfilePictureName,
+            UserGroupId=user.UserGroupId
         };
     }
 
@@ -464,6 +466,7 @@ namespace Infrastructure.SecurityManager.AspNetIdentity;
                 EmailConfirmed = x.EmailConfirmed,
                 CreatedAt = x.CreatedAt,
                 wareHouse = x.wareHouse,
+                UserGroupId=x.UserGroupId
             })
             .ToListAsync(cancellationToken);
 

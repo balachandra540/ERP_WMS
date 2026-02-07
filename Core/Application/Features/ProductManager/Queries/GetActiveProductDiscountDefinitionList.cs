@@ -38,25 +38,20 @@ public class GetActiveProductDiscountDefinitionListHandler
     }
 
     public async Task<GetActiveProductDiscountDefinitionListResult> Handle(
-        GetActiveProductDiscountDefinitionListRequest request,
-        CancellationToken cancellationToken)
+    GetActiveProductDiscountDefinitionListRequest request,
+    CancellationToken cancellationToken)
     {
-        // Get today's date at midnight for comparison
-        var today = DateTime.UtcNow.Date;
+        // Fix: Convert UtcNow to Unspecified kind to satisfy 'timestamp without time zone'
+        var today = DateTime.SpecifyKind(DateTime.UtcNow.Date, DateTimeKind.Unspecified);
 
         var items = await _context.ProductDiscountDefinition
-            // 1. Include the User Group details for 'Upto' types
-            .Include(x => x.ProductDiscountDetails.Where(d => !d.IsDeleted)) // ✅ Fix: Filters the child collection
+            .Include(x => x.ProductDiscountDetails.Where(d => !d.IsDeleted))
             .Where(x => x.IsActive && !x.IsDeleted)
-            // 2. Date Range Logic: Today must be between EffectiveFrom and EffectiveTo
             .Where(x => x.EffectiveFrom <= today && (x.EffectiveTo == null || x.EffectiveTo >= today))
             .OrderByDescending(x => x.EffectiveFrom)
             .ToListAsync(cancellationToken);
 
-        return new GetActiveProductDiscountDefinitionListResult
-        {
-            Data = items
-        };
+        return new GetActiveProductDiscountDefinitionListResult { Data = items };
     }
 }
 

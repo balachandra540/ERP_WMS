@@ -10,7 +10,9 @@
     MENU_NAVIGATION: 'menuNavigation',
     AVATAR: 'avatar',
     COMPANY: 'company',
-    LOCATION: 'location'
+    LOCATION: 'location',
+    USER_GROUP_ID: 'userGroupId' // ✅ NEW
+
 };
 
 const StorageManager = {
@@ -95,8 +97,12 @@ const StorageManager = {
     saveLocation: (location) => StorageManager.save(STORAGE_KEYS.LOCATION, location),
     getLocation: () => StorageManager.get(STORAGE_KEYS.LOCATION),
     removeLocation: () => StorageManager.remove(STORAGE_KEYS.LOCATION),
+    saveUserGroupId: (userGroupId) => StorageManager.save(STORAGE_KEYS.USER_GROUP_ID, userGroupId),
+    getUserGroupId: () => StorageManager.get(STORAGE_KEYS.USER_GROUP_ID),
+    removeUserGroupId: () => StorageManager.remove(STORAGE_KEYS.USER_GROUP_ID),
 
     saveLoginResult: (data) => {
+        debugger
         StorageManager.saveAccessToken(data?.content?.data?.accessToken);
         StorageManager.saveRefreshToken(data?.content?.data?.refreshToken);
         StorageManager.saveFirstName(data?.content?.data?.firstName);
@@ -108,5 +114,7 @@ const StorageManager = {
         StorageManager.saveMenuNavigation(data?.content?.data?.menuNavigation);
         StorageManager.saveIsAuthenticated(StorageManager.getUserId() != null);
         StorageManager.saveAvatar(data?.content?.data?.avatar);
+        // ✅ NEW
+        StorageManager.saveUserGroupId(data?.content?.data?.userGroupId);
     }
 };
