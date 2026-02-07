@@ -1049,31 +1049,31 @@ const App = {
         });
 
         // 1. Initialize SignalR Connection
-        const connection = new signalR.HubConnectionBuilder()
-            .withUrl("/approvalHub")
-            .withAutomaticReconnect()
-            .build();
+        //const connection = new signalR.HubConnectionBuilder()
+        //    .withUrl("/approvalHub")
+        //    .withAutomaticReconnect()
+        //    .build();
 
         // 2. Listen for "Approved" event from the Manager
-        connection.on("DiscountApproved", (data) => {
-            const gridData = secondaryGrid.obj.dataSource;
-            // Find row by tempRowId (which we sent as PLU or ID)
-            const row = gridData.find(r => (r.id === data.tempRowId || r.pluCode === data.tempRowId));
+        //connection.on("DiscountApproved", (data) => {
+        //    const gridData = secondaryGrid.obj.dataSource;
+        //    // Find row by tempRowId (which we sent as PLU or ID)
+        //    const row = gridData.find(r => (r.id === data.tempRowId || r.pluCode === data.tempRowId));
 
-            if (row) {
-                row.approvalStatus = "Approved"; // Update status immediately
-                secondaryGrid.obj.refresh();
+        //    if (row) {
+        //        row.approvalStatus = "Approved"; // Update status immediately
+        //        secondaryGrid.obj.refresh();
 
-                Swal.fire({
-                    icon: 'success',
-                    title: 'Approved!',
-                    text: `${data.productName} discount is now ${row.upToDiscount}%`,
-                    timer: 2000
-                });
+        //        Swal.fire({
+        //            icon: 'success',
+        //            title: 'Approved!',
+        //            text: `${data.productName} discount is now ${row.upToDiscount}%`,
+        //            timer: 2000
+        //        });
 
-                methods.calculateLiveTotals(); // Recalculate summary totals
-            }
-        });
+        //        methods.calculateLiveTotals(); // Recalculate summary totals
+        //    }
+        //});
 
         // 3. Start Connection on Mount
         Vue.onMounted(async () => {
