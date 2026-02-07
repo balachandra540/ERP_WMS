@@ -23,7 +23,9 @@
             wareHouse: '',   // Bound to the dropdown
             warehouses: [], 
             userlocations: [],
-            isDefaultLocation:false,
+            isDefaultLocation: false,
+            userGroupId: '', // To store the selected group ID
+            userGroups: [],  // To store the list of available groups
             //AssignLocations:null,
             errors: {
                 firstName: '',
@@ -33,7 +35,8 @@
                 confirmPassword: '',
                 newPassword: '',
                 wareHouse: '',
-                isDefaultLocation:''
+                isDefaultLocation: '',
+                userGroupId: ''
 
             },
             isSubmitting: false,
@@ -53,7 +56,7 @@
         const emailRef = Vue.ref(null);
         const LocationRef = Vue.ref(null);
         const userLocationGridRef = Vue.ref(null);
-
+        const userGroupRef = Vue.ref(null);
         const firstNameText = {
             obj: null,
             create: () => {
@@ -122,7 +125,48 @@
                 emailText.refresh();
             }
         );
+        const userGroupLookup = {
+            obj: null,
+            create: () => {
+                if (state.userGroupData && Array.isArray(state.userGroupData)) {
+                    userGroupLookup.obj = new ej.dropdowns.DropDownList({
+                        dataSource: state.userGroupData,
+                        fields: { value: 'id', text: 'name' }, // Using 'id' and 'name' from UserGroup data
+                        placeholder: 'Select User Group',
+                        filterBarPlaceholder: 'Search Group',
+                        sortOrder: 'Ascending',
+                        allowFiltering: true,
+                        filtering: (e) => {
+                            e.preventDefaultAction = true;
+                            let query = new ej.data.Query();
+                            if (e.text !== '') {
+                                query = query.where('name', 'contains', e.text, true);
+                            }
+                            e.updateData(state.userGroupData, query);
+                        },
+                        change: (e) => {
+                            state.userGroupId = e.value;
+                        }
+                    });
+                    userGroupLookup.obj.appendTo(userGroupRef.value);
+                }
+            },
+            refresh: () => {
+                if (userGroupLookup.obj) {
+                    userGroupLookup.obj.value = state.userGroupId;
+                    // Optionally disable if needed (e.g., if (state.id !== ''))
+                }
+            }
+        };
 
+        // Watch for state changes to refresh the UI component
+        Vue.watch(
+            () => state.userGroupId,
+            (newVal) => {
+                userGroupLookup.refresh();
+                state.errors.userGroupId = '';
+            }
+        );
         const validateForm = function () {
             state.errors.firstName = '';
             state.errors.lastName = '';
@@ -130,7 +174,7 @@
             state.errors.password = '';
             state.errors.confirmPassword = '';
             state.errors.wareHouse = '';  //  new error key
-
+            state.errors.userGroupId = '';
             let isValid = true;
 
             if (!state.firstName) {
@@ -210,6 +254,7 @@
             state.password = '';
             state.confirmPassword = '';
             state.wareHouse = '';
+            state.userGroupId = '';
             isDefaultLocation: false,   // 🔥 add this
 
                 state.errors = {
@@ -219,6 +264,7 @@
                     password: '',
                     confirmPassword: '',
                     wareHouse: '',
+                    userGroupId:'',
                     isDefaultLocation: ''
                 };
             if (LocationGrid && LocationGrid.obj) {
@@ -302,6 +348,9 @@
         //    }
         //};
         const services = {
+            getUserGroupList: async () => {
+                return await AxiosManager.get('/UserGroup/GetUserGroupList');
+            },
             getMainData: async () => {
                 try {
                     const response = await AxiosManager.get('/Security/GetUserList', {});
@@ -310,7 +359,8 @@
                     throw error;
                 }
             },
-            createMainData: async (firstName, lastName, email, emailConfirmed, isBlocked, isDeleted, password, confirmPassword, createdById, wareHouse) => {
+            // Inside the services object
+            createMainData: async (firstName, lastName, email, emailConfirmed, isBlocked, isDeleted, password, confirmPassword, createdById, wareHouse, userGroupId) => {
                 try {
                     const response = await AxiosManager.post('/Security/CreateUser', {
                         firstName,
@@ -322,15 +372,16 @@
                         password,
                         confirmPassword,
                         createdById,
-                        wareHouse  
+                        wareHouse,
+                        userGroupId // <--- Add this line
                     });
                     return response;
                 } catch (error) {
                     throw error;
                 }
-            },
+            }, 
 
-            updateMainData: async (userId, firstName, lastName, emailConfirmed, isBlocked, isDeleted, updatedById, wareHouse) => {
+            updateMainData: async (userId, firstName, lastName, emailConfirmed, isBlocked, isDeleted, updatedById, wareHouse, userGroupId) => {
                 try {
                     const response = await AxiosManager.post('/Security/UpdateUser', {
                         userId,
@@ -340,7 +391,8 @@
                         isBlocked,
                         isDeleted,
                         updatedById,
-                        wareHouse  
+                        wareHouse,
+                        userGroupId // <--- Add this
                     });
                     return response;
                 } catch (error) {
@@ -447,21 +499,26 @@
         const methods = {
             populateMainData: async () => {
                 try {
+                    debugger;
                     const response = await services.getMainData();
-                    
+                    const groupResponse = await services.getUserGroupList();
+                    state.userGroupData = groupResponse?.data?.content?.data ?? []; // Assign to the state
                     state.mainData = response?.data?.content?.data.map(user => {
                         const warehouse = state.warehouses.find(w => w.id === user.wareHouse);
+                        const group = state.userGroupData.find(g => g.id === user.userGroupId);
                         return {
                             ...user,
                             createdAt: new Date(user.createdAt),
-                            wareHouse: warehouse ? warehouse.name : ''
+                            wareHouse: warehouse ? warehouse.name : '',
+                            // Injects the group name into the grid row
+                            userGroupName: group ? group.name : 'No Group'
                         };
                     });
                 } catch (error) {
                     console.error("Error populating main data:", error);
                     state.mainData = [];
                 }
-            },            
+            },
             populateSecondaryData: async (userId) => {
                 try {
                     const rolesResponse = await services.getRolesData();
@@ -531,7 +588,7 @@
                     if (!validateForm()) {
                         return;
                     }
-
+                    debugger;
                     const response = state.id === ''
                         ? await services.createMainData(
                             state.firstName,
@@ -543,7 +600,8 @@
                             state.password,
                             state.confirmPassword,
                             StorageManager.getUserId(),
-                            state.wareHouse 
+                            state.wareHouse,
+                            state.userGroupId // <--- Pass the state value here
                         )
                         : state.deleteMode
                             ? await services.deleteMainData(state.id, StorageManager.getUserId())
@@ -555,7 +613,8 @@
                                 state.isBlocked,
                                 state.isDeleted,
                                 StorageManager.getUserId(),
-                                state.wareHouse 
+                                state.wareHouse,
+                                state.userGroupId // <--- Add this
                             );
 
                     if (response.data.code === 200) {
@@ -609,6 +668,7 @@
                     }
 
                 } catch (error) {
+                    debugger
                     Swal.fire({
                         icon: 'error',
                         title: 'An Error Occurred',
@@ -755,7 +815,8 @@
                 firstNameText.create();
                 lastNameText.create();
                 emailText.create();
-
+                // Initialize the lookup component
+                userGroupLookup.create();
                 mainModal.create();
                 changePasswordModal.create();
                 changeRoleModal.create();
@@ -789,7 +850,8 @@
             mainModalRef.value?.removeEventListener('hidden.bs.modal', resetFormState);
             changePasswordModalRef.value?.removeEventListener('hidden.bs.modal', resetChangePasswordFormState);
             changeRoleModalRef.value?.removeEventListener('hidden.bs.modal', resetSecondaryFormState);
-            LocationRef.value ?. removeEventListener('hidden.bs.modal', resetLocationFormState);
+            LocationRef.value?.removeEventListener('hidden.bs.modal', resetLocationFormState);
+            
         });
 
         const mainGrid = {
@@ -818,6 +880,7 @@
                         { field: 'id', isPrimaryKey: true, headerText: 'Id', visible: false },
                         { field: 'firstName', headerText: 'First Name', width: 150, minWidth: 150 },
                         { field: 'lastName', headerText: 'Last Name', width: 150, minWidth: 150 },
+                        { field: 'userGroupName', headerText: 'Group', width: 150 },
                         { field: 'email', headerText: 'Email', width: 150, minWidth: 150 },
                         { field: 'emailConfirmed', headerText: 'Email Confirmed', textAlign: 'Center', width: 150, minWidth: 150, type: 'boolean', displayAsCheckBox: true },
                         //  New column for Warehouse
@@ -1423,6 +1486,7 @@
             handler,
             LocationRef,
             LocationGrid,
+            userGroupRef,   // 🔥 REQUIRED
             userLocationGridRef
 
         };

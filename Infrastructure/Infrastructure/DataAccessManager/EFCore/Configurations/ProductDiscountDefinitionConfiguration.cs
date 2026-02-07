@@ -13,7 +13,7 @@ namespace Infrastructure.DataAccessManager.EFCore.Configurations
             builder.ToTable("ProductDiscountDefinition");
 
             // -----------------------------
-            //        BASIC FIELDS
+            //         BASIC FIELDS
             //------------------------------
 
             builder.Property(x => x.ProductId)
@@ -36,18 +36,17 @@ namespace Infrastructure.DataAccessManager.EFCore.Configurations
                 .HasColumnType("numeric(5,2)")
                 .IsRequired();
 
-            builder.Property(x => x.MaxDiscountAmount)
-                .HasColumnType("numeric(18,2)")
-                .IsRequired(false);
-
             builder.Property(x => x.EffectiveFrom)
-                .HasDefaultValueSql("CURRENT_DATE");
+                .IsRequired();
+
+            builder.Property(x => x.EffectiveTo)
+                .IsRequired(false);
 
             builder.Property(x => x.IsActive)
                 .HasDefaultValue(true);
 
             // -----------------------------
-            //        CONSTRAINTS
+            //         CONSTRAINTS
             //------------------------------
 
             builder.HasCheckConstraint(
@@ -55,20 +54,23 @@ namespace Infrastructure.DataAccessManager.EFCore.Configurations
                 "\"DiscountType\" IN ('Flat','Upto')"
             );
 
-            builder.HasCheckConstraint(
-                "CHK_ProductDiscountDefinition_DiscountPercentage",
-                "\"DiscountPercentage\" > 0 AND \"DiscountPercentage\" <= 100"
-            );
-
             // -----------------------------
-            //        RELATIONSHIP
+            //        RELATIONSHIPS
             //------------------------------
-            // === CRITICAL FIX: avoid shadow ProductId1 ===
-            builder.HasOne(x => x.Product)                         // navigation on DiscountDefinition
-                   .WithMany(p => p.DiscountDefinitions)          // inverse collection on Product
+
+            // Link to Product
+            builder.HasOne(x => x.Product)
+                   .WithMany(p => p.DiscountDefinitions)
                    .HasForeignKey(x => x.ProductId)
                    .OnDelete(DeleteBehavior.Restrict)
                    .HasConstraintName("FK_ProductDiscountDefinition_Product");
+
+            // Link to Child Details (One-to-Many)
+            builder.HasMany(x => x.ProductDiscountDetails)
+                   .WithOne(d => d.ProductDiscountDefinition)
+                   .HasForeignKey(d => d.ProductDiscountDefinitionId)
+                   .OnDelete(DeleteBehavior.Cascade) // Deleting definition removes all its user group rules
+                   .HasConstraintName("FK_ProductDiscountDefinition_Details");
         }
     }
 }

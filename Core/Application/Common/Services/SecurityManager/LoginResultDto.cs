@@ -13,4 +13,6 @@ public record LoginResultDto
     public List<MenuNavigationTreeNodeDto>? MenuNavigation { get; init; }
     public List<string>? Roles { get; init; }
     public string? Location { get;init; }
+    public string? UserGroupId { get; init; }
+
 }

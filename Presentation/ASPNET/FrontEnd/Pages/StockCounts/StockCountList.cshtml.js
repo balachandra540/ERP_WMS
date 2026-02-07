@@ -422,6 +422,11 @@
                                 timer: 2000,
                                 showConfirmButton: false
                             });
+                            setTimeout(() => {
+                                mainModal.obj.hide();
+                                resetFormState();
+                            }, 1500);
+
                         } else {
                             Swal.fire({
                                 icon: 'success',

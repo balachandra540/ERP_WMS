@@ -135,6 +135,7 @@ namespace Infrastructure.SecurityManager.AspNetIdentity;
             Roles = roles.ToList(),
             Avatar = user.ProfilePictureName,
             Location = user.wareHouse,
+            UserGroupId=user.UserGroupId
 
         };
     }
@@ -353,7 +354,8 @@ namespace Infrastructure.SecurityManager.AspNetIdentity;
             RefreshToken = newRefreshToken,
             MenuNavigation = NavigationTreeStructure.GetCompleteMenuNavigationTreeNode(),
             Roles = roles.ToList(),
-            Avatar = user.ProfilePictureName
+            Avatar = user.ProfilePictureName,
+            UserGroupId=user.UserGroupId
         };
     }
 
@@ -464,6 +466,7 @@ namespace Infrastructure.SecurityManager.AspNetIdentity;
                 EmailConfirmed = x.EmailConfirmed,
                 CreatedAt = x.CreatedAt,
                 wareHouse = x.wareHouse,
+                UserGroupId=x.UserGroupId
             })
             .ToListAsync(cancellationToken);
 
@@ -677,29 +680,31 @@ namespace Infrastructure.SecurityManager.AspNetIdentity;
 
 
     public async Task<CreateUserResultDto> CreateUserAsync(
-        string email,
-        string password,
-        string confirmPassword,
-        string firstName,
-        string lastName,
-        string warehouse,
-        bool emailConfirmed = true,
-        bool isBlocked = false,
-        bool isDeleted = false,
-        string createdById = "",      
-        CancellationToken cancellationToken = default
-        )
+    string email,
+    string password,
+    string confirmPassword,
+    string firstName,
+    string lastName,
+    string warehouse,
+    bool emailConfirmed = true,
+    bool isBlocked = false,
+    bool isDeleted = false,
+    string createdById = "",
+    string userGroupId = "", // Added parameter
+    CancellationToken cancellationToken = default
+    )
     {
         if (!password.Equals(confirmPassword))
         {
             throw new Exception($"Password and ConfirmPassword is different.");
         }
 
+        // Ensure your ApplicationUser constructor is updated to accept userGroupId if necessary
         var user = new ApplicationUser(
             email,
             firstName,
             lastName,
-             warehouse
+            warehouse
         );
 
         user.EmailConfirmed = emailConfirmed;
@@ -707,6 +712,8 @@ namespace Infrastructure.SecurityManager.AspNetIdentity;
         user.IsDeleted = isDeleted;
         user.CreatedById = createdById;
         user.wareHouse = warehouse;
+        user.UserGroupId = userGroupId; // Map the new field
+
         var result = await _userManager.CreateAsync(user, password);
 
         if (!result.Succeeded)
@@ -728,6 +735,7 @@ namespace Infrastructure.SecurityManager.AspNetIdentity;
             EmailConfirmed = user.EmailConfirmed,
             IsBlocked = user.IsBlocked,
             IsDeleted = user.IsDeleted,
+            // Optional: Include UserGroupId in the result DTO if needed by the UI
         };
     }
 
@@ -740,6 +748,7 @@ namespace Infrastructure.SecurityManager.AspNetIdentity;
         bool isBlocked = false,
         bool isDeleted = false,
         string updatedById = "",
+        string userGroupId = "", // Added parameter
         CancellationToken cancellationToken = default
         )
     {
@@ -762,6 +771,7 @@ namespace Infrastructure.SecurityManager.AspNetIdentity;
         user.IsDeleted = isDeleted;
         user.UpdatedById = updatedById;
         user.wareHouse = warehouse;
+        user.UserGroupId = userGroupId; // Allow updating the user's group
 
         var result = await _userManager.UpdateAsync(user);
 
@@ -779,10 +789,9 @@ namespace Infrastructure.SecurityManager.AspNetIdentity;
             EmailConfirmed = user.EmailConfirmed,
             IsBlocked = user.IsBlocked,
             IsDeleted = user.IsDeleted,
-            wareHouse=user.wareHouse,
+            wareHouse = user.wareHouse
         };
     }
-
     public async Task<DeleteUserResultDto> DeleteUserAsync(
         string userId,
         string deletedById = "",

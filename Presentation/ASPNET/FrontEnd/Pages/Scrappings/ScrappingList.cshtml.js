@@ -681,6 +681,10 @@
                                 timer: 1200,
                                 showConfirmButton: false
                             });
+                            setTimeout(() => {
+                                mainModal.obj.hide();
+                            }, 1500);
+
                         }
                         else {
                             Swal.fire({

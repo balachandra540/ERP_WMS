@@ -16,9 +16,9 @@ public class ApplicationUser : IdentityUser
     public string? UpdatedById { get; set; }
     public string? wareHouse { get; set; }
 
-    // NEW PROPERTY: Add this line for your new column
     public string? PhoneNumber { get; set; }
 
+    public string? UserGroupId { get; set; }
     public string? Test { get; set; }
 
     public ICollection<UserWarehouse> UserWarehouses { get; set; } = new List<UserWarehouse>();
@@ -28,7 +28,8 @@ public class ApplicationUser : IdentityUser
         string email,
         string firstName,
         string lastName,
-        string wareHouse ,
+        string wareHouse,
+        string userGroupId = "", // Add this parameter here
         string companyName = "",
         string createdById = ""
         )
@@ -43,8 +44,13 @@ public class ApplicationUser : IdentityUser
         LastName = lastName.Trim();
         CompanyName = companyName.Trim();
         CreatedById = createdById.Trim();
-        // Optional: Initialize the new property here if needed
-         PhoneNumber = "";
+
+        PhoneNumber = "";
         this.wareHouse = wareHouse != null ? wareHouse.Trim() : "";
+
+        // Assign the User Group ID
+        this.UserGroupId = string.IsNullOrWhiteSpace(userGroupId)
+            ? null
+            : userGroupId.Trim();
     }
 }

@@ -1585,6 +1585,9 @@
                         timer: 1500,
                         showConfirmButton: false
                     });
+                    setTimeout(() => {
+                        mainModal.obj.hide();
+                    }, 1500);
 
                 } else {
                     throw new Error(response.data.message);

@@ -22,6 +22,8 @@ public class CreateUserRequest : IRequest<CreateUserResult>
     public bool? IsDeleted { get; init; }
     public string? CreatedById { get; init; }
     public string? wareHouse { get; init; }
+    // Added UserGroupId property
+    public string? UserGroupId { get; init; }
 }
 
 public class CreateUserValidator : AbstractValidator<CreateUserRequest>
@@ -34,6 +36,8 @@ public class CreateUserValidator : AbstractValidator<CreateUserRequest>
         RuleFor(x => x.FirstName).NotEmpty();
         RuleFor(x => x.LastName).NotEmpty();
         RuleFor(x => x.wareHouse).NotEmpty();
+        // Added validation rule
+        RuleFor(x => x.UserGroupId).NotEmpty().WithMessage("User Group is required.");
     }
 }
 
@@ -59,6 +63,7 @@ public class CreateUserHandler : IRequestHandler<CreateUserRequest, CreateUserRe
             request.IsBlocked ?? false,
             request.IsDeleted ?? false,
             request.CreatedById ?? "",
+            request.UserGroupId ?? "", // Added parameter to service call
             cancellationToken
             );
 

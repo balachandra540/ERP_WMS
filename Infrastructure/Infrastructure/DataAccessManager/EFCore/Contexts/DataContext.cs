@@ -65,6 +65,7 @@ public class DataContext : IdentityDbContext<ApplicationUser>, IEntityDbSet
     public DbSet<ProductPriceDefinition> ProductPriceDefinition { get; set; } //Add this 
     public DbSet<ProductDiscountDefinition> ProductDiscountDefinition { get; set; } //Add this 
     public DbSet<UserGroup> UserGroup { get; set; } //Add this 
+    public DbSet<ProductDiscountDetail> ProductDiscountDetail { get; set; }
 
     public DbSet<ProductPluCodes> ProductPluCodes { get; set; }
 
@@ -133,9 +134,9 @@ public class DataContext : IdentityDbContext<ApplicationUser>, IEntityDbSet
         modelBuilder.ApplyConfiguration(new ProductGroupAttributeValueConfiguration());
         modelBuilder.ApplyConfiguration(new PurchaseOrderItemAttributeCombinationConfiguration());
         modelBuilder.ApplyConfiguration(new ProductPriceDefinitionConfiguration());
+        modelBuilder.ApplyConfiguration(new ProductDiscountDetailConfiguration());
         modelBuilder.ApplyConfiguration(new ProductDiscountDefinitionConfiguration());
-        modelBuilder.ApplyConfiguration(new ProductDiscountDefinitionConfiguration());
-
+        modelBuilder.ApplyConfiguration(new UserGroupConfiguration());
         modelBuilder.ApplyConfiguration(new GoodsReceiveItemDetailConfiguration());
         modelBuilder.ApplyConfiguration(new InventoryTransactionAttributesDetailsConfiguration());
         modelBuilder.ApplyConfiguration(new SalesOrderItemDetailsConfiguration());

@@ -12,4 +12,6 @@ public record RefreshTokenResultDto
     public string? Avatar { get; init; }
     public List<MenuNavigationTreeNodeDto>? MenuNavigation { get; init; }
     public List<string>? Roles { get; init; }
+    public string? UserGroupId { get; init; }
+
 }

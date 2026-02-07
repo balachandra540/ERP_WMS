@@ -1048,7 +1048,44 @@ const App = {
             }
         });
 
+        // 1. Initialize SignalR Connection
+        //const connection = new signalR.HubConnectionBuilder()
+        //    .withUrl("/approvalHub")
+        //    .withAutomaticReconnect()
+        //    .build();
 
+        // 2. Listen for "Approved" event from the Manager
+        //connection.on("DiscountApproved", (data) => {
+        //    const gridData = secondaryGrid.obj.dataSource;
+        //    // Find row by tempRowId (which we sent as PLU or ID)
+        //    const row = gridData.find(r => (r.id === data.tempRowId || r.pluCode === data.tempRowId));
+
+        //    if (row) {
+        //        row.approvalStatus = "Approved"; // Update status immediately
+        //        secondaryGrid.obj.refresh();
+
+        //        Swal.fire({
+        //            icon: 'success',
+        //            title: 'Approved!',
+        //            text: `${data.productName} discount is now ${row.upToDiscount}%`,
+        //            timer: 2000
+        //        });
+
+        //        methods.calculateLiveTotals(); // Recalculate summary totals
+        //    }
+        //});
+
+        // 3. Start Connection on Mount
+        Vue.onMounted(async () => {
+            try {
+                // ... existing init logic ...
+                await connection.start();
+                const groupId = StorageManager.getUserGroupId();
+                await connection.invoke("JoinGroup", groupId); // Join manager group if applicable
+            } catch (err) {
+                console.error("SignalR Connection Error: ", err);
+            }
+        });
         const customerState = Vue.reactive({
             mainData: [],
             deleteMode: false,
@@ -2120,6 +2157,11 @@ const App = {
                                 timer: 1200,
                                 showConfirmButton: false
                             });
+                            setTimeout(() => {
+                                mainModal.obj.hide();
+                                resetFormState();
+                            }, 1500);
+
                         } else {
                             Swal.fire({
                                 icon: 'success',
@@ -2689,19 +2731,33 @@ const App = {
                 let totalDiscount = 0;   // Total discount
                 let totalAfterDiscount = 0; // Before tax
 
+               
+                // Inside methods.calculateLiveTotals
                 currentData.forEach(row => {
                     const qty = parseFloat(row.quantity || 0);
                     const unitPrice = parseFloat(row.unitPrice || 0);
-                    const discount = parseFloat(row.discountAmount || 0);
-
                     const gross = qty * unitPrice;
-                    const netAfterDiscount = gross - discount;
+
+                    // Fetch active discount definitions for current product
+                    const rowDiscounts = state.discountDefinitionListLookupData
+                        ?.filter(x => x.productId === row.productId && x.isActive) ?? [];
+
+                    // Sum the Percentages
+                    const flatPercent = rowDiscounts
+                        .filter(d => d.discountType === "Flat")
+                        .reduce((sum, d) => sum + (d.discountPercentage || 0), 0);
+
+                    const manualUpToPercent = parseFloat(row.upToDiscount || 0);
+                    const combinedPercent = flatPercent + manualUpToPercent;
+
+                    // Final Amounts
+                    const rowDiscountAmt = (gross * combinedPercent) / 100;
+                    const netAfterDiscount = gross - rowDiscountAmt;
 
                     totalGross += gross;
-                    totalDiscount += discount;
+                    totalDiscount += rowDiscountAmt;
                     totalAfterDiscount += netAfterDiscount;
                 });
-
                 // 7️⃣ Tax calculation
                 const taxRate = parseFloat(state.selectedTaxRate || 0); // e.g. 18
                 const taxAmount = (totalAfterDiscount * taxRate) / 100;
@@ -2714,6 +2770,72 @@ const App = {
                 state.discountAmount = NumberFormatManager.formatToLocale(totalDiscount);
                 state.taxAmount = NumberFormatManager.formatToLocale(taxAmount);
                 state.totalAmount = NumberFormatManager.formatToLocale(finalTotal);
+            },
+            // Inside the methods object
+            // Inside methods object
+            handleDiscountApproval: function (enteredVal, currentUserLimit, absoluteMax, details, rowData) {
+                const currentUserGroupId = StorageManager.getUserGroupId();
+
+                if (enteredVal <= currentUserLimit) {
+                    rowData.approvalStatus = "Auto-Approved";
+                    rowData.approverGroupId = currentUserGroupId;
+                    return { success: true, status: "Approved" };
+                }
+                else if (enteredVal <= absoluteMax) {
+                    const higherGroup = details
+                        .filter(d => d.maxPercentage >= enteredVal)
+                        .sort((a, b) => a.maxPercentage - b.maxPercentage)[0];
+
+                    rowData.approvalStatus = "Waiting Approval"; // Change status name
+                    rowData.approverGroupId = higherGroup.userGroupId;
+
+                    // 🔥 Trigger Immediate Notification
+                    methods.sendImmediateApprovalRequest({
+                        approverGroupId: higherGroup.userGroupId,
+                        productId: rowData.productId,
+                        productName: rowData.productName,
+                        percentage: enteredVal,
+                        tempRowId: rowData.id || rowData.pluCode // Unique identifier for the row
+                    });
+
+                    Swal.fire({
+                        icon: 'warning',
+                        title: 'Waiting for Approval...',
+                        text: `Percentage ${enteredVal}% is over your limit. Request sent to ${higherGroup.userGroupName}. Please wait for them to approve before finalizing.`,
+                        showConfirmButton: false,
+                        timer: 3000
+                    });
+
+                    return { success: true, status: "Waiting" };
+                }
+                else {
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Not Allowed',
+                        text: `Maximum limit is ${absoluteMax}%.`,
+                    });
+                    return { success: false, status: "Blocked" };
+                }
+            },
+            // Inside methods object
+            // Inside the methods object
+            sendImmediateApprovalRequest: async function (data) {
+                try {
+                    if (connection.state === signalR.HubConnectionState.Connected) {
+                        // Send request to the hub
+                        await connection.invoke("RequestInstantApproval", {
+                            userGroupId: data.approverGroupId,
+                            requestedBy: StorageManager.getUserId(),
+                            productId: data.productId,
+                            productName: data.productName,
+                            percentage: data.percentage,
+                            tempRowId: data.tempRowId
+                        });
+                        console.log("⚡ SignalR: Approval request sent.");
+                    }
+                } catch (err) {
+                    console.error("SignalR Invoke Error:", err);
+                }
             }
         };
         // Lookup Components
@@ -3732,10 +3854,21 @@ const App = {
                                                         ? priceDef.salePrice
                                                         : selectedProduct.unitPrice;
 
-                                                    // ✅ FIXED: define discountDef
-                                                    const discountDef =
-                                                        state.discountDefinitionListLookupData
-                                                            ?.find(x => x.productId === productId && x.isActive);
+                                                    // 1. Get all active discounts for this product
+                                                    const discounts = state.discountDefinitionListLookupData
+                                                        ?.filter(x => x.productId === productId && x.isActive) ?? [];
+
+                                                    // 2. Identify if "Upto" exists to enable the field
+                                                    const isUpto = discounts.some(x => x.discountType === "Upto");
+
+                                                    // 3. Select the primary discount for auto-calc (Prefer Flat if auto-applying)
+                                                    const discountDef = discounts.find(x => x.discountType === "Flat")
+                                                        || discounts.find(x => x.discountType === "Upto");
+
+                                                    if (typeof upToDiscountObj !== 'undefined' && upToDiscountObj) {
+                                                        upToDiscountObj.enabled = isUpto;
+                                                    }
+                                                    // 🔥 UPTO DISCOUNT LOGIC END
 
                                                     // ✅ FIXED: define discountAmount
                                                     const discountAmount =
@@ -3986,6 +4119,75 @@ const App = {
                             }
                         },
                         {
+                            field: 'upToDiscount',
+                            headerText: 'Up To % Discount',
+                            width: 140,
+                            type: 'number',
+                            format: 'N0',
+                            textAlign: 'Right',
+                            edit: {
+                                create: () => document.createElement('input'),
+                                read: () => upToDiscountObj.value,
+                                destroy: () => upToDiscountObj.destroy(),
+                                write: (args) => {
+                                    debugger;
+                                    const currentUserGroupId = StorageManager.getUserGroupId();
+                                    const discountDef = state.discountDefinitionListLookupData
+                                        ?.find(x => x.productId === args.rowData.productId && x.isActive && x.discountType === "Upto");
+
+                                    const isUptoType = !!discountDef;
+                                    const details = discountDef?.productDiscountDetails || [];
+                                    const currentUserLimit = details.find(d => d.userGroupId === currentUserGroupId)?.maxPercentage ?? 0;
+                                    const absoluteMax = details.length > 0 ? Math.max(...details.map(d => d.maxPercentage)) : 0;
+                                    const flatDef = state.discountDefinitionListLookupData
+                                        ?.find(x => x.productId === args.rowData.productId && x.isActive && x.discountType === "Flat");
+
+                                    upToDiscountObj = new ej.inputs.NumericTextBox({
+                                        value: args.rowData.upToDiscount ?? 0,
+                                        min: 0,
+                                        max: 100,
+                                        format: 'n0',
+                                        decimals: 0,
+                                        enabled: isUptoType,
+                                        change: (e) => {
+                                            const enteredVal = e.value || 0;
+                                            debugger;
+                                            // 🔥 Call the new approval function
+                                            const result = methods.handleDiscountApproval(
+                                                enteredVal,
+                                                currentUserLimit,
+                                                absoluteMax,
+                                                details,
+                                                args.rowData
+                                            );
+
+                                            if (result.reset) {
+                                                upToDiscountObj.value = 0;
+                                                processCalculations(0);
+                                            } else {
+                                                processCalculations(enteredVal);
+                                            }
+                                        }
+                                    });
+
+                                    function processCalculations(val) {
+                                        if (priceObj && quantityObj && totalObj && discountAmountObj) {
+                                            const qty = quantityObj.value || 0;
+                                            const price = priceObj.value || 0;
+                                            const gross = qty * price;
+                                            const flatPercent = flatDef ? (flatDef.discountPercentage || 0) : 0;
+                                            const totalDiscountAmt = (gross * (flatPercent + val)) / 100;
+
+                                            discountAmountObj.value = totalDiscountAmt;
+                                            totalObj.value = gross - totalDiscountAmt;
+                                        }
+                                        methods.calculateLiveTotals();
+                                    }
+
+                                    upToDiscountObj.appendTo(args.element);
+                                }
+                            }
+                        }, {
                             field: 'quantity',
                             headerText: 'Quantity',
                             width: 200,

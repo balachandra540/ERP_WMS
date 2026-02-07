@@ -20,6 +20,8 @@ public class UpdateUserRequest : IRequest<UpdateUserResult>
     public bool? IsDeleted { get; init; }
     public string? UpdatedById { get; init; }
     public string? wareHouse { get; init; }
+    public string? UserGroupId { get; set; }
+
 }
 
 public class UpdateUserValidator : AbstractValidator<UpdateUserRequest>
@@ -51,7 +53,8 @@ public class UpdateUserHandler : IRequestHandler<UpdateUserRequest, UpdateUserRe
             request.EmailConfirmed ?? true,
             request.IsBlocked ?? false,
             request.IsDeleted ?? false,
-            request.UpdatedById ?? "",           
+            request.UpdatedById ?? "", 
+            request.UserGroupId,
             cancellationToken
             );
 

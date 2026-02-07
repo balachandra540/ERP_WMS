@@ -1,4 +1,5 @@
-﻿using Microsoft.EntityFrameworkCore;
+﻿using Domain.Entities;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using static Domain.Common.Constants;
 
@@ -29,7 +30,18 @@ public class ApplicationUserConfiguration : IEntityTypeConfiguration<Application
         builder.Property(u => u.CreatedById)
             .HasMaxLength(UserIdConsts.MaxLength)
             .IsRequired(false);
+        // ================================
+        // === NEW USER GROUP CONFIG ======
+        // ================================
 
+        builder.Property(u => u.UserGroupId)
+            .IsRequired(false); // Set to true if every user must belong to a group
+
+        // Define the Foreign Key relationship
+        builder.HasOne<UserGroup>()
+            .WithMany() // Assuming a UserGroup has many ApplicationUsers
+            .HasForeignKey(u => u.UserGroupId)
+            .OnDelete(DeleteBehavior.Restrict); // Prevents deleting a group that has users
         builder.Property(u => u.UpdatedAt)
             .IsRequired(false);
 
