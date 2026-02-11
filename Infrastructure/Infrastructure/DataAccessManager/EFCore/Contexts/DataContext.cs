@@ -75,7 +75,7 @@ public class DataContext : IdentityDbContext<ApplicationUser>, IEntityDbSet
     public DbSet<TransferOutDetails> TransferOutDetails { get; set; } = default!;
 
     public DbSet<UserWarehouse> UserWarehouses { get; set; } = default!;
-
+    public DbSet<DiscountApprovalLog> DiscountApprovalLog { get; set; }
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         foreach (var entityType in modelBuilder.Model.GetEntityTypes())
@@ -142,7 +142,9 @@ public class DataContext : IdentityDbContext<ApplicationUser>, IEntityDbSet
         modelBuilder.ApplyConfiguration(new SalesOrderItemDetailsConfiguration());
         modelBuilder.ApplyConfiguration(new TransferOutDetailsConfiguration());
         modelBuilder.ApplyConfiguration(new UserWarehouseConfiguration());
+        modelBuilder.ApplyConfiguration(new DiscountApprovalLogConfiguration());
 
+        
 
     }
 

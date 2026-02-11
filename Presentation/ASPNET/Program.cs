@@ -1,3 +1,4 @@
+using Application.Common.Hubs;
 using Application.Features.WarehouseManager.Commands;
 using ASPNET.BackEnd;
 using ASPNET.BackEnd.Common.Middlewares;
@@ -14,6 +15,7 @@ if (!Directory.Exists(logPath))
 
 builder.Services.AddBackEndServices(builder.Configuration);
 builder.Services.AddFrontEndServices();
+builder.Services.AddSignalR();
 //  Register the handler if you're injecting it manually
 builder.Services.AddScoped<UpdateWarehouseLogoHandler>();
 
@@ -36,5 +38,7 @@ app.MapStaticAssets();
 
 app.MapFrontEndRoutes();
 app.MapBackEndRoutes();
+app.MapHub<ApprovalHub>("/approvalHub");
+
 
 app.Run();

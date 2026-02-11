@@ -63,7 +63,8 @@ public interface IEntityDbSet
     public DbSet<InventoryTransactionAttributesDetails> InventoryTransactionAttributesDetails { get; set; }
     //public DbSet<UserWarehouse> UserWarehouse  { get; set; }
     public DbSet<SalesOrderItemDetails> SalesOrderItemDetails { get; }
+    public DbSet<DiscountApprovalLog> DiscountApprovalLog { get; set; }
 
 
-    }
+}
 
