@@ -1052,38 +1052,59 @@ const App = {
         let connection = null;
         if (typeof signalR !== 'undefined') {
             connection = new signalR.HubConnectionBuilder()
-                .withUrl("/approvalHub")
+                .withUrl("/ApprovalHub")
                 .withAutomaticReconnect()
                 .build();
+            // 1. Listen for the response from the Hub
+            if (connection) {
+                connection.on("DiscountApproved", (data) => {
+                    debugger;
+                    // Find the specific row in the grid using PLU and ProductId
+                    const gridData = secondaryGrid.obj.dataSource;
+                    const row = gridData.find(r => r.pluCode === data.pluCode && r.productId === data.productId);
+                    if (row) {
+                        row.approvalStatus = data.status; // "Approved" or "Rejected"
+                        row.approvalComments = data.comments;
+                        row.approverName = data.approvedBy;
 
-            connection.on("DiscountApproved", (data) => {
-                const gridData = secondaryGrid.obj.dataSource;
-                const row = gridData.find(r => (r.id === data.tempRowId || r.pluCode === data.tempRowId));
+                        // If rejected, reset upToDiscount to 0 or max allowed without approval
+                        if (data.status === 'Rejected') {
+                            row.upToDiscount = 0; // Or set to currentUserLimit if needed
+                            Swal.fire({
+                                icon: 'error',
+                                title: `Discount ${data.status}`,
+                                text: `By: ${data.approvedBy}. Comments: ${data.comments}`,
+                                timer: 3000
+                            });
+                        } else {
+                            // For approved, the upToDiscount is already set, just update status
+                            Swal.fire({
+                                icon: 'success',
+                                title: `Discount ${data.status}`,
+                                text: `By: ${data.approvedBy}. Comments: ${data.comments}`,
+                                timer: 3000
+                            });
+                        }
 
-                if (row) {
-                    row.approvalStatus = "Approved";
-                    secondaryGrid.obj.refresh();
-                    Swal.fire({
-                        icon: 'success',
-                        title: 'Approved!',
-                        text: `${data.productName} discount is now ${row.upToDiscount}%`,
-                        timer: 2000
-                    });
-                    methods.calculateLiveTotals();
-                }
-            });
+                        secondaryGrid.obj.refresh(); // Visual update
+                        methods.calculateLiveTotals(); // Recalculate based on updated discount/status
+                    }
+                });
+            }
         } else {
             console.error("❌ SignalR library not found. Please include the signalr.min.js script.");
         }
         // 3. Start Connection on Mount
+        // In both Salesman and Manager JavaScript
         Vue.onMounted(async () => {
             try {
-                // ... existing init logic ...
                 await connection.start();
                 const groupId = StorageManager.getUserGroupId();
-                await connection.invoke("JoinGroup", groupId); // Join manager group if applicable
+                await connection.invoke("JoinGroup", groupId);
+                console.log("✅ SignalR Connected. My Group ID:", groupId);
+                console.log("✅ Connection ID:", connection.connectionId);
             } catch (err) {
-                console.error("SignalR Connection Error: ", err);
+                console.error("❌ SignalR Connection Error:", err);
             }
         });
         const customerState = Vue.reactive({
@@ -2771,70 +2792,113 @@ const App = {
                 state.taxAmount = NumberFormatManager.formatToLocale(taxAmount);
                 state.totalAmount = NumberFormatManager.formatToLocale(finalTotal);
             },
-            // Inside the methods object
             // Inside methods object
             handleDiscountApproval: function (enteredVal, currentUserLimit, absoluteMax, details, rowData) {
                 const currentUserGroupId = StorageManager.getUserGroupId();
 
+                // Case 1: Within user's own limit
                 if (enteredVal <= currentUserLimit) {
                     rowData.approvalStatus = "Auto-Approved";
                     rowData.approverGroupId = currentUserGroupId;
                     return { success: true, status: "Approved" };
                 }
+
+                // Case 2: Requires higher approval
                 else if (enteredVal <= absoluteMax) {
+                    // Find the lowest group that can approve this percentage
                     const higherGroup = details
                         .filter(d => d.maxPercentage >= enteredVal)
                         .sort((a, b) => a.maxPercentage - b.maxPercentage)[0];
 
-                    rowData.approvalStatus = "Waiting Approval"; // Change status name
+                    rowData.approvalStatus = "Waiting Approval";
                     rowData.approverGroupId = higherGroup.userGroupId;
 
-                    // 🔥 Trigger Immediate Notification
+                    // 🔥 Trigger the SignalR Request
                     methods.sendImmediateApprovalRequest({
                         approverGroupId: higherGroup.userGroupId,
                         productId: rowData.productId,
                         productName: rowData.productName,
-                        percentage: enteredVal,
-                        tempRowId: rowData.id || rowData.pluCode // Unique identifier for the row
+                        pluCode: rowData.pluCode,
+                        quantity: rowData.quantity || 1, // Ensure quantity isn't null
+                        percentage: enteredVal
                     });
 
                     Swal.fire({
                         icon: 'warning',
                         title: 'Waiting for Approval...',
-                        text: `Percentage ${enteredVal}% is over your limit. Request sent to ${higherGroup.userGroupName}. Please wait for them to approve before finalizing.`,
+                        text: `Percentage ${enteredVal}% requires approval from ${higherGroup.userGroupName}. A request has been sent.`,
                         showConfirmButton: false,
-                        timer: 3000
+                        timer: 3500
                     });
 
                     return { success: true, status: "Waiting" };
                 }
+
+                // Case 3: Exceeds absolute system maximum
                 else {
                     Swal.fire({
                         icon: 'error',
-                        title: 'Not Allowed',
-                        text: `Maximum limit is ${absoluteMax}%.`,
+                        title: 'Limit Exceeded',
+                        text: `The absolute maximum allowed is ${absoluteMax}%.`,
                     });
                     return { success: false, status: "Blocked" };
                 }
             },
-            // Inside methods object
-            // Inside the methods object
             sendImmediateApprovalRequest: async function (data) {
                 try {
-                    if (connection.state === signalR.HubConnectionState.Connected) {
-                        // Send request to the hub
-                        await connection.invoke("RequestInstantApproval", {
-                            userGroupId: data.approverGroupId,
-                            requestedBy: StorageManager.getUserId(),
+                    // Ensure SignalR connection is active
+                    if (connection && connection.state === signalR.HubConnectionState.Connected) {
+
+                        // 1. Get the Current User's (Salesman) Group ID for the "Return Address"
+                        const myGroupId = StorageManager.getUserGroupId();
+
+                        // 2. Construct the DTO exactly as the Backend expects
+                        const approvalDto = {
+                            userGroupId: data.approverGroupId,      // The Manager's Group (Target)
+                            requesterGroupId: myGroupId,           // The Salesman's Group (Source)
                             productId: data.productId,
+                            pluCode: data.pluCode,
+                            quantity: parseFloat(data.quantity),
+                            // Note: If your backend DTO doesn't have 'percentage' or 'productName' yet, 
+                            // they will be ignored, but it's good practice to send them.
                             productName: data.productName,
-                            percentage: data.percentage,
-                            tempRowId: data.tempRowId
-                        });
-                        console.log("⚡ SignalR: Approval request sent.");
+                            percentage: data.percentage
+                        };
+
+                        // 3. Invoke the Hub Method
+                        await connection.invoke("RequestInstantApproval", approvalDto);
+
+                        console.log("⚡ SignalR: Request sent to Group " + data.approverGroupId);
+                    } else {
+                        console.warn("SignalR not connected. Email might still trigger if handled via API.");
                     }
                 } catch (err) {
                     console.error("SignalR Invoke Error:", err);
+                    toast.error("Failed to send instant notification to managers.");
+                }
+            },
+            updateRowStatus: function (productId, status) {
+                // 1. Find the item in your local grid data array (replace 'gridData' with your actual variable)
+                const item = gridData.find(row => row.productId === productId);
+
+                if (item) {
+                    // 2. Update the status and the visual indicator
+                    item.approvalStatus = status; // e.g., "Approved" or "Rejected"
+
+                    // 3. If you use a framework like Vue/React, the UI updates automatically.
+                    // If you use DataTables, you need to redraw the row:
+                    if ($.fn.DataTable.isDataTable('#salesGrid')) {
+                        const table = $('#salesGrid').DataTable();
+                        const row = table.row((idx, data) => data.productId === productId);
+
+                        if (row.any()) {
+                            const rowData = row.data();
+                            rowData.approvalStatus = status;
+                            row.data(rowData).draw(false);
+                        }
+                    }
+
+                    console.log(`✅ Product ${productId} updated to status: ${status}`);
                 }
             }
         };
