@@ -3291,9 +3291,7 @@ const App = {
                         // CREATE NEW GRN
                         if (args.item.id === 'AddCustom') {
                             resetFormState();
-                            // ✅ Set TODAY as default
-                            //setDefaultDate();
-
+                           
                             state.deleteMode = false;
                             state.mainTitle = 'Add Goods Receive Items';
 
@@ -3375,6 +3373,10 @@ const App = {
                                 if (secondaryGrid.obj) secondaryGrid.obj.refresh();
                             }, 100);
 
+                            if (goodsReceiveStatusListLookup.obj) {
+                                goodsReceiveStatusListLookup.obj.value = state.status;
+                            }
+                            
                             return;
                         }
 

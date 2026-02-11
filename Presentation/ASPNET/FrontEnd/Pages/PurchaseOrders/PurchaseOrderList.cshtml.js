@@ -687,7 +687,8 @@
                      else if (state.deleteMode) {
                         // **DELETE GOODS RECEIPT**
                         response = await services.deleteMainData(state.id, userId);
-                    } else {
+                    }
+                    else {
                         const DeleteditemsDto = (deletedRecords || [])
                             .flat(Infinity)  // First: flatten to [{id: "123"}]
                             .map(item => ({   // Then: map over flattened array
@@ -1197,6 +1198,13 @@
                                 secondaryGrid.refresh();
 
                                 mainModal.obj.show();
+
+                                Vue.nextTick(() => {
+                                  
+                                    if (purchaseOrderStatusListLookup.obj) {
+                                        purchaseOrderStatusListLookup.obj.value = state.orderStatus;
+                                    }
+                                });
                             }
                         }
 

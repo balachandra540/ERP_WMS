@@ -1655,24 +1655,38 @@ const App = {
                     throw error;
                 }
             },
-            calculateSaleRate: (unitPrice, quantity, discountPercent, taxPercent) => {
-                const discountPerUnit = (unitPrice * (discountPercent ?? 0)) / 100;
-                const discountedRate = unitPrice - discountPerUnit;
+            //calculateSaleRate: (unitPrice, quantity, discountPercent, taxPercent) => {
+            //    const discountPerUnit = (unitPrice * (discountPercent ?? 0)) / 100;
+            //    const discountedRate = unitPrice - discountPerUnit;
 
-                const taxPerUnit = (discountedRate * (taxPercent ?? 0)) / 100;
-                const rateAfterTax = discountedRate + taxPerUnit;
+            //    const taxPerUnit = (discountedRate * (taxPercent ?? 0)) / 100;
+            //    const rateAfterTax = discountedRate + taxPerUnit;
 
-                const totalAfterTax = rateAfterTax * (quantity ?? 1);
+            //    const totalAfterTax = rateAfterTax * (quantity ?? 1);
+
+            //    return {
+            //        discountPerUnit,
+            //        discountedRate,
+            //        taxPerUnit,
+            //        rateAfterTax,
+            //        totalAfterTax
+            //    };
+            //},
+            calculateSaleRate: (unitPrice, taxPercent, quantity) => {
+                //const discountPerUnit = (unitPrice * (discountPercent ?? 0)) / 100;
+                //const discountedRate = unitPrice - discountPerUnit;
+
+                const taxPerUnit = (unitPrice * (taxPercent ?? 0)) / 100;
+                const rateAfterTax = unitPrice + taxPerUnit;
+
+                const total = rateAfterTax * (quantity ?? 1);
 
                 return {
-                    discountPerUnit,
-                    discountedRate,
                     taxPerUnit,
                     rateAfterTax,
-                    totalAfterTax
+                    total
                 };
             },
-
 
            };
         //// Customer Text Inputs
@@ -1948,6 +1962,13 @@ const App = {
                     const price = parseFloat(item.unitPrice || 0);
                     const discPercent = parseFloat(item.discountPercentage || 0);
                     const discAmt = parseFloat(item.discountAmount || 0);
+                    const taxPercent = parseFloat(item.taxId || 0); 
+
+                    //// Calculate gross, tax, and total after tax
+                    //const grossAmount = qty * price;
+                    const taxAmount = parseFloat(item.taxAmount || 0); 
+                    //const taxAmount = (taxableAmount * taxPercent) / 100;
+                    const totalAfterTax = parseFloat(item.totalAfterTax || 0); 
                     item.__validatedAttributes = Attributes;
                     return {
                         id: item.id ?? null,
@@ -1960,6 +1981,10 @@ const App = {
                         discountPercentage: discPercent,
                         discountAmount: discAmt,
                         grossAmount: qty * price, // Total before discount/tax
+
+                        taxPercent: taxPercent,
+                        taxAmount: taxAmount,
+                        totalAfterTax: totalAfterTax,
 
                         total: item.total ?? 0, // Final line total (Net)
                         summary: item.summary ?? "",
@@ -2068,10 +2093,14 @@ const App = {
                         unitPrice: item.unitPrice,
                         quantity: item.quantity,
 
-                        // 🔥 NEW ITEM-LEVEL FIELDS
+                        // NEW ITEM-LEVEL FIELDS
                         discountPercentage: Number(item.discountPercentage || 0),
                         discountAmount: Number(item.discountAmount || 0),
                         grossAmount: Number(item.unitPrice || 0) * Number(item.quantity || 0),
+
+                        taxId: item.taxId,
+                        taxAmount: Number(item.taxAmount || 0),
+                        totalAfterTax: Number(item.totalAfterTax),
 
                         total: item.total,
                         summary: item.summary,
@@ -2097,7 +2126,7 @@ const App = {
                             state.orderDate,
                             state.description,
                             state.orderStatus,
-                            state.taxId,
+                            null,
                             state.customerId,
                             userId,
                             itemsDto,
@@ -2128,7 +2157,7 @@ const App = {
                             state.orderDate,
                             state.description,
                             state.orderStatus,
-                            state.taxId,
+                            null,
                             state.customerId,
                             userId,
                             itemsDto,
@@ -2630,9 +2659,9 @@ const App = {
                 // Iterate detail rows
                 // -------------------------------
                 row.detailEntries.forEach((entry, index) => {
-                    const imei1 = (entry.IMEI1 || "").trim();
-                    const imei2 = (entry.IMEI2 || "").trim();
-                    const serviceNo = (entry.ServiceNo || "").trim();
+                    const imei1 = (entry.IMEI1 || entry.imeI1 ||"").trim();
+                    const imei2 = (entry.IMEI2 || entry.imeI2 || "").trim();
+                    const serviceNo = (entry.ServiceNo || entry.serviceNo || "").trim();
 
                     // -------------------------------
                     // REQUIRED FIELD VALIDATION
@@ -2730,10 +2759,11 @@ const App = {
                 let totalGross = 0;      // Items total before discount
                 let totalDiscount = 0;   // Total discount
                 let totalAfterDiscount = 0; // Before tax
-
+                let totalTaxAmount = 0;
                
                 // Inside methods.calculateLiveTotals
                 currentData.forEach(row => {
+                    debugger;
                     const qty = parseFloat(row.quantity || 0);
                     const unitPrice = parseFloat(row.unitPrice || 0);
                     const gross = qty * unitPrice;
@@ -2757,6 +2787,11 @@ const App = {
                     totalGross += gross;
                     totalDiscount += rowDiscountAmt;
                     totalAfterDiscount += netAfterDiscount;
+                    const taxPercent = taxObj?.value
+                        ? (state.taxListLookupData.find(t => t.id === row.taxId)?.percentage || 0) : 0;
+
+                    const calc = services.calculateSaleRate(netAfterDiscount, taxPercent, qty);
+                    totalTaxAmount += calc.taxPerUnit;
                 });
                 // 7️⃣ Tax calculation
                 const taxRate = parseFloat(state.selectedTaxRate || 0); // e.g. 18
@@ -2768,7 +2803,7 @@ const App = {
                 // 9️⃣ Update Vue state
                 state.subTotalAmount = NumberFormatManager.formatToLocale(totalGross);
                 state.discountAmount = NumberFormatManager.formatToLocale(totalDiscount);
-                state.taxAmount = NumberFormatManager.formatToLocale(taxAmount);
+                state.taxAmount = NumberFormatManager.formatToLocale(totalTaxAmount);
                 state.totalAmount = NumberFormatManager.formatToLocale(finalTotal);
             },
             // Inside the methods object
@@ -3887,9 +3922,33 @@ const App = {
 
                                                     if (quantityObj) {
                                                         quantityObj.value = 1;
-                                                        if (totalObj) {
-                                                            totalObj.value = finalPrice * quantityObj.value;
+                                                        const finalUnitPrice = finalPrice - discountAmount;
+                                                        const taxPercent =
+                                                            state.taxListLookupData.find(t => t.id === taxObj?.value)?.percentage ?? 0;
+
+
+                                                        const calc = services.calculateSaleRate(finalUnitPrice, taxPercent, quantityObj.value = 1);
+
+                                                        if (quantityObj) {
+                                                            quantityObj.value = 1;
                                                         }
+                                                        if (taxAmountObj) {
+                                                            taxAmountObj.value = calc.taxPerUnit;
+                                                        }
+                                                        if (totalAfterTaxObj) {
+                                                            totalAfterTaxObj.value = calc.rateAfterTax;
+                                                        }
+                                                        if (totalObj) {
+                                                            totalObj.value = calc.total;
+                                                        }
+                                                        //if (totalObj) {
+                                                        //    totalObj.value = finalPrice * quantityObj.value;
+                                                        //}
+
+                                                        // 🔥 DATA (THIS WAS MISSING)
+                                                        args.rowData.taxAmount = calc.taxPerUnit;
+                                                        args.rowData.totalAfterTax = calc.rateAfterTax;
+                                                        args.rowData.total = calc.total;
                                                     }
                                                 }
                                             }
@@ -3965,13 +4024,28 @@ const App = {
 
                                                     const discountAmount = discountDef ? (salePrice * (discountDef.discountPercentage || 0)) / 100 : 0;                                                    // ✅ FIXED: single finalPrice
                                                     const finalPrice = salePrice - discountAmount;
+                                                    const taxPercent =
+                                                        state.taxListLookupData.find(t => t.id === taxObj?.value)?.percentage ?? 0;
+
+                                                    const calc = services.calculateSaleRate(finalPrice,  taxPercent, qty = 1);
 
                                                     if (quantityObj) {
                                                         quantityObj.value = 1;
-                                                        if (totalObj) {
-                                                            totalObj.value = finalPrice * quantityObj.value;
-                                                        }
                                                     }
+                                                    if (taxAmountObj) {
+                                                        taxAmountObj.value = calc.taxPerUnit;
+                                                    }
+                                                    if (totalAfterTaxObj) {
+                                                        totalAfterTaxObj.value = calc.rateAfterTax;
+                                                    }
+                                                    if (totalObj) {
+                                                        totalObj.value = calc.total;
+                                                    }
+                                                    // 🔥 DATA (THIS WAS MISSING)
+                                                    args.rowData.taxAmount = calc.taxPerUnit;
+                                                    args.rowData.totalAfterTax = calc.rateAfterTax;
+                                                    args.rowData.total = calc.total;
+
                                                 }
                                             }
 
@@ -4019,6 +4093,7 @@ const App = {
                                         enabled: false,
 
                                         change: (e) => {
+                                            debugger;
                                             const selectedProduct = state.productListLookupData.find(item => item.id === e.value);
                                             if (!selectedProduct) return;
 
@@ -4032,6 +4107,7 @@ const App = {
                                             const finalPrice = priceDef ? priceDef.salePrice : selectedProduct.unitPrice;
 
                                             if (priceObj) priceObj.value = finalPrice;
+                                            if (taxObj) taxObj.value = selectedProduct.taxId;
 
                                             if (summaryObj) summaryObj.value = selectedProduct.description;
 
@@ -4067,11 +4143,34 @@ const App = {
                                 write: (args) => {
                                     priceObj = new ej.inputs.NumericTextBox({
                                         value: args.rowData.unitPrice ?? 0,
+                                        //change: (e) => {
+                                        //    if (quantityObj && totalObj) {
+                                        //        const total = e.value * quantityObj.value;
+                                        //        totalObj.value = total;
+                                        //    }
+                                        //}
                                         change: (e) => {
-                                            if (quantityObj && totalObj) {
-                                                const total = e.value * quantityObj.value;
-                                                totalObj.value = total;
-                                            }
+                                            const unitPrice = e.value ?? 0;
+                                            const qty = quantityObj?.value ?? 1;
+                                            const Gross = unitPrice * qty;
+                                            const discount = discountPercentObj?.value ?? 0;
+
+                                            const taxPercent =
+                                                state.taxListLookupData.find(t => t.id === taxObj?.value)?.percentage ?? 0;
+
+                                            const discountAmount = Gross * (discount || 0) / 100 ?? 0;                                                    // ✅ FIXED: single finalPrice
+                                            const finalPrice = Gross - discountAmount;
+                                            const calc = services.calculateSaleRate(finalPrice, taxPercent, qty);
+                                            discountAmountObj &&( discountAmountObj.value = discountAmount);
+                                            taxAmountObj && (taxAmountObj.value = calc.taxPerUnit);
+                                            totalAfterTaxObj && (totalAfterTaxObj.value = calc.rateAfterTax);
+                                            totalObj && (totalObj.value = calc.total);
+
+                                            // 🔥 DATA (THIS WAS MISSING)
+                                            args.rowData.discountAmount = discountAmount;
+                                            args.rowData.taxAmount = calc.taxPerUnit;
+                                            args.rowData.totalAfterTax = calc.rateAfterTax;
+                                            args.rowData.total = calc.total;
                                         }
                                     });
                                     priceObj.appendTo(args.element);
@@ -4103,15 +4202,38 @@ const App = {
                                         min: 0,
                                         max: 100,
                                         format: 'n0',
-                                        decimals: 0, // 🔥 FORCE INTEGER
-                                        readonly: true, // 🔥 Enforce Read-Only
+                                        decimals: 0, //  FORCE INTEGER
+                                        readonly: true, //  Enforce Read-Only
+                                       
                                         change: (e) => {
                                             if (priceObj && quantityObj && discountAmountObj) {
                                                 const gross = priceObj.value * quantityObj.value;
                                                 const discountAmt = (gross * e.value) / 100;
                                                 discountAmountObj.value = discountAmt;
                                             }
+                                            const discount = e.value ?? 0;
+                                            const unitPrice = priceObj?.value ?? 0;
+                                            const qty = quantityObj?.value ?? 1;
+                                            const gross = unitPrice * qty;
+                                            const taxPercent =
+                                                state.taxListLookupData.find(t => t.id === taxObj?.value)?.percentage ?? 0;
+                                            const discountAmt = (gross * discount) / 100;
+
+                                            const finalPrice = gross - discountAmt
+
+                                            const calc = services.calculateSaleRate(finalPrice, taxPercent,qty);
+
+
+                                            taxAmountObj && (taxAmountObj.value = calc.taxPerUnit);
+                                            totalAfterTaxObj && (totalAfterTaxObj.value = calc.rateAfterTax);
+                                            totalObj && (totalObj.value = calc.total);
+
+                                            //  DATA (THIS WAS MISSING)
+                                            args.rowData.taxAmount = calc.taxPerUnit;
+                                            args.rowData.totalAfterTax = calc.rateAfterTax;
+                                            args.rowData.total = calc.total;
                                         }
+
                                     });
 
                                     discountPercentObj.appendTo(args.element);
@@ -4152,7 +4274,7 @@ const App = {
                                         change: (e) => {
                                             const enteredVal = e.value || 0;
                                             debugger;
-                                            // 🔥 Call the new approval function
+                                            //  Call the new approval function
                                             const result = methods.handleDiscountApproval(
                                                 enteredVal,
                                                 currentUserLimit,
@@ -4177,9 +4299,19 @@ const App = {
                                             const gross = qty * price;
                                             const flatPercent = flatDef ? (flatDef.discountPercentage || 0) : 0;
                                             const totalDiscountAmt = (gross * (flatPercent + val)) / 100;
+                                            const finalPrice = gross - totalDiscountAmt
+                                            const taxPercent = taxObj?.value
+                                                ? (state.taxListLookupData.find(t => t.id === taxObj.value)?.percentage || 0)
+                                                : 0;
+                                            const calc = services.calculateSaleRate(finalPrice, taxPercent, qty);
 
+
+                                            taxAmountObj && (taxAmountObj.value = calc.taxPerUnit);
+                                            totalAfterTaxObj && (totalAfterTaxObj.value = calc.rateAfterTax);
+                                            totalObj && (totalObj.value = calc.total);
                                             discountAmountObj.value = totalDiscountAmt;
-                                            totalObj.value = gross - totalDiscountAmt;
+
+                                        //    totalObj.value = gross - totalDiscountAmt;
                                         }
                                         methods.calculateLiveTotals();
                                     }
@@ -4217,7 +4349,7 @@ const App = {
                                     quantityObj = new ej.inputs.NumericTextBox({
                                         value: args.rowData.quantity ?? 0,
                                         format: 'n0',
-                                        decimals: 0, // 🔥 FORCE INTEGER
+                                        decimals: 0, // FORCE INTEGER
                                         change: (e) => {
                                             if (!priceObj || !totalObj) return;
 
@@ -4238,17 +4370,175 @@ const App = {
                                             if (discountAmountObj) {
                                                 discountAmountObj.value = discountAmount;
                                             }
+                                            //const discountAmountPerUnit = (price * (discountPercent || 0)) / 100 ;                                                    // ✅ FIXED: single finalPrice
+                                            //const finalPrice = price - discountAmountPerUnit;
+                                            const finalPrice = grossAmount - discountAmount;
+                                            const taxPercent = taxObj?.value
+                                                ? (state.taxListLookupData.find(t => t.id === taxObj.value)?.percentage || 0)
+                                                : 0;
+                                            const calc = services.calculateSaleRate(finalPrice, taxPercent, qty);
 
+                                           
+                                            if (taxAmountObj) {
+                                                taxAmountObj.value = calc.taxPerUnit;
+                                            }
+                                            if (totalAfterTaxObj) {
+                                                totalAfterTaxObj.value = calc.rateAfterTax;
+                                            }
+                                            if (totalObj) {
+                                                totalObj.value = calc.total;
+                                            }
+                                            //  DATA (THIS WAS MISSING)
+                                            args.rowData.taxAmount = calc.taxPerUnit;
+                                            args.rowData.totalAfterTax = calc.rateAfterTax;
+                                            args.rowData.total = calc.total;
                                             // 🔹 net total
-                                            totalObj.value = grossAmount - discountAmount;
+                                        //    totalObj.value = grossAmount - discountAmount;
                                         }
                                     });
 
                                     quantityObj.appendTo(args.element);
                                 }
                             }
-                        }                  
-,
+                        }, 
+                        // =========================
+                        // DISCOUNT AMOUNT
+                        // =========================
+                        {
+                            field: 'discountAmount',
+                            headerText: 'Discount Amount',
+                            width: 140,
+                            type: 'number',
+                            format: 'N2',
+                            textAlign: 'Right',
+                            allowEditing: false,
+                            disableHtmlEncode: false,
+                            edit: {
+                                create: () => {
+                                    return document.createElement('input');
+                                },
+                                read: () => {
+                                    return discountAmountObj.value;
+                                },
+                                destroy: () => {
+                                    discountAmountObj.destroy();
+                                },
+                                write: (args) => {
+                                    discountAmountObj = new ej.inputs.NumericTextBox({
+                                        value: args.rowData.discountAmount ?? 0,
+                                        format: 'N2',
+                                        readonly: true, //  Enforce Read-Only
+                                    });
+
+                                    discountAmountObj.appendTo(args.element);
+                                }
+                            }
+                        },
+
+
+                        {
+                            field: 'taxId',
+                            headerText: 'Tax',
+                            width: 120,
+                            editType: 'dropdownedit',
+                            valueAccessor: (field, data) => {
+                                debugger;
+                                const tax = state.taxListLookupData.find(t => t.id === data[field]);
+                                return tax ? `${tax.name} (${tax.percentage}%)` : '';
+                            },
+                            edit: {
+                                create: () => document.createElement('input'),
+                                read: () => taxObj?.value,
+                                destroy: () => taxObj?.destroy(),
+                                write: (args) => {
+                                    debugger;
+                                    taxObj = new ej.dropdowns.DropDownList({
+                                        dataSource: state.taxListLookupData,
+                                        fields: { value: 'id', text: 'name' },
+                                        value: args.rowData.taxId ?? 0,
+                                        placeholder: 'Select Tax',
+                                        readonly: true
+
+                                        //change: (e) => {
+                                        //    const taxPercent =
+                                        //        state.taxListLookupData.find(t => t.id === e.value)?.percentage ?? 0;
+
+                                        //    const unitPrice = priceObj?.value ?? 0;
+                                        //    const qty = quantityObj?.value ?? 1;
+                                        //    const discount = discountPercentObj?.value ?? 0;
+
+                                        //    const calc = services.calculatesalerate(unitprice, taxpercent, qty);
+
+                                        //    args.rowData.taxId = e.value;
+                                        //    args.rowData.taxAmount = calc.taxPerUnit;
+                                        //    args.rowData.totalAfterTax = calc.rateAfterTax;
+                                        //    args.rowData.total = calc.totalAfterTax;
+
+                                        //    taxAmountObj && (taxAmountObj.value = calc.taxPerUnit);
+                                        //    totalAfterTaxObj && (totalAfterTaxObj.value = calc.rateAfterTax);
+                                        //    totalObj && (totalObj.value = calc.totalAfterTax);
+                                        //}
+
+                                    });
+
+                                    taxObj.appendTo(args.element);
+                                }
+                            }
+                        },
+                        {
+                            field: 'taxAmount',
+                            headerText: 'Tax Amount',
+                            width: 150,
+                            type: 'number',
+                            format: 'N2',
+                            textAlign: 'Right',
+                            allowEditing: false,
+                            disableHtmlEncode: false,
+                            edit: {
+                                create: () => {
+                                    let taxAmtElement = document.createElement('input');
+                                    return taxAmtElement;
+                                },
+                                read: () => taxAmountObj?.value ?? 0,
+
+                                destroy: () => { debugger; taxAmountObj?.destroy() },
+                                
+                                 write: (args) => {
+                                     taxAmountObj = new ej.inputs.NumericTextBox({
+                                         value: args.rowData.taxAmount ?? 0,
+                                        format: 'n2',
+                                        decimals: 2, //  FORCE INTEGER
+                                         readonly: true
+                                    });
+
+                                     taxAmountObj.appendTo(args.element);
+                                }
+                            }
+                        },
+                        {
+                            field: 'totalAfterTax',
+                            headerText: 'Rate After Tax',
+                            width: 150,
+                            type: 'number', format: 'N2', textAlign: 'Right',
+                            allowEditing: false,
+                            disableHtmlEncode: false,
+                            edit: {
+                                create: () => document.createElement('input'),
+                                read: () => totalAfterTaxObj?.value ?? 0,
+                                destroy: () => totalAfterTaxObj?.destroy(),
+                                write: (args) => {
+                                    totalAfterTaxObj = new ej.inputs.NumericTextBox({
+                                        value: args.rowData.totalAfterTax ?? 0,
+                                        format: 'N2',
+                                        decimals: 2, // FORCE INTEGER
+                                        readonly: true
+
+
+                                    });
+                                    totalAfterTaxObj.appendTo(args.element);
+                                }
+                            }
+                        },
                         {
                             field: 'details',
                             headerText: 'Attributes',
@@ -4270,45 +4560,10 @@ const App = {
         </a>
     `;
                             },
-
                             // Needed to allow HTML inside cell
                             allowEditing: false
                         },
-                        // =========================
-                        // DISCOUNT AMOUNT
-                        // =========================
-                        {
-                            field: 'discountAmount',
-                            headerText: 'Discount Amount',
-                            width: 140,
-                            type: 'number',
-                            format: 'N2',
-                            textAlign: 'Right',
-                            allowEditing: false,
-                            disableHtmlEncode: false,
-                             edit: {
-                                create: () => {
-                                    return document.createElement('input');
-                                },
-                                read: () => {
-                                    return discountAmountObj.value;
-                                },
-                                destroy: () => {
-                                    discountAmountObj.destroy();
-                                },
-                                write: (args) => {
-                                    discountAmountObj = new ej.inputs.NumericTextBox({
-                                        value: args.rowData.discountAmount ?? 0,
-                                        format: 'N2',
-                                        readonly: true, // 🔥 Enforce Read-Only
-                                    });
-
-                                    discountAmountObj.appendTo(args.element);
-                                 }
-                            }
-                        },
-
-
+                       
                         {
                             field: 'total',
                             headerText: 'Total',
@@ -4318,9 +4573,7 @@ const App = {
                                     let totalElem = document.createElement('input');
                                     return totalElem;
                                 },
-                                read: () => {
-                                    return totalObj.value;
-                                },
+                                read: () => totalObj?.value ?? 0,
                                 destroy: () => {
                                     totalObj.destroy();
                                 },
@@ -4418,18 +4671,18 @@ const App = {
                             // Search logic here
                         }
                     },
-
-                    // 🔥 UNCOMMENTED AND IMPLEMENTED actionComplete
+                    
+                    // UNCOMMENTED AND IMPLEMENTED actionComplete
                     actionComplete: async (args) => {
                         if (args.requestType === 'save' && args.action === 'add') {
-                            // 🔥 TRACK ADDED ROW
+                            //  TRACK ADDED ROW
                             secondaryGrid.manualBatchChanges.addedRecords.push(args.data);
                             console.log('✅ Row Added:', args.data);
                             console.log('📋 Current Batch Changes:', secondaryGrid.manualBatchChanges);
                         }
 
                         if (args.requestType === 'save' && args.action === 'edit') {
-                            // 🔥 TRACK MODIFIED ROW (update if exists, else add)
+                            //  TRACK MODIFIED ROW (update if exists, else add)
                             const index = secondaryGrid.manualBatchChanges.changedRecords.findIndex(
                                 r => r.id === args.data?.id
                             );
@@ -4499,12 +4752,12 @@ const App = {
                 secondaryGrid.obj.appendTo(secondaryGridRef.value);
             },
 
-            // 🔥 GET ALL BATCH CHANGES
+            //  GET ALL BATCH CHANGES
             getBatchChanges: () => {
                 return secondaryGrid.manualBatchChanges;
             },
 
-            // 🔥 CLEAR BATCH CHANGES (after successful save)
+            //  CLEAR BATCH CHANGES (after successful save)
             clearBatchChanges: () => {
                 secondaryGrid.manualBatchChanges = {
                     addedRecords: [],
@@ -4517,6 +4770,12 @@ const App = {
             refresh: () => {
                 if (!secondaryGrid.obj) return;
                 secondaryGrid.obj.setProperties({ dataSource: state.secondaryData });
+            },
+            destroy: () => {
+                if(secondaryGrid.obj) {
+                    secondaryGrid.obj.destroy();
+                    secondaryGrid.obj = null;
+                }
             }
         };
 

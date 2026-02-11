@@ -30,10 +30,17 @@ public class UpdateSalesOrderItemDto
     public double UnitPrice { get; init; }
     public double Quantity { get; init; }
 
-    // 🔥 NEW ITEM-LEVEL FINANCIAL FIELDS
+    // NEW ITEM-LEVEL FINANCIAL FIELDS
     public double DiscountPercentage { get; init; }
     public double DiscountAmount { get; init; }
     public double GrossAmount { get; init; }
+
+
+    // 🔥 TAX (NEW)
+    //public int? TaxPercentage { get; init; }
+    public double TaxAmount { get; init; }
+    public double TotalAfterTax { get; init; }
+    public string? TaxId { get; init; }
 
     public double Total { get; init; }
     public string? Summary { get; init; }
@@ -89,7 +96,7 @@ public class UpdateSalesOrderValidator : AbstractValidator<UpdateSalesOrderReque
         RuleFor(x => x.OrderDate).NotEmpty();
         RuleFor(x => x.OrderStatus).NotEmpty();
         RuleFor(x => x.CustomerId).NotEmpty();
-        RuleFor(x => x.TaxId).NotEmpty();
+        //RuleFor(x => x.TaxId).NotEmpty();
 
         RuleForEach(x => x.Items).ChildRules(item =>
         {
@@ -202,11 +209,16 @@ public class UpdateSalesOrderHandler
                     UnitPrice = dto.UnitPrice,
                     Quantity = dto.Quantity,
 
-                    // 🔥 PERSIST NEW ITEM DISCOUNTS
+                    // PERSIST NEW ITEM DISCOUNTS
                     DiscountPercentage = dto.DiscountPercentage,
                     DiscountAmount = dto.DiscountAmount,
                     GrossAmount = dto.GrossAmount,
 
+                    //tax
+                    //TaxPercentage = dto.TaxPercentage,
+                    TaxAmount = dto.TaxAmount,
+                    TotalAfterTax = dto.TotalAfterTax,
+                    TaxId =dto.TaxId,
                     Total = dto.Total,
                     Summary = dto.Summary
                 };
@@ -224,7 +236,9 @@ public class UpdateSalesOrderHandler
                 item.DiscountPercentage = dto.DiscountPercentage;
                 item.DiscountAmount = dto.DiscountAmount;
                 item.GrossAmount = dto.GrossAmount;
-
+                item.TaxId = dto.TaxId;
+                item.TaxAmount = dto.TaxAmount;
+                item.TotalAfterTax = dto.TotalAfterTax;
                 item.Total = dto.Total;
                 item.Summary = dto.Summary;
 

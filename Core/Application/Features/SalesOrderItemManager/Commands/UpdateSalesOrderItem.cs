@@ -68,7 +68,7 @@ public class UpdateSalesOrderItemHandler : IRequestHandler<UpdateSalesOrderItemR
         entity.Summary = request.Summary;
         entity.UnitPrice = request.UnitPrice;
         entity.Quantity = request.Quantity;
-
+     
         entity.Total = entity.UnitPrice * entity.Quantity;
 
         _repository.Update(entity);

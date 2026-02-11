@@ -28,8 +28,20 @@ public class SalesOrderItemConfiguration : BaseEntityConfiguration<SalesOrderIte
             .HasDefaultValue(0.0);
 
         builder.Property(x => x.GrossAmount)
-            .IsRequired(false)
+    .IsRequired(false)
+    .HasDefaultValue(0.0);
+
+        //builder.Property(x => x.TaxPercentage)
+        //    .IsRequired(false)
+        //    .HasDefaultValue(0.0);
+        builder.Property(x => x.TaxId).HasMaxLength(IdConsts.MaxLength).IsRequired(false);
+
+        builder.Property(x => x.TaxAmount)
             .HasDefaultValue(0.0);
+
+        builder.Property(x => x.TotalAfterTax)
+            .HasDefaultValue(0.0);
+
         // ⭐ NEW: PLU Code field mapping
         builder.Property(x => x.PluCode)
        .IsRequired(false);

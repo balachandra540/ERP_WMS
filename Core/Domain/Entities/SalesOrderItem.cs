@@ -13,10 +13,19 @@ public class SalesOrderItem : BaseEntity
     public double? UnitPrice { get; set; } = 0;
     public double? Quantity { get; set; } = 1;
 
-    // 🔥 NEW FINANCIAL COLUMNS
+    //  NEW FINANCIAL COLUMNS
     public double? DiscountPercentage { get; set; } = 0; // The % discount applied
     public double? DiscountAmount { get; set; } = 0;     // Total savings for this line
     public double? GrossAmount { get; set; } = 0;        // Total before discount (Qty * Price)
+
+
+    //  TAX (NEW)
+    //public double? TaxPercentage { get; set; }
+
+    public string? TaxId { get; set; }
+
+    public double TaxAmount { get; set; } = 0;
+    public double TotalAfterTax { get; set; } = 0;
 
     public double? Total { get; set; } = 0; // Final Net amount (Gross - Discount)
 

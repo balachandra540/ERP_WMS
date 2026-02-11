@@ -24,11 +24,17 @@ public class SalesOrderItemDto
     public double UnitPrice { get; init; }
     public double Quantity { get; init; }
 
-    // 🔥 NEW ITEM-LEVEL FIELDS
+    //  NEW ITEM-LEVEL FIELDS
     public double DiscountPercentage { get; init; }
     public double DiscountAmount { get; init; }
     public double GrossAmount { get; init; }
 
+    //  TAX (NEW)
+    //public int? TaxPercentage { get; init; }
+    public string? TaxId { get; init; }
+
+    public double TaxAmount { get; init; }
+    public double TotalAfterTax { get; init; }
     public double Total { get; init; }
     public string? Summary { get; init; }
     public List<CreateSalesOrderItemDetailDto> Attributes { get; init; } = new();
@@ -69,7 +75,7 @@ public class CreateSalesOrderValidator : AbstractValidator<CreateSalesOrderReque
         RuleFor(x => x.OrderDate).NotEmpty();
         RuleFor(x => x.OrderStatus).NotEmpty();
         RuleFor(x => x.CustomerId).NotEmpty();
-        RuleFor(x => x.TaxId).NotEmpty();
+       // RuleFor(x => x.TaxId).NotEmpty();
 
         RuleFor(x => x.Items)
             .NotEmpty()
@@ -154,7 +160,7 @@ public class CreateSalesOrderHandler
             TaxId = request.TaxId,
             LocationId = request.LocationId,
 
-            // 🔥 SAVING ORDER-LEVEL TOTALS
+            //  SAVING ORDER-LEVEL TOTALS
             BeforeTaxAmount = request.BeforeTaxAmount,
             TotalDiscountAmount = request.TotalDiscountAmount,
             TaxAmount = request.TaxAmount,
@@ -177,11 +183,17 @@ public class CreateSalesOrderHandler
                 UnitPrice = dto.UnitPrice,
                 Quantity = dto.Quantity,
 
-                // 🔥 SAVING ITEM-LEVEL DISCOUNTS
+                //  SAVING ITEM-LEVEL DISCOUNTS
                 DiscountPercentage = dto.DiscountPercentage,
                 DiscountAmount = dto.DiscountAmount,
                 GrossAmount = dto.GrossAmount,
 
+                // TAX 
+                //TaxPercentage = dto.TaxPercentage,
+                TaxAmount = dto.TaxAmount,
+                TotalAfterTax = dto.TotalAfterTax,
+
+                TaxId =dto.TaxId,
                 Total = dto.Total, // Final line total (Net)
                 Summary = dto.Summary
             };
