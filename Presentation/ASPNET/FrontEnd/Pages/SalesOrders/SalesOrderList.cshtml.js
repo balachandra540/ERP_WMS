@@ -1086,7 +1086,6 @@ const App = {
                             });
                         }
 
-                        secondaryGrid.obj.refresh(); // Visual update
                         methods.calculateLiveTotals(); // Recalculate based on updated discount/status
                     }
                 });
@@ -1259,6 +1258,21 @@ const App = {
             // --- ROW VALIDATION (only your allowed fields) ---
             currentSecondaryData.forEach((record, index) => {
 
+
+                // --- 🔒 UPTO DISCOUNT APPROVAL CHECK ---
+                // Check if an UpTo discount was entered
+                const enteredUpTo = parseFloat(record.upToDiscount || 0);
+
+                if (enteredUpTo > 0) {
+                    // Block if status is not Approved or Auto-Approved
+                    const isApproved = record.approvalStatus === 'Approved' || record.approvalStatus === 'Auto-Approved';
+
+                    if (!isApproved) {
+                        const status = record.approvalStatus || 'Pending';
+                        state.errors.gridItems.push(`Row ${index + 1}: Discount (${enteredUpTo}%) status is "${status}". It must be Approved before submitting.`);
+                        isValid = false;
+                    }
+                }
                 if (!record.pluCode || record.pluCode.length < 5) {
                     state.errors.gridItems.push(`Row ${index + 1}: PLU code must be at least 5 characters.`);
                     isValid = false;
@@ -1939,139 +1953,75 @@ const App = {
             },
             prepareSecondaryDataForSubmission: function () {
                 const batchChanges = secondaryGrid.getBatchChanges();
-
-                console.log('Batch Changes:', batchChanges);
-
-                // Base data if editing an existing document
-                //let currentSecondaryData = state.id !== ""
-                //    ? [...state.secondaryData]
-                //    : [];
-
                 let currentSecondaryData = [...state.secondaryData];
-
                 const addedRecords = batchChanges.addedRecords || [];
                 const changedRecords = batchChanges.changedRecords || [];
 
-                // --- Helper: Match by id (or purchaseOrderItemId if exists) ---
                 const matchRecord = (a, b) => {
-                    // Existing DB records
                     if (a.id && b.id) return a.id === b.id;
-
-                    // New rows (no id yet)
                     if (!a.id && !b.id) {
-                        return a.productId === b.productId &&
-                            a.pluCode === b.pluCode && a.unitPrice === b.unitPrice;
+                        return a.productId === b.productId && a.pluCode === b.pluCode && a.unitPrice === b.unitPrice;
                     }
-
                     return false;
                 };
 
-                // Allowed fields only
                 const filterFields = (item) => {
-                    const { Attributes, errors } =
-                        methods.collectDetailAttributes(item);
-                    if (errors.length > 0) {
-                        //Swal.fire({
-                        //    icon: "error",
-                        //    title: "Validation Failed",
-                        //    html: errors.join("<br>")
-                        //});
-                        throw new Error("ATTRIBUTE_VALIDATION_FAILED"); // ⛔ STOP EVERYTHING
-                    }
-                    // Calculations for the DTO
+                    const { Attributes, errors } = methods.collectDetailAttributes(item);
+                    if (errors.length > 0) throw new Error("ATTRIBUTE_VALIDATION_FAILED");
+
                     const qty = parseFloat(item.quantity || 0);
                     const price = parseFloat(item.unitPrice || 0);
                     const discPercent = parseFloat(item.discountPercentage || 0);
                     const discAmt = parseFloat(item.discountAmount || 0);
-                    const taxPercent = parseFloat(item.taxId || 0); 
+                    const taxPercent = parseFloat(item.taxId || 0);
+                    const taxAmount = parseFloat(item.taxAmount || 0);
+                    const totalAfterTax = parseFloat(item.totalAfterTax || 0);
 
-                    //// Calculate gross, tax, and total after tax
-                    //const grossAmount = qty * price;
-                    const taxAmount = parseFloat(item.taxAmount || 0); 
-                    //const taxAmount = (taxableAmount * taxPercent) / 100;
-                    const totalAfterTax = parseFloat(item.totalAfterTax || 0); 
                     item.__validatedAttributes = Attributes;
+
                     return {
                         id: item.id ?? null,
                         pluCode: Number(item.pluCode),
                         productId: item.productId,
                         unitPrice: price,
                         quantity: qty,
-
-                        // 🔥 NEW FIELDS REQUESTED
                         discountPercentage: discPercent,
                         discountAmount: discAmt,
-                        grossAmount: qty * price, // Total before discount/tax
+                        // 🔥 ADDED APPROVAL FIELDS
+                        upToDiscount: parseFloat(item.upToDiscount || 0),
+                        approverGroupId: item.approverGroupId || null,
+                        approvalStatus: item.approvalStatus || null,
 
+                        grossAmount: qty * price,
                         taxPercent: taxPercent,
                         taxAmount: taxAmount,
                         totalAfterTax: totalAfterTax,
-
-                        total: item.total ?? 0, // Final line total (Net)
+                        total: item.total ?? 0,
                         summary: item.summary ?? "",
                         detailEntries: item.__validatedAttributes ?? []
                     };
-                    
                 };
 
-                // --- 1️⃣ PROCESS CHANGED RECORDS ---
+                // Process records
                 for (let changed of changedRecords) {
                     const index = currentSecondaryData.findIndex(item => matchRecord(item, changed));
-
-                    if (index !== -1) {
-                        currentSecondaryData[index] = {
-                            ...currentSecondaryData[index],
-                            ...filterFields(changed)
-                        };
-                    } else {
-                        currentSecondaryData.push(filterFields(changed));
-                    }
+                    index !== -1 ? (currentSecondaryData[index] = { ...currentSecondaryData[index], ...filterFields(changed) })
+                        : currentSecondaryData.push(filterFields(changed));
                 }
-
-                // --- 2️⃣ PROCESS ADDED RECORDS ---
                 for (let added of addedRecords) {
                     const index = currentSecondaryData.findIndex(item => matchRecord(item, added));
-                    if (index !== -1) {
-                        currentSecondaryData[index] = {
-                            ...currentSecondaryData[index],
-                            ...filterFields(added)
-                        };
-                    } else {
-                        currentSecondaryData.push(filterFields(added));
-                    }
+                    index !== -1 ? (currentSecondaryData[index] = { ...currentSecondaryData[index], ...filterFields(added) })
+                        : currentSecondaryData.push(filterFields(added));
                 }
 
-                // --- 3️⃣ PROCESS DELETED RECORDS ---
                 let deletedRecords = (batchChanges.deletedRecords || []).flat(Infinity);
-
                 if (deletedRecords.length > 0) {
-                    currentSecondaryData = currentSecondaryData.filter(item =>
-                        !deletedRecords.some(del => matchRecord(item, del))
-                    );
+                    currentSecondaryData = currentSecondaryData.filter(item => !deletedRecords.some(del => matchRecord(item, del)));
                 }
 
-                // --- 4️⃣ VALID ITEMS (clean final list) ---
-                const validItems = currentSecondaryData.filter(item => {
-                    if (!item.productId) return false;
-                    if (!item.pluCode || item.pluCode.length < 5) return false;
-                    if (item.quantity <= 0) return false;
-                    if (item.unitPrice === null || item.unitPrice === undefined) return false;
-                    return true;
-                });
+                const validItems = currentSecondaryData.filter(item => item.productId && item.pluCode?.toString().length >= 5 && item.quantity > 0);
 
-                console.log("📌 Final Valid Items:", validItems);
-                console.log("❌ Final Deleted Items:", deletedRecords);
-
-                return {
-                    validItems,
-                    deletedRecords,
-                    summary: {
-                        total: validItems.length,
-                        added: addedRecords.length,
-                        changed: changedRecords.length,
-                        deleted: deletedRecords.length
-                    }
-                };
+                return { validItems, deletedRecords };
             },
             handleFormSubmit: async () => {
                 try {
@@ -2113,21 +2063,22 @@ const App = {
                         productId: item.productId,
                         unitPrice: item.unitPrice,
                         quantity: item.quantity,
-
-                        // NEW ITEM-LEVEL FIELDS
                         discountPercentage: Number(item.discountPercentage || 0),
                         discountAmount: Number(item.discountAmount || 0),
-                        grossAmount: Number(item.unitPrice || 0) * Number(item.quantity || 0),
 
+                        // 🔥 NEW FIELDS FOR BACKEND DTO
+                        upToDiscount: Number(item.upToDiscount || 0),
+                        approverGroupId: item.approverGroupId,
+                        approvalStatus: item.approvalStatus,
+
+                        grossAmount: Number(item.unitPrice || 0) * Number(item.quantity || 0),
                         taxId: item.taxId,
                         taxAmount: Number(item.taxAmount || 0),
                         totalAfterTax: Number(item.totalAfterTax),
-
                         total: item.total,
                         summary: item.summary,
                         Attributes: item.detailEntries,
                     }));
-
                     // ----------------------------------------------------
                     // Order-Level Summary Totals (Formatted for API)
                     // ----------------------------------------------------

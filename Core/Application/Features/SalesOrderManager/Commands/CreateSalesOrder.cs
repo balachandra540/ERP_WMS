@@ -38,6 +38,10 @@ public class SalesOrderItemDto
     public double Total { get; init; }
     public string? Summary { get; init; }
     public List<CreateSalesOrderItemDetailDto> Attributes { get; init; } = new();
+    // 🔥 NEW UP-TO DISCOUNT & APPROVAL FIELDS
+    public double UpToDiscount { get; init; }      // The manual % entered
+    public string? ApprovalStatus { get; init; }    // "Approved" or "Auto-Approved"
+    public string? ApproverGroupId { get; init; }   // The ID of the manager group that approved
 }
 
 public class CreateSalesOrderItemDetailDto
@@ -187,7 +191,10 @@ public class CreateSalesOrderHandler
                 DiscountPercentage = dto.DiscountPercentage,
                 DiscountAmount = dto.DiscountAmount,
                 GrossAmount = dto.GrossAmount,
-
+                // 🔥 SAVING NEW UP-TO DISCOUNT FIELDS
+                UpToDiscount = dto.UpToDiscount,
+                ApprovalStatus = dto.ApprovalStatus,
+                ApproverGroupId = dto.ApproverGroupId,
                 // TAX 
                 //TaxPercentage = dto.TaxPercentage,
                 TaxAmount = dto.TaxAmount,

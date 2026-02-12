@@ -45,6 +45,10 @@ public class UpdateSalesOrderItemDto
     public double Total { get; init; }
     public string? Summary { get; init; }
     public List<SalesOrderItemDetailsDto> Attributes { get; init; } = new();
+
+    public double UpToDiscount { get; init; }      // The manual % entered
+    public string? ApprovalStatus { get; init; }    // "Approved" or "Auto-Approved"
+    public string? ApproverGroupId { get; init; }   // The ID of the manager group that approved
 }
 
 public class SalesOrderItemDetailsDto
@@ -213,6 +217,10 @@ public class UpdateSalesOrderHandler
                     DiscountPercentage = dto.DiscountPercentage,
                     DiscountAmount = dto.DiscountAmount,
                     GrossAmount = dto.GrossAmount,
+                    // 🔥 SAVING NEW UP-TO DISCOUNT FIELDS
+                    UpToDiscount = dto.UpToDiscount,
+                    ApprovalStatus = dto.ApprovalStatus,
+                    ApproverGroupId = dto.ApproverGroupId,
 
                     //tax
                     //TaxPercentage = dto.TaxPercentage,
@@ -241,7 +249,11 @@ public class UpdateSalesOrderHandler
                 item.TotalAfterTax = dto.TotalAfterTax;
                 item.Total = dto.Total;
                 item.Summary = dto.Summary;
-
+                // 🔥 SAVING NEW UP-TO DISCOUNT FIELDS
+                item.UpToDiscount = dto.UpToDiscount;
+                item.ApprovalStatus = dto.ApprovalStatus;
+                item.ApproverGroupId = dto.ApproverGroupId;
+               
                 _itemRepository.Update(item);
 
                 // Re-sync attributes (IMEI/Serial)

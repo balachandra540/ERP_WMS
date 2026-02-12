@@ -17,6 +17,10 @@ public class SalesOrderItem : BaseEntity
     public double? DiscountPercentage { get; set; } = 0; // The % discount applied
     public double? DiscountAmount { get; set; } = 0;     // Total savings for this line
     public double? GrossAmount { get; set; } = 0;        // Total before discount (Qty * Price)
+                                                         // 🔥 NEW: UP TO DISCOUNT & APPROVAL COLUMNS
+    public double? UpToDiscount { get; set; } = 0;       // Manual % entered by user
+    public string? ApprovalStatus { get; set; }          // e.g., "Approved", "Auto-Approved", "Waiting Approval"
+    public string? ApproverGroupId { get; set; }         // The Group ID required/used for approval
 
 
     //  TAX (NEW)
