@@ -100,6 +100,30 @@
             </div>
         </div>
     </div>
+    <div class="modal fade" id="RoleModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
+        <div class="modal-dialog modal-lg modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Manage Group Roles</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="alert alert-info py-2">
+                        Select the roles to assign to the <strong>{{ state.name }}</strong> group.
+                    </div>
+                    <div id="RoleGrid"></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <button type="button" class="btn btn-primary" v-on:click="handler.saveRoles" :disabled="state.isRoleSubmitting">
+                        <span v-if="state.isRoleSubmitting" class="spinner-border spinner-border-sm me-2"></span>
+                        <span v-if="!state.isRoleSubmitting">Save Roles</span>
+                        <span v-else>Saving...</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
 
 @section scripts {
