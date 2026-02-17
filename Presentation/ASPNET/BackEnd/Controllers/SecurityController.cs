@@ -410,6 +410,39 @@ public class SecurityController : BaseApiController
             Content = response
         });
     }
+    [Authorize]
+    [HttpPost("GetUserGroupRoles")]
+    public async Task<ActionResult<ApiSuccessResult<GetUserGroupRolesResult>>>
+GetUserGroupRolesAsync(
+    GetUserGroupRolesRequest request,
+    CancellationToken cancellationToken)
+    {
+        var response = await _sender.Send(request, cancellationToken);
+
+        return Ok(new ApiSuccessResult<GetUserGroupRolesResult>
+        {
+            Code = StatusCodes.Status200OK,
+            Message = $"Success executing {nameof(GetUserGroupRolesAsync)}",
+            Content = response
+        });
+    }
+    [Authorize]
+    [HttpPost("UpdateUserGroupRole")]
+    public async Task<ActionResult<ApiSuccessResult<UpdateUserGroupRoleResult>>>
+UpdateUserGroupRoleAsync(
+    UpdateUserGroupRoleRequest request,
+    CancellationToken cancellationToken)
+    {
+        var response = await _sender.Send(request, cancellationToken);
+
+        return Ok(new ApiSuccessResult<UpdateUserGroupRoleResult>
+        {
+            Code = StatusCodes.Status200OK,
+            Message = $"Success executing {nameof(UpdateUserGroupRoleAsync)}",
+            Content = response
+        });
+    }
+
 
 
 }

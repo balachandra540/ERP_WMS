@@ -1,7 +1,6 @@
 ﻿using Application.Common.Services.SecurityManager;
 using Domain.Entities;
 using Microsoft.EntityFrameworkCore;
-
 namespace Application.Common.Repositories;
 
 

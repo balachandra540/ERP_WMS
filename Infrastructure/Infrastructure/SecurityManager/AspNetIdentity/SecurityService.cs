@@ -103,8 +103,10 @@ namespace Infrastructure.SecurityManager.AspNetIdentity;
 
         var accessToken = _tokenService.GenerateToken(user, null);
         var refreshToken = _tokenService.GenerateRefreshToken();
-        var roles = await _userManager.GetRolesAsync(user);
-
+// --- UPDATED CODE START ---
+    // Replaced _userManager.GetRolesAsync(user) with GetUserGroupRolesAsync using the user's GroupId
+    var roles = await GetUserGroupRolesAsync(user.UserGroupId, cancellationToken);
+    // --- UPDATED CODE END ---
         var tokens = await _context.Token.Where(x => x.UserId == user.Id).ToListAsync(cancellationToken);
         foreach (var item in tokens)
         {
@@ -861,51 +863,46 @@ namespace Infrastructure.SecurityManager.AspNetIdentity;
             throw new Exception($"Password change failed: {errors}");
         }
     }
-
     public async Task<List<string>> GetUserRolesAsync(
-        string userId,
-        CancellationToken cancellationToken = default
-        )
+    string userId,
+    CancellationToken cancellationToken = default)
     {
         var user = await _userManager.FindByIdAsync(userId);
 
         if (user == null)
-        {
             throw new Exception($"Unable to load user with id: {userId}");
-        }
 
         var roles = await _userManager.GetRolesAsync(user);
+
         return roles.ToList();
     }
 
     public async Task<List<string>> UpdateUserRoleAsync(
-            string userId,
-            string roleName,
-            bool accessGranted,
-            CancellationToken cancellationToken = default
-        )
+    string userId,
+    string roleName,
+    bool accessGranted,
+    CancellationToken cancellationToken = default)
     {
         var user = await _userManager.FindByIdAsync(userId);
-        if (user == null)
-        {
-            throw new Exception($"Unable to load user with id: {userId}");
-        }
 
-        //if (user.Email == _identitySettings.DefaultAdmin.Email)
-        //{
-        //    throw new Exception($"Update default admin is not allowed.");
-        //}
+        if (user == null)
+            throw new Exception($"Unable to load user with id: {userId}");
+
+        var role = await _roleManager.FindByNameAsync(roleName);
+
+        if (role == null)
+            throw new Exception($"Role '{roleName}' not found.");
 
         var currentRoles = await _userManager.GetRolesAsync(user);
+
         if (accessGranted)
         {
             if (!currentRoles.Contains(roleName))
             {
                 var result = await _userManager.AddToRoleAsync(user, roleName);
+
                 if (!result.Succeeded)
-                {
-                    throw new Exception($"Failed to add role '{roleName}' to user with id: {userId}. Errors: {string.Join(", ", result.Errors.Select(e => e.Description))}");
-                }
+                    throw new Exception(string.Join(", ", result.Errors.Select(e => e.Description)));
             }
         }
         else
@@ -913,15 +910,75 @@ namespace Infrastructure.SecurityManager.AspNetIdentity;
             if (currentRoles.Contains(roleName))
             {
                 var result = await _userManager.RemoveFromRoleAsync(user, roleName);
+
                 if (!result.Succeeded)
-                {
-                    throw new Exception($"Failed to remove role '{roleName}' from user with id: {userId}. Errors: {string.Join(", ", result.Errors.Select(e => e.Description))}");
-                }
+                    throw new Exception(string.Join(", ", result.Errors.Select(e => e.Description)));
             }
         }
 
-        var updatedRoles = await _userManager.GetRolesAsync(user);
-        return updatedRoles.ToList();
+        return (await _userManager.GetRolesAsync(user)).ToList();
+    }
+
+    public async Task<List<string>> GetUserGroupRolesAsync(
+    string userGroupId,
+    CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrEmpty(userGroupId))
+            return new List<string>();
+
+        var roleIds = await _context.UserRolesExtended
+            .Where(x => x.UserGroupId == userGroupId)
+            .Select(x => x.RoleId)
+            .ToListAsync(cancellationToken);
+
+        var roleNames = await _roleManager.Roles
+            .Where(r => roleIds.Contains(r.Id))
+            .Select(r => r.Name!)
+            .ToListAsync(cancellationToken);
+
+        return roleNames;
+    }
+
+    public async Task<List<string>> UpdateUserGroupRoleAsync(
+    string userGroupId,
+    string roleName,
+    bool accessGranted,
+    CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrEmpty(userGroupId))
+            throw new Exception("Invalid UserGroupId");
+
+        var role = await _roleManager.FindByNameAsync(roleName);
+        if (role == null)
+            throw new Exception("Role not found");
+
+        var existing = await _context.UserRolesExtended
+            .FirstOrDefaultAsync(x =>
+                x.UserGroupId == userGroupId &&
+                x.RoleId == role.Id,
+                cancellationToken);
+
+        if (accessGranted)
+        {
+            if (existing == null)
+            {
+                await _context.UserRolesExtended.AddAsync(new ApplicationUserRole
+                {
+                    UserId = null,
+                    UserGroupId = userGroupId,
+                    RoleId = role.Id
+                }, cancellationToken);
+            }
+        }
+        else
+        {
+            if (existing != null)
+                _context.UserRolesExtended.Remove(existing);
+        }
+
+        await _context.SaveChangesAsync(cancellationToken);
+
+        return await GetUserGroupRolesAsync(userGroupId, cancellationToken);
     }
 
 
