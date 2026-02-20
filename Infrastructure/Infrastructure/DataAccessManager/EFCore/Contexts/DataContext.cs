@@ -2,18 +2,27 @@
 using Domain.Entities;
 using Infrastructure.DataAccessManager.EFCore.Configurations;
 using Infrastructure.SecurityManager.AspNetIdentity;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 
 namespace Infrastructure.DataAccessManager.EFCore.Contexts;
 
 
-public class DataContext : IdentityDbContext<ApplicationUser>, IEntityDbSet
+public class DataContext : IdentityDbContext<
+        ApplicationUser,
+        IdentityRole,
+        string,
+        IdentityUserClaim<string>,
+        ApplicationUserRole,          // 🔥 IMPORTANT
+        IdentityUserLogin<string>,
+        IdentityRoleClaim<string>,
+        IdentityUserToken<string>>, IEntityDbSet
 {
     public DataContext(DbContextOptions<DataContext> options) : base(options)
     {
     }
-
+    public DbSet<ApplicationUserRole> UserRolesExtended { get; set; }
     public DbSet<Token> Token { get; set; }
     public DbSet<Todo> Todo { get; set; }
     public DbSet<TodoItem> TodoItem { get; set; }
@@ -91,6 +100,7 @@ public class DataContext : IdentityDbContext<ApplicationUser>, IEntityDbSet
         base.OnModelCreating(modelBuilder);
 
         modelBuilder.ApplyConfiguration(new ApplicationUserConfiguration());
+        modelBuilder.ApplyConfiguration(new ApplicationUserRoleConfiguration());
         modelBuilder.ApplyConfiguration(new TokenConfiguration());
         modelBuilder.ApplyConfiguration(new TodoConfiguration());
         modelBuilder.ApplyConfiguration(new TodoItemConfiguration());

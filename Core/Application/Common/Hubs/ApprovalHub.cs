@@ -94,7 +94,7 @@ public class ApprovalHub : Hub
 <body>
     <div style='font-family: Segoe UI, Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: auto; border: 1px solid #e0e0e0; border-radius: 8px; overflow: hidden;'>
         <div style='background-color: #007bff; color: white; padding: 20px; text-align: center;'>
-            <h2 style='margin: 0;'>INDOTALENT</h2>
+            <h2 style='margin: 0;'>WHMS</h2>
             <p style='margin: 5px 0 0;'>Discount Approval Request</p>
         </div>
         <div style='padding: 30px; line-height: 1.6; color: #333;'>
@@ -120,7 +120,7 @@ public class ApprovalHub : Hub
             </div>
         </div>
         <div style='background-color: #f1f1f1; padding: 15px; text-align: center; font-size: 12px; color: #777;'>
-            <p>This is an automated request from INDOTALENT ERP System.</p>
+            <p>This is an automated request from WHMS ERP System.</p>
         </div>
     </div>
 </body>

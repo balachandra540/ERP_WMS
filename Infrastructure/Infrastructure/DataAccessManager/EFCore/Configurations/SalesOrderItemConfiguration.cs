@@ -30,7 +30,18 @@ public class SalesOrderItemConfiguration : BaseEntityConfiguration<SalesOrderIte
         builder.Property(x => x.GrossAmount)
     .IsRequired(false)
     .HasDefaultValue(0.0);
+        // --- 🚀 NEW: UP TO DISCOUNT & APPROVAL MAPPING ---
+        builder.Property(x => x.UpToDiscount)
+            .IsRequired(false)
+            .HasDefaultValue(0.0);
 
+        builder.Property(x => x.ApprovalStatus)
+            .HasMaxLength(50) // e.g., "Approved", "Waiting Approval"
+            .IsRequired(false);
+
+        builder.Property(x => x.ApproverGroupId)
+            .HasMaxLength(IdConsts.MaxLength)
+            .IsRequired(false);
         //builder.Property(x => x.TaxPercentage)
         //    .IsRequired(false)
         //    .HasDefaultValue(0.0);

@@ -124,17 +124,27 @@ public interface ISecurityService
         CancellationToken cancellationToken
         );
 
-    public Task<List<string>> GetUserRolesAsync(
+    // Direct user roles (Identity)
+    Task<List<string>> GetUserRolesAsync(
         string userId,
-        CancellationToken cancellationToken = default
-        );
+        CancellationToken cancellationToken = default);
 
-    public Task<List<string>> UpdateUserRoleAsync(
+    Task<List<string>> UpdateUserRoleAsync(
         string userId,
         string roleName,
         bool accessGranted,
-        CancellationToken cancellationToken = default
-        );
+        CancellationToken cancellationToken = default);
+    // UserGroup roles (Custom table)
+    Task<List<string>> GetUserGroupRolesAsync(
+        string userGroupId,
+        CancellationToken cancellationToken = default);
+
+    Task<List<string>> UpdateUserGroupRoleAsync(
+        string userGroupId,
+        string roleName,
+        bool accessGranted,
+        CancellationToken cancellationToken = default);
+
 
     public Task ChangeAvatarAsync(
         string userId,

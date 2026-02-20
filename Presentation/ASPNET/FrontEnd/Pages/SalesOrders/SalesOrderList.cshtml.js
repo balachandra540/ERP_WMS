@@ -1086,7 +1086,6 @@ const App = {
                             });
                         }
 
-                        secondaryGrid.obj.refresh(); // Visual update
                         methods.calculateLiveTotals(); // Recalculate based on updated discount/status
                     }
                 });
@@ -1259,6 +1258,21 @@ const App = {
             // --- ROW VALIDATION (only your allowed fields) ---
             currentSecondaryData.forEach((record, index) => {
 
+
+                // --- 🔒 UPTO DISCOUNT APPROVAL CHECK ---
+                // Check if an UpTo discount was entered
+                const enteredUpTo = parseFloat(record.upToDiscount || 0);
+
+                if (enteredUpTo > 0) {
+                    // Block if status is not Approved or Auto-Approved
+                    const isApproved = record.approvalStatus === 'Approved' || record.approvalStatus === 'Auto-Approved';
+
+                    if (!isApproved) {
+                        const status = record.approvalStatus || 'Pending';
+                        state.errors.gridItems.push(`Row ${index + 1}: Discount (${enteredUpTo}%) status is "${status}". It must be Approved before submitting.`);
+                        isValid = false;
+                    }
+                }
                 if (!record.pluCode || record.pluCode.length < 5) {
                     state.errors.gridItems.push(`Row ${index + 1}: PLU code must be at least 5 characters.`);
                     isValid = false;
@@ -1939,139 +1953,75 @@ const App = {
             },
             prepareSecondaryDataForSubmission: function () {
                 const batchChanges = secondaryGrid.getBatchChanges();
-
-                console.log('Batch Changes:', batchChanges);
-
-                // Base data if editing an existing document
-                //let currentSecondaryData = state.id !== ""
-                //    ? [...state.secondaryData]
-                //    : [];
-
                 let currentSecondaryData = [...state.secondaryData];
-
                 const addedRecords = batchChanges.addedRecords || [];
                 const changedRecords = batchChanges.changedRecords || [];
 
-                // --- Helper: Match by id (or purchaseOrderItemId if exists) ---
                 const matchRecord = (a, b) => {
-                    // Existing DB records
                     if (a.id && b.id) return a.id === b.id;
-
-                    // New rows (no id yet)
                     if (!a.id && !b.id) {
-                        return a.productId === b.productId &&
-                            a.pluCode === b.pluCode && a.unitPrice === b.unitPrice;
+                        return a.productId === b.productId && a.pluCode === b.pluCode && a.unitPrice === b.unitPrice;
                     }
-
                     return false;
                 };
 
-                // Allowed fields only
                 const filterFields = (item) => {
-                    const { Attributes, errors } =
-                        methods.collectDetailAttributes(item);
-                    if (errors.length > 0) {
-                        //Swal.fire({
-                        //    icon: "error",
-                        //    title: "Validation Failed",
-                        //    html: errors.join("<br>")
-                        //});
-                        throw new Error("ATTRIBUTE_VALIDATION_FAILED"); // ⛔ STOP EVERYTHING
-                    }
-                    // Calculations for the DTO
+                    const { Attributes, errors } = methods.collectDetailAttributes(item);
+                    if (errors.length > 0) throw new Error("ATTRIBUTE_VALIDATION_FAILED");
+
                     const qty = parseFloat(item.quantity || 0);
                     const price = parseFloat(item.unitPrice || 0);
                     const discPercent = parseFloat(item.discountPercentage || 0);
                     const discAmt = parseFloat(item.discountAmount || 0);
-                    const taxPercent = parseFloat(item.taxId || 0); 
+                    const taxPercent = parseFloat(item.taxId || 0);
+                    const taxAmount = parseFloat(item.taxAmount || 0);
+                    const totalAfterTax = parseFloat(item.totalAfterTax || 0);
 
-                    //// Calculate gross, tax, and total after tax
-                    //const grossAmount = qty * price;
-                    const taxAmount = parseFloat(item.taxAmount || 0); 
-                    //const taxAmount = (taxableAmount * taxPercent) / 100;
-                    const totalAfterTax = parseFloat(item.totalAfterTax || 0); 
                     item.__validatedAttributes = Attributes;
+
                     return {
                         id: item.id ?? null,
                         pluCode: Number(item.pluCode),
                         productId: item.productId,
                         unitPrice: price,
                         quantity: qty,
-
-                        // 🔥 NEW FIELDS REQUESTED
                         discountPercentage: discPercent,
                         discountAmount: discAmt,
-                        grossAmount: qty * price, // Total before discount/tax
+                        // 🔥 ADDED APPROVAL FIELDS
+                        upToDiscount: parseFloat(item.upToDiscount || 0),
+                        approverGroupId: item.approverGroupId || null,
+                        approvalStatus: item.approvalStatus || null,
 
+                        grossAmount: qty * price,
                         taxPercent: taxPercent,
                         taxAmount: taxAmount,
                         totalAfterTax: totalAfterTax,
-
-                        total: item.total ?? 0, // Final line total (Net)
+                        total: item.total ?? 0,
                         summary: item.summary ?? "",
                         detailEntries: item.__validatedAttributes ?? []
                     };
-                    
                 };
 
-                // --- 1️⃣ PROCESS CHANGED RECORDS ---
+                // Process records
                 for (let changed of changedRecords) {
                     const index = currentSecondaryData.findIndex(item => matchRecord(item, changed));
-
-                    if (index !== -1) {
-                        currentSecondaryData[index] = {
-                            ...currentSecondaryData[index],
-                            ...filterFields(changed)
-                        };
-                    } else {
-                        currentSecondaryData.push(filterFields(changed));
-                    }
+                    index !== -1 ? (currentSecondaryData[index] = { ...currentSecondaryData[index], ...filterFields(changed) })
+                        : currentSecondaryData.push(filterFields(changed));
                 }
-
-                // --- 2️⃣ PROCESS ADDED RECORDS ---
                 for (let added of addedRecords) {
                     const index = currentSecondaryData.findIndex(item => matchRecord(item, added));
-                    if (index !== -1) {
-                        currentSecondaryData[index] = {
-                            ...currentSecondaryData[index],
-                            ...filterFields(added)
-                        };
-                    } else {
-                        currentSecondaryData.push(filterFields(added));
-                    }
+                    index !== -1 ? (currentSecondaryData[index] = { ...currentSecondaryData[index], ...filterFields(added) })
+                        : currentSecondaryData.push(filterFields(added));
                 }
 
-                // --- 3️⃣ PROCESS DELETED RECORDS ---
                 let deletedRecords = (batchChanges.deletedRecords || []).flat(Infinity);
-
                 if (deletedRecords.length > 0) {
-                    currentSecondaryData = currentSecondaryData.filter(item =>
-                        !deletedRecords.some(del => matchRecord(item, del))
-                    );
+                    currentSecondaryData = currentSecondaryData.filter(item => !deletedRecords.some(del => matchRecord(item, del)));
                 }
 
-                // --- 4️⃣ VALID ITEMS (clean final list) ---
-                const validItems = currentSecondaryData.filter(item => {
-                    if (!item.productId) return false;
-                    if (!item.pluCode || item.pluCode.length < 5) return false;
-                    if (item.quantity <= 0) return false;
-                    if (item.unitPrice === null || item.unitPrice === undefined) return false;
-                    return true;
-                });
+                const validItems = currentSecondaryData.filter(item => item.productId && item.pluCode?.toString().length >= 5 && item.quantity > 0);
 
-                console.log("📌 Final Valid Items:", validItems);
-                console.log("❌ Final Deleted Items:", deletedRecords);
-
-                return {
-                    validItems,
-                    deletedRecords,
-                    summary: {
-                        total: validItems.length,
-                        added: addedRecords.length,
-                        changed: changedRecords.length,
-                        deleted: deletedRecords.length
-                    }
-                };
+                return { validItems, deletedRecords };
             },
             handleFormSubmit: async () => {
                 try {
@@ -2113,21 +2063,22 @@ const App = {
                         productId: item.productId,
                         unitPrice: item.unitPrice,
                         quantity: item.quantity,
-
-                        // NEW ITEM-LEVEL FIELDS
                         discountPercentage: Number(item.discountPercentage || 0),
                         discountAmount: Number(item.discountAmount || 0),
-                        grossAmount: Number(item.unitPrice || 0) * Number(item.quantity || 0),
 
+                        // 🔥 NEW FIELDS FOR BACKEND DTO
+                        upToDiscount: Number(item.upToDiscount || 0),
+                        approverGroupId: item.approverGroupId,
+                        approvalStatus: item.approvalStatus,
+
+                        grossAmount: Number(item.unitPrice || 0) * Number(item.quantity || 0),
                         taxId: item.taxId,
                         taxAmount: Number(item.taxAmount || 0),
                         totalAfterTax: Number(item.totalAfterTax),
-
                         total: item.total,
                         summary: item.summary,
                         Attributes: item.detailEntries,
                     }));
-
                     // ----------------------------------------------------
                     // Order-Level Summary Totals (Formatted for API)
                     // ----------------------------------------------------
@@ -3875,6 +3826,269 @@ const App = {
                         {
                             field: 'id', isPrimaryKey: true, headerText: 'Id', visible: false
                         },
+                        //{
+                        //    field: "pluCode",
+                        //    headerText: "PLU Code",
+                        //    width: 140,
+                        //    editType: "stringedit",
+                        //    validationRules: { required: true },
+
+                        //    edit: {
+                        //        create: () => {
+                        //            let pluElem = document.createElement("input");
+                        //            return pluElem;
+                        //        },
+                        //        read: () => pluObj?.value,
+                        //        destroy: () => pluObj?.destroy(),
+
+                        //        write: (args) => {
+                        //            pluObj = new ej.inputs.TextBox({
+                        //                value: args.rowData.pluCode ?? "",
+                        //                cssClass: 'plu-editor',
+                        //                placeholder: "Enter 5+ characters"
+                        //            });
+
+                        //            pluObj.appendTo(args.element);
+
+                        //            const inputElement = pluObj.element;
+
+                        //            inputElement.addEventListener('keydown', (e) => {
+                        //                const key = e.key;
+                        //                const isValidKey = /^[a-zA-Z0-9]$/.test(key) ||
+                        //                    ['Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'Tab', 'Enter'].includes(key);
+
+                        //                if (!isValidKey) {
+                        //                    e.preventDefault();
+                        //                    console.log('❌ Invalid character blocked:', key);
+                        //                }
+                        //            });
+
+                        //            /* ===================== KEYUP ===================== */
+                        //            inputElement.addEventListener('keyup', async () => {
+                        //                const enteredPLU = inputElement.value?.trim() ?? "";
+
+                        //                console.log('⬆️ KEYUP Event - PLU:', enteredPLU, 'Length:', enteredPLU.length);
+
+                        //                if (enteredPLU.length < 5) return;
+
+                        //                try {
+                        //                    const result = await services.getProductIdByPLU(enteredPLU);
+                        //                    const productId = result?.data?.content?.productId;
+                        //                    debugger
+                        //                    if (!productId) {
+                        //                        Swal.fire({
+                        //                            icon: 'warning',
+                        //                            title: 'Invalid PLU',
+                        //                            text: 'No product found for this PLU code',
+                        //                            timer: 2000,
+                        //                            showConfirmButton: false
+                        //                        });
+                        //                        return;
+                        //                    }
+
+                        //                    args.rowData.productId = productId;
+
+                        //                    if (productObj) {
+                        //                        productObj.value = productId;
+                        //                        productObj.dataBind();
+                        //                        productObj.change({ value: productId });
+
+                        //                        const GridData = gridObj.dataSource;
+                        //                        const existingRow = GridData.find(r => r.productId === productId);
+
+                        //                        if (existingRow && existingRow.pluCode === enteredPLU) {
+                        //                            existingRow.quantity = (existingRow.quantity || 1) + 1;
+                        //                            const price = existingRow.price || existingRow.unitPrice;
+                        //                            existingRow.total = existingRow.quantity * price;
+                        //                            gridObj.refresh();
+                        //                            return;
+                        //                        }
+                        //                        else {
+                        //                            const priceDef = state.priceDefinitionListLookupData
+                        //                                ?.find(x => x.productId === productId && x.isActive);
+
+                        //                            const selectedProduct =
+                        //                                state.productListLookupData.find(
+                        //                                    item => item.id === productObj.value
+                        //                                );
+
+                        //                            const finalPrice = priceDef
+                        //                                ? priceDef.salePrice
+                        //                                : selectedProduct.unitPrice;
+
+                        //                            // 1. Get all active discounts for this product
+                        //                            const discounts = state.discountDefinitionListLookupData
+                        //                                ?.filter(x => x.productId === productId && x.isActive) ?? [];
+
+                        //                            // 2. Identify if "Upto" exists to enable the field
+                        //                            const isUpto = discounts.some(x => x.discountType === "Upto");
+
+                        //                            // 3. Select the primary discount for auto-calc (Prefer Flat if auto-applying)
+                        //                            const discountDef = discounts.find(x => x.discountType === "Flat")
+                        //                                || discounts.find(x => x.discountType === "Upto");
+
+                        //                            if (typeof upToDiscountObj !== 'undefined' && upToDiscountObj) {
+                        //                                upToDiscountObj.enabled = isUpto;
+                        //                            }
+                        //                            // 🔥 UPTO DISCOUNT LOGIC END
+
+                        //                            // ✅ FIXED: define discountAmount
+                        //                            const discountAmount =
+                        //                                discountDef
+                        //                                    ? (finalPrice * (discountDef.discountPercentage || 0)) / 100
+                        //                                    : 0;
+
+                        //                            if (discountPercentObj) {
+                        //                                discountPercentObj.value =
+                        //                                    discountDef?.discountPercentage ?? 0;
+                        //                            }
+
+                        //                            if (discountAmountObj) {
+                        //                                discountAmountObj.value = discountAmount;
+                        //                            }
+
+                        //                            if (quantityObj) {
+                        //                                quantityObj.value = 1;
+                        //                                const finalUnitPrice = finalPrice - discountAmount;
+                        //                                const taxPercent =
+                        //                                    state.taxListLookupData.find(t => t.id === taxObj?.value)?.percentage ?? 0;
+
+
+                        //                                const calc = services.calculateSaleRate(finalUnitPrice, taxPercent, quantityObj.value = 1);
+
+                        //                                if (quantityObj) {
+                        //                                    quantityObj.value = 1;
+                        //                                }
+                        //                                if (taxAmountObj) {
+                        //                                    taxAmountObj.value = calc.taxPerUnit;
+                        //                                }
+                        //                                if (totalAfterTaxObj) {
+                        //                                    totalAfterTaxObj.value = calc.rateAfterTax;
+                        //                                }
+                        //                                if (totalObj) {
+                        //                                    totalObj.value = calc.total;
+                        //                                }
+                        //                                //if (totalObj) {
+                        //                                //    totalObj.value = finalPrice * quantityObj.value;
+                        //                                //}
+
+                        //                                // 🔥 DATA (THIS WAS MISSING)
+                        //                                args.rowData.taxAmount = calc.taxPerUnit;
+                        //                                args.rowData.totalAfterTax = calc.rateAfterTax;
+                        //                                args.rowData.total = calc.total;
+                        //                            }
+                        //                        }
+                        //                    }
+
+                        //                } catch (error) {
+                        //                    console.error('❌ KEYUP Error:', error);
+                        //                    Swal.fire({
+                        //                        icon: 'error',
+                        //                        title: 'Error',
+                        //                        text: 'Failed to fetch product details',
+                        //                        timer: 2000
+                        //                    });
+                        //                }
+                        //            });
+
+                        //            /* ===================== CHANGE ===================== */
+                        //            inputElement.addEventListener('change', async () => {
+                        //                const enteredPLU = inputElement.value?.trim() ?? "";
+
+                        //                console.log('📝 CHANGE Event - PLU:', enteredPLU);
+
+                        //                if (enteredPLU.length < 5) return;
+
+                        //                try {
+                        //                    const result = await services.getProductIdByPLU(enteredPLU);
+                        //                    const productId = result?.data?.content?.productId;
+
+                        //                    if (!productId) {
+                        //                        Swal.fire({
+                        //                            icon: 'warning',
+                        //                            title: 'Invalid PLU',
+                        //                            text: 'No product found for this PLU code',
+                        //                            timer: 2000,
+                        //                            showConfirmButton: false
+                        //                        });
+                        //                        return;
+                        //                    }
+
+                        //                    args.rowData.productId = productId;
+
+                        //                    if (productObj) {
+                        //                        productObj.value = productId;
+                        //                        productObj.dataBind();
+                        //                        productObj.change({ value: productId });
+
+                        //                        const GridData = gridObj.dataSource;
+                        //                        const existingRow = GridData.find(r => r.productId === productId);
+
+                        //                        if (existingRow && existingRow.pluCode === enteredPLU) {
+                        //                            existingRow.quantity = (existingRow.quantity || 1) + 1;
+                        //                            const price = existingRow.price || existingRow.unitPrice;
+                        //                            existingRow.total = existingRow.quantity * price;
+                        //                            gridObj.refresh();
+                        //                            return;
+                        //                        }
+                        //                        else {
+                        //                            const priceDef = state.priceDefinitionListLookupData
+                        //                                ?.find(x => x.productId === productId && x.isActive);
+
+                        //                            const selectedProduct =
+                        //                                state.productListLookupData.find(
+                        //                                    item => item.id === productObj.value
+                        //                                );
+
+                        //                            // ✅ FIXED: product → selectedProduct
+                        //                            const salePrice = priceDef
+                        //                                ? priceDef.salePrice
+                        //                                : selectedProduct.unitPrice;
+
+                        //                            const discountDef =
+                        //                                state.discountDefinitionListLookupData
+                        //                                    ?.find(x => x.productId === productId && x.isActive);
+
+                        //                            const discountAmount = discountDef ? (salePrice * (discountDef.discountPercentage || 0)) / 100 : 0;                                                    // ✅ FIXED: single finalPrice
+                        //                            const finalPrice = salePrice - discountAmount;
+                        //                            const taxPercent =
+                        //                                state.taxListLookupData.find(t => t.id === taxObj?.value)?.percentage ?? 0;
+
+                        //                            const calc = services.calculateSaleRate(finalPrice,  taxPercent, qty = 1);
+
+                        //                            if (quantityObj) {
+                        //                                quantityObj.value = 1;
+                        //                            }
+                        //                            if (taxAmountObj) {
+                        //                                taxAmountObj.value = calc.taxPerUnit;
+                        //                            }
+                        //                            if (totalAfterTaxObj) {
+                        //                                totalAfterTaxObj.value = calc.rateAfterTax;
+                        //                            }
+                        //                            if (totalObj) {
+                        //                                totalObj.value = calc.total;
+                        //                            }
+                        //                            // 🔥 DATA (THIS WAS MISSING)
+                        //                            args.rowData.taxAmount = calc.taxPerUnit;
+                        //                            args.rowData.totalAfterTax = calc.rateAfterTax;
+                        //                            args.rowData.total = calc.total;
+
+                        //                        }
+                        //                    }
+
+                        //                } catch (error) {
+                        //                    console.error('❌ CHANGE Error:', error);
+                        //                    Swal.fire({
+                        //                        icon: 'error',
+                        //                        title: 'Error',
+                        //                        text: 'Failed to fetch product details',
+                        //                        timer: 2000
+                        //                    });
+                        //                }
+                        //            });
+                        //        }
+                        //    }
+                        //},
                         {
                             field: "pluCode",
                             headerText: "PLU Code",
@@ -3896,132 +4110,109 @@ const App = {
                                         cssClass: 'plu-editor',
                                         placeholder: "Enter 5+ characters"
                                     });
-
                                     pluObj.appendTo(args.element);
 
                                     const inputElement = pluObj.element;
+                                    let pluDebounce = null;
+                                    let isProcessing = false;
 
-                                    inputElement.addEventListener('keydown', (e) => {
-                                        const key = e.key;
-                                        const isValidKey = /^[a-zA-Z0-9]$/.test(key) ||
-                                            ['Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'Tab', 'Enter'].includes(key);
+                                    // ── HELPER A: Populate editor objects + rowData ──────────
+                                    const applyProductToObjs = (productId, product, qty = 1) => {
+                                        const priceDef = state.priceDefinitionListLookupData
+                                            ?.find(x => x.productId === productId && x.isActive);
+                                        const salePrice = priceDef ? priceDef.salePrice : (product?.unitPrice ?? 0);
 
-                                        if (!isValidKey) {
-                                            e.preventDefault();
-                                            console.log('❌ Invalid character blocked:', key);
+                                        const discounts = state.discountDefinitionListLookupData
+                                            ?.filter(x => x.productId === productId && x.isActive) ?? [];
+                                        const flatDef = discounts.find(d => d.discountType === "Flat");
+                                        const isUpto = discounts.some(d => d.discountType === "Upto");
+                                        const discountPct = flatDef?.discountPercentage ?? 0;
+                                        const discountAmt = (salePrice * discountPct) / 100;
+                                        const netPrice = salePrice - discountAmt;
+
+                                        const taxPercent = state.taxListLookupData
+                                            .find(t => t.id === taxObj?.value)?.percentage ?? 0;
+                                        const calc = services.calculateSaleRate(netPrice, taxPercent, qty);
+
+                                        if (productObj) { productObj.value = productId; productObj.dataBind(); }
+                                        if (priceObj) priceObj.value = salePrice;
+                                        if (discountPercentObj) discountPercentObj.value = discountPct;
+                                        if (discountAmountObj) discountAmountObj.value = discountAmt;
+                                        if (quantityObj) quantityObj.value = qty;
+                                        if (taxAmountObj) taxAmountObj.value = calc.taxPerUnit;
+                                        if (totalAfterTaxObj) totalAfterTaxObj.value = calc.rateAfterTax;
+                                        if (totalObj) totalObj.value = calc.total;
+                                        if (typeof upToDiscountObj !== 'undefined' && upToDiscountObj)
+                                            upToDiscountObj.enabled = isUpto;
+                                        if (summaryObj) summaryObj.value = product?.description ?? "";
+                                        if (numberObj) numberObj.value = product?.number ?? "";
+                                        if (taxObj && product?.taxId) taxObj.value = product.taxId;
+
+                                        args.rowData.productId = productId;
+                                        args.rowData.unitPrice = salePrice;
+                                        args.rowData.discountPercentage = discountPct;
+                                        args.rowData.discountAmount = discountAmt;
+                                        args.rowData.quantity = qty;
+                                        args.rowData.taxAmount = calc.taxPerUnit;
+                                        args.rowData.totalAfterTax = calc.rateAfterTax;
+                                        args.rowData.total = calc.total;
+                                        args.rowData.summary = product?.description ?? "";
+                                        args.rowData.productNumber = product?.number ?? "";
+                                        args.rowData.taxId = product?.taxId;
+                                    };
+
+                                    // ── HELPER B: Recalculate persisted row data ─────────────
+                                    const recalcRowData = (rowData, productId, newQty) => {
+                                        const priceDef = state.priceDefinitionListLookupData
+                                            ?.find(x => x.productId === productId && x.isActive);
+                                        const salePrice = priceDef ? priceDef.salePrice : (rowData.unitPrice ?? 0);
+                                        const discounts = state.discountDefinitionListLookupData
+                                            ?.filter(x => x.productId === productId && x.isActive) ?? [];
+                                        const flatDef = discounts.find(d => d.discountType === "Flat");
+                                        const discountPct = flatDef?.discountPercentage ?? rowData.discountPercentage ?? 0;
+                                        const discountAmt = (salePrice * discountPct) / 100;
+                                        const netPrice = salePrice - discountAmt;
+                                        const taxPercent = state.taxListLookupData
+                                            .find(t => t.id === (taxObj?.value ?? rowData.taxId))?.percentage ?? 0;
+                                        const calc = services.calculateSaleRate(netPrice, taxPercent, newQty);
+
+                                        rowData.quantity = newQty;
+                                        rowData.unitPrice = salePrice;
+                                        rowData.discountPercentage = discountPct;
+                                        rowData.discountAmount = discountAmt;
+                                        rowData.taxAmount = calc.taxPerUnit;
+                                        rowData.totalAfterTax = calc.rateAfterTax;
+                                        rowData.total = calc.total;
+                                    };
+
+                                    // ── HELPER C: Open attribute modal + auto-add next row ───
+                                    const openAttributeModalWithAutoNext = async (rowData) => {
+                                        let rowIndex = state.secondaryData
+                                            .findIndex(r => r === rowData || (r.id && r.id === rowData.id));
+                                        let injected = false;
+
+                                        if (rowIndex === -1) {
+                                            rowIndex = state.secondaryData.length;
+                                            state.secondaryData.push(rowData);
+                                            injected = true;
                                         }
-                                    });
 
-                                    /* ===================== KEYUP ===================== */
-                                    inputElement.addEventListener('keyup', async () => {
-                                        const enteredPLU = inputElement.value?.trim() ?? "";
+                                        const detailModalEl = document.getElementById('detailModal');
+                                        const autoAddNextRow = () => {
+                                            console.log('🔄 Attribute modal closed → auto-adding next row');
 
-                                        console.log('⬆️ KEYUP Event - PLU:', enteredPLU, 'Length:', enteredPLU.length);
-
-                                        if (enteredPLU.length < 5) return;
-
-                                        try {
-                                            const result = await services.getProductIdByPLU(enteredPLU);
-                                            const productId = result?.data?.content?.productId;
-                                            debugger
-                                            if (!productId) {
-                                                Swal.fire({
-                                                    icon: 'warning',
-                                                    title: 'Invalid PLU',
-                                                    text: 'No product found for this PLU code',
-                                                    timer: 2000,
-                                                    showConfirmButton: false
-                                                });
-                                                return;
-                                            }
-
-                                            args.rowData.productId = productId;
-
-                                            if (productObj) {
-                                                productObj.value = productId;
-                                                productObj.dataBind();
-                                                productObj.change({ value: productId });
-
-                                                const GridData = gridObj.dataSource;
-                                                const existingRow = GridData.find(r => r.productId === productId);
-
-                                                if (existingRow && existingRow.pluCode === enteredPLU) {
-                                                    existingRow.quantity = (existingRow.quantity || 1) + 1;
-                                                    const price = existingRow.price || existingRow.unitPrice;
-                                                    existingRow.total = existingRow.quantity * price;
-                                                    gridObj.refresh();
-                                                    return;
+                                            setTimeout(() => {
+                                                if (!secondaryGrid.obj.isEdit) {
+                                                    secondaryGrid.obj.addRecord();
                                                 }
-                                                else {
-                                                    const priceDef = state.priceDefinitionListLookupData
-                                                        ?.find(x => x.productId === productId && x.isActive);
+                                            }, 100);
 
-                                                    const selectedProduct =
-                                                        state.productListLookupData.find(
-                                                            item => item.id === productObj.value
-                                                        );
+                                            detailModalEl?.removeEventListener('hidden.bs.modal', autoAddNextRow);
+                                        };
 
-                                                    const finalPrice = priceDef
-                                                        ? priceDef.salePrice
-                                                        : selectedProduct.unitPrice;
+                                        detailModalEl?.addEventListener('hidden.bs.modal', autoAddNextRow);
 
-                                                    // 1. Get all active discounts for this product
-                                                    const discounts = state.discountDefinitionListLookupData
-                                                        ?.filter(x => x.productId === productId && x.isActive) ?? [];
-
-                                                    // 2. Identify if "Upto" exists to enable the field
-                                                    const isUpto = discounts.some(x => x.discountType === "Upto");
-
-                                                    // 3. Select the primary discount for auto-calc (Prefer Flat if auto-applying)
-                                                    const discountDef = discounts.find(x => x.discountType === "Flat")
-                                                        || discounts.find(x => x.discountType === "Upto");
-
-                                                    if (typeof upToDiscountObj !== 'undefined' && upToDiscountObj) {
-                                                        upToDiscountObj.enabled = isUpto;
-                                                    }
-                                                    // 🔥 UPTO DISCOUNT LOGIC END
-
-                                                    // ✅ FIXED: define discountAmount
-                                                    const discountAmount =
-                                                        discountDef
-                                                            ? (finalPrice * (discountDef.discountPercentage || 0)) / 100
-                                                            : 0;
-
-                                                    if (discountPercentObj) {
-                                                        discountPercentObj.value =
-                                                            discountDef?.discountPercentage ?? 0;
-                                                    }
-
-                                                    if (discountAmountObj) {
-                                                        discountAmountObj.value = discountAmount;
-                                                    }
-
-                                                    if (quantityObj) {
-                                                        quantityObj.value = 1;
-                                                        const finalUnitPrice = finalPrice - discountAmount;
-                                                        const taxPercent =
-                                                            state.taxListLookupData.find(t => t.id === taxObj?.value)?.percentage ?? 0;
-
-
-                                                        const calc = services.calculateSaleRate(finalUnitPrice, taxPercent, quantityObj.value = 1);
-
-                                                        if (quantityObj) {
-                                                            quantityObj.value = 1;
-                                                        }
-                                                        if (taxAmountObj) {
-                                                            taxAmountObj.value = calc.taxPerUnit;
-                                                        }
-                                                        if (totalAfterTaxObj) {
-                                                            totalAfterTaxObj.value = calc.rateAfterTax;
-                                                        }
-                                                        if (totalObj) {
-                                                            totalObj.value = calc.total;
-                                                        }
-                                                        //if (totalObj) {
-                                                        //    totalObj.value = finalPrice * quantityObj.value;
-                                                        //}
-
-                                                        //  DATA (THIS WAS MISSING)
+                                                        // 🔥 DATA (THIS WAS MISSING)
                                                         args.rowData.taxAmount = calc.taxPerUnit;
                                                         args.rowData.totalAfterTax = calc.rateAfterTax;
                                                         args.rowData.total = calc.total;
@@ -4029,24 +4220,18 @@ const App = {
                                                 }
                                             }
 
-                                        } catch (error) {
-                                            console.error('❌ KEYUP Error:', error);
-                                            Swal.fire({
-                                                icon: 'error',
-                                                title: 'Error',
-                                                text: 'Failed to fetch product details',
-                                                timer: 2000
-                                            });
+                                        if (injected && !rowData.id) {
+                                            state.secondaryData.splice(rowIndex, 1);
                                         }
-                                    });
+                                    };
 
-                                    /* ===================== CHANGE ===================== */
-                                    inputElement.addEventListener('change', async () => {
-                                        const enteredPLU = inputElement.value?.trim() ?? "";
+                                    // ── CORE: processPLU ─────────────────────────────────────
+                                    const processPLU = async (enteredPLU) => {
+                                        if (isProcessing) return;
+                                        if (!enteredPLU || enteredPLU.length < 5) return;
 
-                                        console.log('📝 CHANGE Event - PLU:', enteredPLU);
-
-                                        if (enteredPLU.length < 5) return;
+                                        isProcessing = true;
+                                        console.log('🔍 Processing PLU:', enteredPLU);
 
                                         try {
                                             const result = await services.getProductIdByPLU(enteredPLU);
@@ -4063,81 +4248,137 @@ const App = {
                                                 return;
                                             }
 
-                                            args.rowData.productId = productId;
+                                            const product = state.productListLookupData.find(p => p.id === productId);
+                                            const hasAttributes = !!(product?.imei1 || product?.imei2 || product?.serviceNo);
 
-                                            if (productObj) {
-                                                productObj.value = productId;
-                                                productObj.dataBind();
-                                                productObj.change({ value: productId });
+                                            // ── Duplicate check ───────────────────────────────
+                                            const allGridData = [
+                                                ...state.secondaryData,
+                                                ...secondaryGrid.manualBatchChanges.addedRecords
+                                            ];
+                                            const duplicateRow = allGridData.find(r => r.productId === productId);
 
-                                                const GridData = gridObj.dataSource;
-                                                const existingRow = GridData.find(r => r.productId === productId);
+                                            if (duplicateRow) {
+                                                // ════════════════ DUPLICATE PATH ═════════════════
+                                                console.log('♻️  Duplicate detected, incrementing quantity');
 
-                                                if (existingRow && existingRow.pluCode === enteredPLU) {
-                                                    existingRow.quantity = (existingRow.quantity || 1) + 1;
-                                                    const price = existingRow.price || existingRow.unitPrice;
-                                                    existingRow.total = existingRow.quantity * price;
-                                                    gridObj.refresh();
-                                                    return;
+                                                secondaryGrid.obj.closeEdit();
+
+                                                const newQty = (parseFloat(duplicateRow.quantity) || 1) + 1;
+                                                recalcRowData(duplicateRow, productId, newQty);
+
+                                                const isAddedRecord = secondaryGrid.manualBatchChanges
+                                                    .addedRecords.includes(duplicateRow);
+
+                                                if (!isAddedRecord) {
+                                                    const alreadyTracked = secondaryGrid.manualBatchChanges
+                                                        .changedRecords.find(r => r.id === duplicateRow.id);
+                                                    if (alreadyTracked) {
+                                                        Object.assign(alreadyTracked, duplicateRow);
+                                                    } else {
+                                                        secondaryGrid.manualBatchChanges.changedRecords.push(duplicateRow);
+                                                    }
                                                 }
-                                                else {
-                                                    const priceDef = state.priceDefinitionListLookupData
-                                                        ?.find(x => x.productId === productId && x.isActive);
 
-                                                    const selectedProduct =
-                                                        state.productListLookupData.find(
-                                                            item => item.id === productObj.value
-                                                        );
+                                                secondaryGrid.obj.setProperties({
+                                                    dataSource: [...secondaryGrid.obj.dataSource]
+                                                });
+                                                methods.calculateLiveTotals();
 
-                                                    // ✅ FIXED: product → selectedProduct
-                                                    const salePrice = priceDef
-                                                        ? priceDef.salePrice
-                                                        : selectedProduct.unitPrice;
+                                                console.log(`✅ Duplicate PLU "${enteredPLU}" → qty = ${newQty}`);
 
-                                                    const discountDef =
-                                                        state.discountDefinitionListLookupData
-                                                            ?.find(x => x.productId === productId && x.isActive);
-
-                                                    const discountAmount = discountDef ? (salePrice * (discountDef.discountPercentage || 0)) / 100 : 0;                                                    // ✅ FIXED: single finalPrice
-                                                    const finalPrice = salePrice - discountAmount;
-                                                    const taxPercent =
-                                                        state.taxListLookupData.find(t => t.id === taxObj?.value)?.percentage ?? 0;
-
-                                                    const calc = services.calculateSaleRate(finalPrice,  taxPercent, qty = 1);
-
-                                                    if (quantityObj) {
-                                                        quantityObj.value = 1;
-                                                    }
-                                                    if (taxAmountObj) {
-                                                        taxAmountObj.value = calc.taxPerUnit;
-                                                    }
-                                                    if (totalAfterTaxObj) {
-                                                        totalAfterTaxObj.value = calc.rateAfterTax;
-                                                    }
-                                                    if (totalObj) {
-                                                        totalObj.value = calc.total;
-                                                    }
-                                                    // 🔥 DATA (THIS WAS MISSING)
-                                                    args.rowData.taxAmount = calc.taxPerUnit;
-                                                    args.rowData.totalAfterTax = calc.rateAfterTax;
-                                                    args.rowData.total = calc.total;
-
+                                                if (hasAttributes) {
+                                                    await openAttributeModalWithAutoNext(duplicateRow);
+                                                } else {
+                                                    setTimeout(() => {
+                                                        if (!secondaryGrid.obj.isEdit) {
+                                                            secondaryGrid.obj.addRecord();
+                                                        }
+                                                    }, 100);
                                                 }
+
+                                            } else {
+                                                // ═════════════ NEW PRODUCT PATH ══════════════════
+                                                console.log('✨ New product, committing row');
+
+                                                // 1. Force blur to sync value with Syncfusion Grid's validation
+                                                // This explicitly fixes the "need to click outside" issue.
+                                                inputElement.blur();
+                                                inputElement.dispatchEvent(new Event('change', { bubbles: true }));
+
+                                                // 2. Set rowData and apply to UI components
+                                                args.rowData.pluCode = enteredPLU;
+                                                applyProductToObjs(productId, product, 1);
+
+                                                const committedRow = args.rowData;
+
+                                                // 3. Delay to allow Syncfusion validation state to securely update
+                                                setTimeout(() => {
+                                                    // Commit the row 
+                                                    secondaryGrid.obj.endEdit();
+                                                    console.log(`✅ New PLU "${enteredPLU}" → row committed`);
+
+                                                    // 4. Wait for grid's save cycle (actionComplete) to finish fully
+                                                    setTimeout(() => {
+                                                        if (hasAttributes) {
+                                                            console.log('🎯 Opening attribute modal for first scan');
+                                                            openAttributeModalWithAutoNext(committedRow);
+                                                        } else {
+                                                            // No attributes → add next row automatically
+                                                            if (!secondaryGrid.obj.isEdit) {
+                                                                secondaryGrid.obj.addRecord();
+                                                            }
+                                                        }
+                                                    }, 400); // Increased slightly to 400ms for safety
+                                                }, 100);
                                             }
-
                                         } catch (error) {
-                                            console.error('❌ CHANGE Error:', error);
+                                            console.error('❌ PLU Processing Error:', error);
                                             Swal.fire({
                                                 icon: 'error',
                                                 title: 'Error',
-                                                text: 'Failed to fetch product details',
-                                                timer: 2000
+                                                text: 'Failed to process PLU code. Please try again.',
+                                                timer: 2000,
+                                                showConfirmButton: false
                                             });
+                                        } finally {
+                                            isProcessing = false;
                                         }
+                                    };
+
+                                    // ── EVENT: keydown (Enter → immediate, block invalid) ────
+                                    inputElement.addEventListener('keydown', (e) => {
+                                        if (e.key === 'Enter') {
+                                            e.preventDefault();
+                                            e.stopPropagation();
+                                            clearTimeout(pluDebounce);
+                                            processPLU(inputElement.value?.trim() ?? "");
+                                            return;
+                                        }
+
+                                        const isValidKey = /^[a-zA-Z0-9]$/.test(e.key) ||
+                                            ['Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'Tab'].includes(e.key);
+
+                                        if (!isValidKey) {
+                                            e.preventDefault();
+                                        }
+                                    });
+
+                                    // ── EVENT: keyup (300ms debounce for manual typing) ──────
+                                    inputElement.addEventListener('keyup', (e) => {
+                                        if (e.key === 'Enter') return;
+                                        clearTimeout(pluDebounce);
+
+                                        const enteredPLU = inputElement.value?.trim() ?? "";
+                                        if (enteredPLU.length < 5) return;
+
+                                        pluDebounce = setTimeout(() => processPLU(enteredPLU), 300);
                                     });
                                 }
                             }
                         },
+
+                       
                         {
                             field: 'productId',
                             headerText: 'Product',

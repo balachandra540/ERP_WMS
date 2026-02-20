@@ -930,7 +930,7 @@
                         { text: 'Delete', tooltipText: 'Delete', prefixIcon: 'e-delete', id: 'DeleteCustom' },
                         { type: 'Separator' },
                         { text: 'Change Password', tooltipText: 'Change Password', id: 'ChangePasswordCustom' },
-                        { text: 'Change Role', tooltipText: 'Change Role', id: 'ChangeRoleCustom' },
+                        //{ text: 'Change Role', tooltipText: 'Change Role', id: 'ChangeRoleCustom' },
                         { tooltipText: 'Locations', text: 'Locations', id: 'ChangeLocations', visible: false },
                     ],
                     beforeDataBound: () => { },

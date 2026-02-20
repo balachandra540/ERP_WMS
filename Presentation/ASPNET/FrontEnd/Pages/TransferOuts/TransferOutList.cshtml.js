@@ -1734,6 +1734,163 @@
                         // ============================================
                         // 🔥 PLU CODE COLUMN (FROM FIRST IMPLEMENTATION)
                         // ============================================
+                        //{
+                        //    field: "pluCode",
+                        //    headerText: "PLU Code",
+                        //    width: 140,
+                        //    editType: "stringedit",
+                        //    validationRules: { required: true },
+                        //    edit: {
+                        //        create: () => {
+                        //            let pluElem = document.createElement("input");
+                        //            return pluElem;
+                        //        },
+                        //        read: () => pluObj?.value,
+                        //        destroy: () => pluObj?.destroy(),
+
+                        //        write: (args) => {
+                        //            pluObj = new ej.inputs.TextBox({
+                        //                value: args.rowData.pluCode ?? "",
+                        //                cssClass: 'plu-editor',
+                        //                placeholder: "Enter 5+ characters"
+                        //            });
+
+                        //            pluObj.appendTo(args.element);
+                        //            const inputElement = pluObj.element;
+
+                        //            // 🔥 INPUT VALIDATION - Only alphanumeric
+                        //            inputElement.addEventListener('keydown', (e) => {
+                        //                const key = e.key;
+                        //                const isValidKey = /^[a-zA-Z0-9]$/.test(key) ||
+                        //                    ['Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'Tab', 'Enter'].includes(key);
+
+                        //                if (!isValidKey) {
+                        //                    e.preventDefault();
+                        //                    console.log('❌ Invalid character blocked:', key);
+                        //                }
+                        //            });
+
+                        //            // 🔥 KEYUP EVENT - Real-time validation
+                        //            inputElement.addEventListener('keyup', async (e) => {
+                        //                const enteredPLU = inputElement.value?.trim() ?? "";
+                        //                console.log('⬆️ KEYUP Event - PLU:', enteredPLU, 'Length:', enteredPLU.length);
+
+                        //                if (enteredPLU.length < 5) {
+                        //                    console.log('⏳ Waiting for more characters... (' + enteredPLU.length + '/5)');
+                        //                    return;
+                        //                }
+
+                        //                try {
+                        //                    console.log('📡 Calling API for PLU:', enteredPLU);
+                        //                    const result = await services.getProductIdByPLU(enteredPLU);
+                        //                    const productId = result?.data?.content?.productId;
+
+                        //                    if (!productId) {
+                        //                        Swal.fire({
+                        //                            icon: 'warning',
+                        //                            title: 'Invalid PLU',
+                        //                            text: 'No product found for this PLU code',
+                        //                            timer: 2000,
+                        //                            showConfirmButton: false
+                        //                        });
+                        //                        console.log('❌ No product found for PLU:', enteredPLU);
+                        //                        return;
+                        //                    }
+
+                        //                    console.log('✅ Product found - ID:', productId);
+                        //                    args.rowData.productId = productId;
+
+                        //                    // 🔥 UPDATE PRODUCT DROPDOWN
+                        //                    if (productObj) {
+                        //                        productObj.value = productId;
+                        //                        productObj.dataBind();
+                        //                        productObj.change({ value: productId });
+                        //                        const GridData = gridObj.dataSource;
+                        //                        // 🔎 check if same product already exists
+                        //                        const existingRow = GridData.find(r => r.productId === productId);
+                        //                        if (existingRow && existingRow.pluCode === enteredPLU) {
+                        //                            // ✅ SAME ITEM  AGAIN
+                        //                            existingRow.requestStock = (existingRow.requestStock || 1) + 1;
+                        //                            gridObj.refresh();
+                        //                            return; // ⛔ stop further processing
+                        //                        }
+                        //                        if (requestStockObj) {
+                        //                            requestStockObj.value = 1;
+                        //                        }
+                        //                    }
+
+                        //                    // 🔥 UPDATE TOTAL STOCK - CRITICAL FIX
+                        //                    const stock = methods.getProductStock?.(productId) || 0;
+                        //                    if (totalStockObj) {
+                        //                        totalStockObj.value = stock;
+                        //                        totalStockObj.readOnly = true;
+                        //                        console.log('✅ Total Stock updated:', stock);
+                        //                    }
+
+                        //                } catch (error) {
+                        //                    console.error('❌ KEYUP Error:', error);
+                        //                    Swal.fire({
+                        //                        icon: 'error',
+                        //                        title: 'Error',
+                        //                        text: 'Failed to fetch product details',
+                        //                        timer: 2000
+                        //                    });
+                        //                }
+                        //            });
+
+                        //            // 🔥 CHANGE EVENT - Final validation
+                        //            inputElement.addEventListener('change', async (e) => {
+                        //                const enteredPLU = inputElement.value?.trim() ?? "";
+                        //                console.log('📝 CHANGE Event - PLU:', enteredPLU, 'Length:', enteredPLU.length);
+
+                        //                if (!enteredPLU || enteredPLU.length < 5) {
+                        //                    console.log('❌ PLU too short, skipping API call');
+                        //                    return;
+                        //                }
+
+                        //                try {
+                        //                    const result = await services.getProductIdByPLU(enteredPLU);
+                        //                    const productId = result?.data?.content?.productId;
+
+                        //                    if (!productId) {
+                        //                        Swal.fire({
+                        //                            icon: 'warning',
+                        //                            title: 'Invalid PLU',
+                        //                            text: 'No product found for this PLU code',
+                        //                            timer: 2000,
+                        //                            showConfirmButton: false
+                        //                        });
+                        //                        return;
+                        //                    }
+
+                        //                    args.rowData.productId = productId;
+                        //                    if (productObj) {
+                        //                        productObj.value = productId;
+                        //                        productObj.dataBind();
+                        //                        productObj.change({ value: productId });
+                        //                        const GridData = gridObj.dataSource;
+                        //                        // 🔎 check if same product already exists
+                        //                        const existingRow = GridData.find(r => r.productId === productId);
+                        //                        if (existingRow && existingRow.pluCode === enteredPLU) {
+                        //                            // ✅ SAME ITEM  AGAIN
+                        //                            existingRow.requestStock = (existingRow.requestStock || 1) + 1;
+                        //                            gridObj.refresh();
+                        //                            return; // ⛔ stop further processing
+                        //                        }
+                        //                        if (requestStockObj) {
+                        //                            requestStockObj.value = 1;
+                        //                        }
+
+
+                        //                    }
+
+                        //                } catch (error) {
+                        //                    console.error('❌ CHANGE Error:', error);
+                        //                }
+                        //            });
+                        //        }
+                        //    }
+                        //},
                         {
                             field: "pluCode",
                             headerText: "PLU Code",
@@ -1754,34 +1911,75 @@
                                         cssClass: 'plu-editor',
                                         placeholder: "Enter 5+ characters"
                                     });
-
                                     pluObj.appendTo(args.element);
+
                                     const inputElement = pluObj.element;
+                                    let pluDebounce = null;
+                                    let isProcessing = false;
 
-                                    // 🔥 INPUT VALIDATION - Only alphanumeric
-                                    inputElement.addEventListener('keydown', (e) => {
-                                        const key = e.key;
-                                        const isValidKey = /^[a-zA-Z0-9]$/.test(key) ||
-                                            ['Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'Tab', 'Enter'].includes(key);
+                                    // ── HELPER A: Populate editor objects + rowData ──────────
+                                    const applyProductToObjs = (productId, product, qty = 1) => {
+                                        const stock = methods.getProductStock?.(productId) || 0;
 
-                                        if (!isValidKey) {
-                                            e.preventDefault();
-                                            console.log('❌ Invalid character blocked:', key);
+                                        if (productObj) { productObj.value = productId; productObj.dataBind(); }
+                                        if (totalStockObj) { totalStockObj.value = stock; totalStockObj.readOnly = true; }
+                                        if (requestStockObj) requestStockObj.value = qty;
+
+                                        args.rowData.productId = productId;
+                                        args.rowData.requestStock = qty;
+                                        args.rowData.totalStock = stock;
+                                    };
+
+                                    // ── HELPER B: Recalculate persisted row data ─────────────
+                                    const recalcRowData = (rowData, productId, newQty) => {
+                                        const stock = methods.getProductStock?.(productId) || 0;
+                                        rowData.requestStock = newQty;
+                                        rowData.totalStock = stock;
+                                    };
+
+                                    // ── HELPER C: Open attribute modal + auto-add next row ───
+                                    const openAttributeModalWithAutoNext = async (rowData) => {
+                                        let rowIndex = state.secondaryData
+                                            .findIndex(r => r === rowData || (r.id && r.id === rowData.id));
+                                        let injected = false;
+
+                                        if (rowIndex === -1) {
+                                            rowIndex = state.secondaryData.length;
+                                            state.secondaryData.push(rowData);
+                                            injected = true;
                                         }
-                                    });
 
-                                    // 🔥 KEYUP EVENT - Real-time validation
-                                    inputElement.addEventListener('keyup', async (e) => {
-                                        const enteredPLU = inputElement.value?.trim() ?? "";
-                                        console.log('⬆️ KEYUP Event - PLU:', enteredPLU, 'Length:', enteredPLU.length);
+                                        const detailModalEl = document.getElementById('detailModal');
+                                        const autoAddNextRow = () => {
+                                            console.log('🔄 Attribute modal closed → auto-adding next row');
 
-                                        if (enteredPLU.length < 5) {
-                                            console.log('⏳ Waiting for more characters... (' + enteredPLU.length + '/5)');
-                                            return;
+                                            setTimeout(() => {
+                                                if (!secondaryGrid.obj.isEdit) {
+                                                    secondaryGrid.obj.addRecord();
+                                                }
+                                            }, 100);
+
+                                            detailModalEl?.removeEventListener('hidden.bs.modal', autoAddNextRow);
+                                        };
+
+                                        detailModalEl?.addEventListener('hidden.bs.modal', autoAddNextRow);
+
+                                        await methods.openDetailModal(rowIndex);
+
+                                        if (injected && !rowData.id) {
+                                            state.secondaryData.splice(rowIndex, 1);
                                         }
+                                    };
+
+                                    // ── CORE: processPLU ─────────────────────────────────────
+                                    const processPLU = async (enteredPLU) => {
+                                        if (isProcessing) return;
+                                        if (!enteredPLU || enteredPLU.length < 5) return;
+
+                                        isProcessing = true;
+                                        console.log('🔍 Processing PLU:', enteredPLU);
 
                                         try {
-                                            console.log('📡 Calling API for PLU:', enteredPLU);
                                             const result = await services.getProductIdByPLU(enteredPLU);
                                             const productId = result?.data?.content?.productId;
 
@@ -1793,100 +1991,133 @@
                                                     timer: 2000,
                                                     showConfirmButton: false
                                                 });
-                                                console.log('❌ No product found for PLU:', enteredPLU);
                                                 return;
                                             }
 
-                                            console.log('✅ Product found - ID:', productId);
-                                            args.rowData.productId = productId;
+                                            const product = state.productListLookupData.find(p => p.id === productId);
+                                            const hasAttributes = !!(product?.imei1 || product?.imei2 || product?.serviceNo);
 
-                                            // 🔥 UPDATE PRODUCT DROPDOWN
-                                            if (productObj) {
-                                                productObj.value = productId;
-                                                productObj.dataBind();
-                                                productObj.change({ value: productId });
-                                                const GridData = gridObj.dataSource;
-                                                // 🔎 check if same product already exists
-                                                const existingRow = GridData.find(r => r.productId === productId);
-                                                if (existingRow && existingRow.pluCode === enteredPLU) {
-                                                    // ✅ SAME ITEM  AGAIN
-                                                    existingRow.requestStock = (existingRow.requestStock || 1) + 1;
-                                                    gridObj.refresh();
-                                                    return; // ⛔ stop further processing
+                                            // ── Duplicate check ───────────────────────────────
+                                            const allGridData = [
+                                                ...state.secondaryData,
+                                                ...secondaryGrid.manualBatchChanges.addedRecords
+                                            ];
+                                            const duplicateRow = allGridData.find(r => r.productId === productId);
+
+                                            if (duplicateRow) {
+                                                // ════════════════ DUPLICATE PATH ═════════════════
+                                                console.log('♻️  Duplicate detected, incrementing quantity');
+
+                                                secondaryGrid.obj.closeEdit();
+
+                                                const newQty = (parseFloat(duplicateRow.requestStock) || 0) + 1;
+                                                recalcRowData(duplicateRow, productId, newQty);
+
+                                                const isAddedRecord = secondaryGrid.manualBatchChanges
+                                                    .addedRecords.includes(duplicateRow);
+
+                                                if (!isAddedRecord) {
+                                                    const alreadyTracked = secondaryGrid.manualBatchChanges
+                                                        .changedRecords.find(r => r.id === duplicateRow.id);
+                                                    if (alreadyTracked) {
+                                                        Object.assign(alreadyTracked, duplicateRow);
+                                                    } else {
+                                                        secondaryGrid.manualBatchChanges.changedRecords.push(duplicateRow);
+                                                    }
                                                 }
-                                                if (requestStockObj) {
-                                                    requestStockObj.value = 1;
+
+                                                secondaryGrid.obj.setProperties({
+                                                    dataSource: [...secondaryGrid.obj.dataSource]
+                                                });
+
+                                                methods.refreshSummary?.();
+                                                console.log(`✅ Duplicate PLU "${enteredPLU}" → requestStock = ${newQty}`);
+
+                                                if (hasAttributes) {
+                                                    await openAttributeModalWithAutoNext(duplicateRow);
+                                                } else {
+                                                    setTimeout(() => {
+                                                        if (!secondaryGrid.obj.isEdit) {
+                                                            secondaryGrid.obj.addRecord();
+                                                        }
+                                                    }, 100);
                                                 }
-                                            }
 
-                                            // 🔥 UPDATE TOTAL STOCK - CRITICAL FIX
-                                            const stock = methods.getProductStock?.(productId) || 0;
-                                            if (totalStockObj) {
-                                                totalStockObj.value = stock;
-                                                totalStockObj.readOnly = true;
-                                                console.log('✅ Total Stock updated:', stock);
-                                            }
+                                            } else {
+                                                // ═════════════ NEW PRODUCT PATH ══════════════════
+                                                console.log('✨ New product, committing row');
 
+                                                // 1. Force blur to sync value with Syncfusion Grid's validation
+                                                inputElement.blur();
+                                                inputElement.dispatchEvent(new Event('change', { bubbles: true }));
+
+                                                // 2. Set rowData and apply to UI components
+                                                args.rowData.pluCode = enteredPLU;
+                                                applyProductToObjs(productId, product, 1);
+
+                                                const committedRow = args.rowData;
+
+                                                // 3. Delay to allow Syncfusion validation state to securely update
+                                                setTimeout(() => {
+                                                    // Commit the row 
+                                                    secondaryGrid.obj.endEdit();
+                                                    console.log(`✅ New PLU "${enteredPLU}" → row committed`);
+
+                                                    // 4. Wait for grid's save cycle (actionComplete) to finish fully
+                                                    setTimeout(() => {
+                                                        if (hasAttributes) {
+                                                            console.log('🎯 Opening attribute modal for first scan');
+                                                            openAttributeModalWithAutoNext(committedRow);
+                                                        } else {
+                                                            // No attributes → add next row automatically
+                                                            if (!secondaryGrid.obj.isEdit) {
+                                                                secondaryGrid.obj.addRecord();
+                                                            }
+                                                        }
+                                                    }, 400);
+                                                }, 100);
+                                            }
                                         } catch (error) {
-                                            console.error('❌ KEYUP Error:', error);
+                                            console.error('❌ PLU Processing Error:', error);
                                             Swal.fire({
                                                 icon: 'error',
                                                 title: 'Error',
-                                                text: 'Failed to fetch product details',
-                                                timer: 2000
+                                                text: 'Failed to process PLU code. Please try again.',
+                                                timer: 2000,
+                                                showConfirmButton: false
                                             });
+                                        } finally {
+                                            isProcessing = false;
                                         }
-                                    });
+                                    };
 
-                                    // 🔥 CHANGE EVENT - Final validation
-                                    inputElement.addEventListener('change', async (e) => {
-                                        const enteredPLU = inputElement.value?.trim() ?? "";
-                                        console.log('📝 CHANGE Event - PLU:', enteredPLU, 'Length:', enteredPLU.length);
-
-                                        if (!enteredPLU || enteredPLU.length < 5) {
-                                            console.log('❌ PLU too short, skipping API call');
+                                    // ── EVENT: keydown (Enter → immediate, block invalid) ────
+                                    inputElement.addEventListener('keydown', (e) => {
+                                        if (e.key === 'Enter') {
+                                            e.preventDefault();
+                                            e.stopPropagation();
+                                            clearTimeout(pluDebounce);
+                                            processPLU(inputElement.value?.trim() ?? "");
                                             return;
                                         }
 
-                                        try {
-                                            const result = await services.getProductIdByPLU(enteredPLU);
-                                            const productId = result?.data?.content?.productId;
+                                        const isValidKey = /^[a-zA-Z0-9]$/.test(e.key) ||
+                                            ['Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'Tab'].includes(e.key);
 
-                                            if (!productId) {
-                                                Swal.fire({
-                                                    icon: 'warning',
-                                                    title: 'Invalid PLU',
-                                                    text: 'No product found for this PLU code',
-                                                    timer: 2000,
-                                                    showConfirmButton: false
-                                                });
-                                                return;
-                                            }
-
-                                            args.rowData.productId = productId;
-                                            if (productObj) {
-                                                productObj.value = productId;
-                                                productObj.dataBind();
-                                                productObj.change({ value: productId });
-                                                const GridData = gridObj.dataSource;
-                                                // 🔎 check if same product already exists
-                                                const existingRow = GridData.find(r => r.productId === productId);
-                                                if (existingRow && existingRow.pluCode === enteredPLU) {
-                                                    // ✅ SAME ITEM  AGAIN
-                                                    existingRow.requestStock = (existingRow.requestStock || 1) + 1;
-                                                    gridObj.refresh();
-                                                    return; // ⛔ stop further processing
-                                                }
-                                                if (requestStockObj) {
-                                                    requestStockObj.value = 1;
-                                                }
-
-                                                
-                                            }
-
-                                        } catch (error) {
-                                            console.error('❌ CHANGE Error:', error);
+                                        if (!isValidKey) {
+                                            e.preventDefault();
                                         }
+                                    });
+
+                                    // ── EVENT: keyup (300ms debounce for manual typing) ──────
+                                    inputElement.addEventListener('keyup', (e) => {
+                                        if (e.key === 'Enter') return;
+                                        clearTimeout(pluDebounce);
+
+                                        const enteredPLU = inputElement.value?.trim() ?? "";
+                                        if (enteredPLU.length < 5) return;
+
+                                        pluDebounce = setTimeout(() => processPLU(enteredPLU), 300);
                                     });
                                 }
                             }

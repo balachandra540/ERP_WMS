@@ -15,6 +15,9 @@ public class GetUserRolesResult
 public class GetUserRolesRequest : IRequest<GetUserRolesResult>
 {
     public string? UserId { get; init; }
+    public string? userGroupId { get; init; }
+
+
 }
 
 public class GetUserRolesValidator : AbstractValidator<GetUserRolesRequest>
@@ -37,7 +40,7 @@ public class GetUserRolesHandler : IRequestHandler<GetUserRolesRequest, GetUserR
     public async Task<GetUserRolesResult> Handle(GetUserRolesRequest request, CancellationToken cancellationToken)
     {
         var result = await _securityService.GetUserRolesAsync(
-            request.UserId ?? "",
+            request.userGroupId,
             cancellationToken
             );
 
