@@ -5,8 +5,8 @@
         if (!isAuthorized) {
             Swal.fire({
                 icon: 'error',
-                title: 'Unauthorized',
-                text: 'You are being redirected...',
+                title: 'Access Denied',
+                text: 'You don’t have permission to this screen. Redirecting...',
                 timer: 2000,
                 showConfirmButton: false
             });

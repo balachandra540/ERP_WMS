@@ -193,11 +193,11 @@
                 isValid = false;
             }
 
-            ////  Validate warehouse selection
-            //if (!state.wareHouse) {
-            //    state.errors.wareHouse = 'Location is required.';
-            //    isValid = false;
-            //}
+            //  Validate warehouse selection
+            if (!state.wareHouse) {
+                state.errors.wareHouse = 'Default Location is required.';
+                isValid = false;
+            }
 
             if (!state.id) {
                 if (!state.password) {
@@ -584,7 +584,7 @@
                 try {
                     state.isSubmitting = true;
                     await new Promise(resolve => setTimeout(resolve, 300));
-
+                    debugger;
                     if (!validateForm()) {
                         return;
                     }
@@ -603,6 +603,7 @@
                             state.wareHouse,
                             state.userGroupId // <--- Pass the state value here
                         )
+
                         : state.deleteMode
                             ? await services.deleteMainData(state.id, StorageManager.getUserId())
                             : await services.updateMainData(
@@ -732,7 +733,7 @@
                     }
 
                     let response;
-
+                    let isLocalCreate = false;
                     // ================= CREATE =================
                     if (!state.editMode && !state.deleteMode) {
                         if (state.id) {
@@ -744,7 +745,17 @@
                             );
                         }
                         else {
-
+                            // NEW User (No ID yet): Store locally in state
+                            // Assuming state.wareHouseList is where you keep the grid data
+                            const newLocation = {
+                                wareHouse: state.wareHouse,
+                                isDefaultLocation: state.isDefaultLocation
+                            };
+                            isLocalCreate = true; // Flag to skip the API response check
+                            setTimeout(() => {
+                                LocationModal.obj.hide();
+                            }, 1500);
+                            return;
                         }
                     }
                     // ================= DELETE =================
@@ -763,10 +774,14 @@
                             StorageManager.getUserId()
                         );
                     }
+                    // Handle Success (Either API success OR Local Storage success)
+                    const isSuccess = isLocalCreate || (response && (response.data.code === 200 || response.data.success === true));
 
-                    if (response.data.code === 200 || response.data.success === true) {
-
-                        await methods.populateUserLocationData(state.id);
+                    if (isSuccess) {
+                        // Only refresh from server if we actually have a User ID
+                        if (state.id) {
+                            await methods.populateUserLocationData(state.id);
+                        }
                         LocationGrid.refresh();
 
                         Swal.fire({
@@ -780,7 +795,25 @@
                             LocationModal.obj.hide();
                         }, 1500);
 
-                    } else {
+                    } 
+                    //if (response.data.code === 200 || response.data.success === true) {
+
+                    //    await methods.populateUserLocationData(state.id);
+                    //    LocationGrid.refresh();
+
+                    //    Swal.fire({
+                    //        icon: 'success',
+                    //        title: state.deleteMode ? 'Delete Successful' : 'Save Successful',
+                    //        timer: 1500,
+                    //        showConfirmButton: false
+                    //    });
+
+                    //    setTimeout(() => {
+                    //        LocationModal.obj.hide();
+                    //    }, 1500);
+
+                    //}
+                    else {
                         Swal.fire({
                             icon: 'error',
                             title: state.deleteMode ? 'Delete Failed' : 'Save Failed',

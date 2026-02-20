@@ -2252,6 +2252,12 @@ const App = {
                 state.errors.taxId = '';
                 state.errors.orderStatus = '';
                 taxListLookup.trackingChange = false;
+                // 9️⃣ Update Vue state
+                state.subTotalAmount = 0;
+                state.discountAmount = 0;
+                state.taxAmount = 0;
+                state.totalAmount = 0;
+                secondaryGrid.clearBatchChanges();
             },
             onMainModalShown: () => {
                 if (state.isAddMode) {
@@ -2318,7 +2324,7 @@ const App = {
                 if (product.imei2) fields.push("imeI2");
                 if (product.serviceNo) fields.push("serviceNo");
 
-                const existingDetails = rowData.attributes || [];
+                const existingDetails = rowData.attributes || rowData.detailEntries || [];
 
                 // -------------------------------------------------------
                 // 6. BUILD HTML TABLE
@@ -2763,8 +2769,14 @@ const App = {
                     if (idx !== -1) currentData[idx] = { ...currentData[idx], ...upd };
                 });
 
+                // check exist or not
+                added.forEach(ad => {
+                    const idx = currentData.findIndex(item => item.id === ad.id);
+                    if (idx !== -1) currentData[idx] = { ...currentData[idx], ...ad };
+                });
+
                 // 4️⃣ Apply additions
-                currentData.push(...added);
+                //currentData.push(...added);
 
                 // 5️⃣ Apply deletions
                 if (deleted.length > 0) {
@@ -4009,7 +4021,7 @@ const App = {
                                                         //    totalObj.value = finalPrice * quantityObj.value;
                                                         //}
 
-                                                        // 🔥 DATA (THIS WAS MISSING)
+                                                        //  DATA (THIS WAS MISSING)
                                                         args.rowData.taxAmount = calc.taxPerUnit;
                                                         args.rowData.totalAfterTax = calc.rateAfterTax;
                                                         args.rowData.total = calc.total;

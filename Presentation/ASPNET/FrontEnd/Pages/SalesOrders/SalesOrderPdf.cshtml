@@ -253,6 +253,7 @@
                     </button>
                 </div>
                 <div id="content" class="print-area">
+                    <h1 class="invoice-title">TAX INVOICE</h1>
 
                     <!-- Header Section -->
                     <div class="invoice-header">
@@ -286,7 +287,6 @@
                         </div>
                     </div>
 
-                    <h1 class="invoice-title">TAX INVOICE</h1>
 
                     <!-- Customer Section -->
                     <div class="customer-section">
@@ -310,7 +310,7 @@
                     </div>
 
                     <!-- Product Table -->
-                    <table class="product-table">
+@*                     <table class="product-table">
                         <thead>
                             <tr>
                                 <th>Sl No</th>
@@ -332,9 +332,91 @@
                             </tr>
                         </tbody>
                     </table>
+ *@
+                    <table class="main-product-table">
+                        <thead>
+                            <tr>
+                                <th width="5%">SI No.</th>
+                                <th width="30%">Description of Goods</th>
+                                <th width="10%">HSN/SAC</th>
+                                <th width="8%">Qty</th>
+                                <th width="10%">Rate</th>
+                                <th width="12%">Gross Amt</th>
+                                <th width="10%">Disc (%)</th>
+                                <th width="15%">Taxable Value</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr v-for="(item, index) in state.items" :key="index">
+                                <td class="text-center">{{ index + 1 }}</td>
+                                <td>
+                                    <strong>{{ item?.product?.name }}</strong>
+                                    <div v-if="item.serialNumber" class="serial-text">{{ item.serialNumber }}</div>
+                                </td>
+                                <td class="text-center">{{ item?.product?.hsnCode }}</td>
+                                <td class="text-center">{{ item?.quantity }} NOS</td>
+                                <td class="text-right">{{ NumberFormatManager.formatToLocale(item.unitPrice) }}</td>
 
+                                <td class="text-right">
+                                    {{ NumberFormatManager.formatToLocale(Number(item.unitPrice || 0) * Number(item.quantity || 0)) }}
+                                </td>
+
+                                <td class="text-center">
+                                    {{ item.discountPercentage }}%
+                                    <br>
+                                    <small>(-{{ NumberFormatManager.formatToLocale(item.discountAmount) }})</small>
+                                </td>
+
+                                <td class="text-right">
+                                    {{ NumberFormatManager.formatToLocale(item.beforeTaxAmount) }}
+                                </td>
+                            </tr>
+
+                            <tr class="spacer-row">
+                                <td>
+                                </td>
+                                <td></td>
+                                <td></td>
+                                <td></td>
+                                <td></td>
+                                <td></td>
+                                <td></td>
+                                <td></td>
+                            </tr>
+
+                            <tr>
+                                <td colspan="7" class="text-right"><strong>Total Taxable Value</strong></td>
+                                <td class="text-right fw-bold">{{ state.subTotal }}</td>
+                            </tr>
+
+                            <tr v-if="state.roundOffRaw !== 0">
+                                <td colspan="7" class="text-right border-0">Discount</td>
+                                <td class="text-right">{{ state.roundOff }}</td>
+                            </tr>
+
+                            <tr>
+                                <td colspan="7" class="text-right border-0">CGST TAX (9%)</td>
+                                <td class="text-right">{{ state.cgst }}</td>
+                            </tr>
+                            <tr>
+                                <td colspan="7" class="text-right border-0">SGST TAX (9%)</td>
+                                <td class="text-right">{{ state.sgst }}</td>
+                            </tr>
+                           
+                            <tr class="grand-total-row">
+                                <td colspan="5" class="text-left">
+                                <div class="amount-words">
+                                    <strong>Amount in Words:</strong>
+                                    <p>{{ state.amountInWords }}</p>
+                                </div>
+                                </td>
+                                <td colspan="2" class="text-right"><strong>Grand Total</strong></td>
+                                <td class="text-right fw-bold bg-light">₹ {{ state.totalAmount }}</td>
+                            </tr>
+                        </tbody>
+                    </table>
                     <!-- Tax Summary -->
-                    <div class="summary-section">
+@*                     <div class="summary-section">
 
                         <div class="amount-words">
                             <strong>Amount in Words:</strong>
@@ -348,6 +430,10 @@
                                     <td class="text-right">{{ state.subTotal }}</td>
                                 </tr>
                                 <tr>
+                                    <td>Discount Amt</td>
+                                    <td class="text-right">{{ state.roundOff }}</td>
+                                </tr>
+                                <tr>
                                     <td>CGST (9%)</td>
                                     <td class="text-right">{{ state.cgst }}</td>
                                 </tr>
@@ -355,10 +441,7 @@
                                     <td>SGST (9%)</td>
                                     <td class="text-right">{{ state.sgst }}</td>
                                 </tr>
-                                <tr>
-                                    <td>Round Off</td>
-                                    <td class="text-right">{{ state.roundOff }}</td>
-                                </tr>
+                                
                                 <tr class="grand-total">
                                     <td>Total</td>
                                     <td class="text-right">{{ state.totalAmount }}</td>
@@ -367,7 +450,7 @@
                         </div>
 
                     </div>
-
+ *@
                     <!-- Declaration -->
                     <div class="declaration">
                         <p>
@@ -603,6 +686,44 @@
     .signature {
         text-align: right;
         margin-top: 30px;
+    }
+
+
+
+     
+    .main-product-table {
+        border: 1px solid #000;
+        margin-top: -1px; /* Prevents double borders between sections */
+    }
+
+    .main-product-table th {
+        font-size: 11px;
+        text-transform: uppercase;
+        border: 1px solid #000;
+        padding: 8px 4px;
+    }
+
+    .main-product-table td {
+        border-right: 1px solid #000;
+        padding: 5px;
+        font-size: 11px;
+    }
+
+    .serial-text {
+        font-size: 9px;
+        color: #444;
+        font-style: italic;
+        margin-top: 2px;
+    }
+
+    .grand-total-row td {
+        border-top: 1px solid #000;
+        font-size: 14px;
+    }
+
+    .spacer-row td {
+        height: 150px; /* Adjust this to make the invoice look "full" */
+        border-bottom: none;
     }
 
 </style>

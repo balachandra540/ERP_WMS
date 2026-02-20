@@ -215,9 +215,16 @@ const App = {
 
         const methods = {
             populatePDFData: async (id) => {
+                debugger;
                 const response = await services.getPDFData(id);
                 const pdfData = response?.data?.content?.data || {};
                 state.items = pdfData.salesOrderItemList || [];
+                // Inside populatePDFData loop
+                //state.items = pdfData.salesOrderItemList.map(item => ({
+                //    ...item,
+                //    formattedGross: NumberFormatManager.formatToLocale(item.unitPrice * item.quantity),
+                //    formattedUnitPrice: NumberFormatManager.formatToLocale(item.unitPrice)
+                //}));
                 state.customer = pdfData.customer || {};
                 state.orderNumber = pdfData.number || '';
                 state.orderDate = DateFormatManager.formatToLocale(pdfData.orderDate) || '';
@@ -352,7 +359,10 @@ const App = {
 
         return {
             state,
-            handler
+            handler,
+            // Add these so the HTML template can "see" them
+            NumberFormatManager,
+            DateFormatManager
         };
     }
 };

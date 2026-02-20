@@ -556,6 +556,22 @@ namespace Infrastructure.SecurityManager.AspNetIdentity;
 
         if (exists)
             throw new Exception("Location already assigned to this user.");
+        if (isDefaultLocation)
+        {
+            await _context.UserWarehouses
+                .Where(x => x.UserId == userId && x.IsDefaultLocation && !x.IsDeleted)
+                .ExecuteUpdateAsync(setters => setters
+                    .SetProperty(x => x.IsDefaultLocation, false),
+                    cancellationToken);
+
+            // 3. Update the 'wareHouse' column in the AspNetUsers table
+            var user = await _userManager.FindByIdAsync(userId);
+            if (user != null)
+            {
+                user.wareHouse = locationId; // Update the user's primary warehouse field
+                await _userManager.UpdateAsync(user);
+            }
+        }
 
         var entity = new UserWarehouse
         {
@@ -563,11 +579,15 @@ namespace Infrastructure.SecurityManager.AspNetIdentity;
             WarehouseId = locationId,
             IsDefaultLocation = isDefaultLocation,
             IsDeleted = false,
-            CreatedAtUtc = DateTime.UtcNow,
+            CreatedAtUtc = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
             CreatedById = createdById
         };
 
-        await _userWareHouse.CreateAsync(entity);
+        //await _userWareHouse.CreateAsync(entity, cancellationToken);
+        // Replace await _userWareHouse.CreateAsync(entity); with:
+        await _context.UserWarehouses.AddAsync(entity, cancellationToken);
+
+        // Now this will work because _context is tracking 'entity'
         var result = await _context.SaveChangesAsync(cancellationToken);
         Console.WriteLine("Rows affected: " + result);
 
@@ -602,22 +622,7 @@ namespace Infrastructure.SecurityManager.AspNetIdentity;
         // unset any other default location for this user
         if (isDefaultLocation)
         {
-            var previousDefaults = await _context.UserWarehouses
-                .Where(x => x.UserId == entity.UserId
-                            && x.Id != entity.Id
-                            && x.IsDefaultLocation
-                            && !x.IsDeleted)
-                .ToListAsync(cancellationToken);
-
-            foreach (var item in previousDefaults)
-            {
-                item.IsDefaultLocation = false;
-                item.UpdatedAtUtc = DateTime.UtcNow;
-                item.UpdatedById = updatedById;
-            }
-        }
-        if (isDefaultLocation)
-        {
+            
             await _context.UserWarehouses
                 .Where(x => x.UserId == entity.UserId
                             && x.Id != entity.Id
@@ -627,17 +632,27 @@ namespace Infrastructure.SecurityManager.AspNetIdentity;
                     .SetProperty(x => x.IsDefaultLocation, false)
                     .SetProperty(x => x.UpdatedById, updatedById),
                     cancellationToken);
+            // 3. Update the 'wareHouse' column in the AspNetUsers table
+            var user = await _userManager.FindByIdAsync(entity.UserId);
+            if (user != null)
+            {
+                user.wareHouse = locationId;
+                // If your ApplicationUser has an UpdatedAt or similar field, fix it here too:
+                user.UpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
+
+                await _userManager.UpdateAsync(user);
+            }
         }
 
 
         // Update current entity
         entity.WarehouseId = locationId;
-        entity.UpdatedAtUtc = DateTime.UtcNow;
+        entity.UpdatedAtUtc = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
         entity.UpdatedById = updatedById;
         entity.IsDefaultLocation = isDefaultLocation;
 
-        _userWareHouse.Update(entity);
-
+        // No need for _context.Update(entity) here because 'entity' is already tracked.
+        // SaveChanges will detect the property changes automatically.
         await _context.SaveChangesAsync(cancellationToken);
 
         return new UpdateUserLocationsListDto
@@ -647,8 +662,9 @@ namespace Infrastructure.SecurityManager.AspNetIdentity;
             LocationId = entity.WarehouseId,
             IsDefaultLocation = entity.IsDefaultLocation,
             IsDeleted = entity.IsDeleted,
-            CreatedAtUtc = entity.CreatedAtUtc,
-            CreatedById = entity.CreatedById
+            CreatedAtUtc = entity.UpdatedAtUtc,
+            CreatedById = entity.UpdatedById,
+            
         };
     }
 
@@ -726,6 +742,22 @@ namespace Infrastructure.SecurityManager.AspNetIdentity;
             await _userManager.AddToRoleAsync(user, RoleHelper.GetProfileRole());
         }
 
+        // 3. Link the Warehouse in the mapping table as DEFAULT
+        if (!string.IsNullOrEmpty(warehouse))
+        {
+            var userLocation = new UserWarehouse
+            {
+                UserId = user.Id, // ID generated by UserManager
+                WarehouseId = warehouse,
+                IsDefaultLocation = true,
+                IsDeleted = false,
+                CreatedAtUtc = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+                CreatedById = createdById
+            };
+
+            await _context.UserWarehouses.AddAsync(userLocation, cancellationToken);
+            await _context.SaveChangesAsync(cancellationToken);
+        }
         return new CreateUserResultDto
         {
             UserId = user.Id,
