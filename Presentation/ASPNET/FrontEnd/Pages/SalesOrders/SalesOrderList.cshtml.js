@@ -4211,14 +4211,10 @@ const App = {
                                         };
 
                                         detailModalEl?.addEventListener('hidden.bs.modal', autoAddNextRow);
+                                        
 
-                                                        // 🔥 DATA (THIS WAS MISSING)
-                                                        args.rowData.taxAmount = calc.taxPerUnit;
-                                                        args.rowData.totalAfterTax = calc.rateAfterTax;
-                                                        args.rowData.total = calc.total;
-                                                    }
-                                                }
-                                            }
+                                        await methods.openDetailModal(rowIndex);
+
 
                                         if (injected && !rowData.id) {
                                             state.secondaryData.splice(rowIndex, 1);
