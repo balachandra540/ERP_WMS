@@ -2637,9 +2637,9 @@ const App = {
                 // Iterate detail rows
                 // -------------------------------
                 row.detailEntries.forEach((entry, index) => {
-                    const imei1 = (entry.IMEI1 || entry.imeI1 ||"").trim();
-                    const imei2 = (entry.IMEI2 || entry.imeI2 || "").trim();
-                    const serviceNo = (entry.ServiceNo || entry.serviceNo || "").trim();
+                    const imei1 = (entry.IMEI1 || entry.imeI1 || null).trim();
+                    const imei2 = (entry.IMEI2 || entry.imeI2 || null).trim();
+                    const serviceNo = (entry.ServiceNo || entry.serviceNo || null).trim();
 
                     // -------------------------------
                     // REQUIRED FIELD VALIDATION
@@ -2664,6 +2664,17 @@ const App = {
                     if (product.imei1 && product.imei2) {
                         if (imei1 && imei2 && imei1 === imei2) {
                             errors.push(`IMEI1 and IMEI2 cannot be same at row ${index + 1}`);
+                        }
+                    }
+                    if (product.imei1 && product.serviceNo) {
+                        if (imei1 && serviceNo && imei1 === serviceNo) {
+                            errors.push(`IMEI1 and ServiceNumber cannot be same at row ${index + 1}`);
+                        }
+                    }
+
+                    if (product.imei2 && product.serviceNo) {
+                        if (imei2 && serviceNo && imei2 === serviceNo) {
+                            errors.push(`IMEI2 and ServiceNumber cannot be same at row ${index + 1}`);
                         }
                     }
 
@@ -2778,11 +2789,11 @@ const App = {
                     totalTaxAmount += calc.taxPerUnit;
                 });
                 // 7️⃣ Tax calculation
-                const taxRate = parseFloat(state.selectedTaxRate || 0); // e.g. 18
-                const taxAmount = (totalAfterDiscount * taxRate) / 100;
+                //const taxRate = parseFloat(state.selectedTaxRate || 0); // e.g. 18
+                //const taxAmount = (totalAfterDiscount * taxRate) / 100;
 
                 // 8️⃣ Final payable
-                const finalTotal = totalAfterDiscount + taxAmount;
+                const finalTotal = totalAfterDiscount + totalTaxAmount;
 
                 // 9️⃣ Update Vue state
                 state.subTotalAmount = NumberFormatManager.formatToLocale(totalGross);
@@ -4252,7 +4263,7 @@ const App = {
                                                 ...state.secondaryData,
                                                 ...secondaryGrid.manualBatchChanges.addedRecords
                                             ];
-                                            const duplicateRow = allGridData.find(r => r.productId === productId);
+                                            const duplicateRow = allGridData.find(r => r.pluCode === enteredPLU);
 
                                             if (duplicateRow) {
                                                 // ════════════════ DUPLICATE PATH ═════════════════

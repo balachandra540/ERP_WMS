@@ -18,7 +18,7 @@ public partial class InventoryTransactionService
     {
         var parent = await _queryContext
             .GoodsReceive
-            .AsNoTracking()
+            //.AsNoTracking()
             .SingleOrDefaultAsync(x => x.Id == moduleId, cancellationToken);
 
         if (parent == null)

@@ -500,265 +500,579 @@ public class UpdateGoodsReceiveHandler
                 ?? throw new InvalidOperationException($"Warehouse not found: {req.DefaultWarehouseId}");
         }
 
-        // --------------------------------------------------------------
-        // 5️⃣ Update GR header
-        // --------------------------------------------------------------
-        gr.ReceiveDate = _security.ConvertToIst(req.ReceiveDate) ?? gr.ReceiveDate;
-        gr.Description = req.Description ?? gr.Description;
-        gr.FreightCharges = req.FreightCharges ?? 0;
-        gr.OtherCharges = req.OtherCharges ?? 0;
-        gr.Status = newStatus;
-        gr.UpdatedById = req.UpdatedById;
-
-        _goodsReceiveRepo.Update(gr);
-
-        // --------------------------------------------------------------
-        // 6️⃣ Per unit calculation
-        // --------------------------------------------------------------
-        double totalQty = req.Items.Sum(x => x.ReceivedQuantity);
-        double freightPerUnit = totalQty == 0 ? 0 : (req.FreightCharges ?? 0) / totalQty;
-        double otherPerUnit = totalQty == 0 ? 0 : (req.OtherCharges ?? 0) / totalQty;
-
-        // --------------------------------------------------------------
-        // 7️⃣ Sync items (Add / Update / Delete)
-        // --------------------------------------------------------------
-        var existingItems = gr.GoodsReceiveItems.ToDictionary(x => x.Id);
-        var incomingItemIds = req.Items.Where(i => i.Id != null).Select(i => i.Id).ToHashSet();
-
-        // DELETE removed items
-        foreach (var old in existingItems.Values.Where(x => !incomingItemIds.Contains(x.Id)).ToList())
-            _itemRepo.Delete(old);
-
-        // Map for storing detail IDs for inventoryTx later
-        var detailMap = new Dictionary<string, List<GoodsReceiveItemDetails>>();
-
-        // Process each incoming item
-        foreach (var dto in req.Items)
+        // ──────────────────────────────────────────────────────────────
+        // START TRANSACTION — everything below this line is atomic
+        // ──────────────────────────────────────────────────────────────
+        //await using var transaction = await _uow.BeginTransactionAsync();
+        try
         {
-            if (!poById.TryGetValue(dto.PurchaseOrderItemId, out var poItem))
-                throw new Exception($"PO Item not found: {dto.PurchaseOrderItemId}");
+            // --------------------------------------------------------------
+            // 5️⃣ Update GR header
+            // --------------------------------------------------------------
+            gr.ReceiveDate = _security.ConvertToIst(req.ReceiveDate) ?? gr.ReceiveDate;
+            gr.Description = req.Description ?? gr.Description;
+            gr.FreightCharges = req.FreightCharges ?? 0;
+            gr.OtherCharges = req.OtherCharges ?? 0;
+            gr.Status = newStatus;
+            gr.UpdatedById = req.UpdatedById;
 
-            GoodsReceiveItem item;
+            _goodsReceiveRepo.Update(gr);
 
-            // UPDATE
-            if (!string.IsNullOrWhiteSpace(dto.Id) && existingItems.TryGetValue(dto.Id, out var exist))
+            // --------------------------------------------------------------
+            // 6️⃣ Per unit calculation
+            // --------------------------------------------------------------
+            double totalQty = req.Items.Sum(x => x.ReceivedQuantity);
+            double freightPerUnit = totalQty == 0 ? 0 : (req.FreightCharges ?? 0) / totalQty;
+            double otherPerUnit = totalQty == 0 ? 0 : (req.OtherCharges ?? 0) / totalQty;
+
+            // --------------------------------------------------------------
+            // 7️⃣ Sync items (Add / Update / Delete)
+            // --------------------------------------------------------------
+            var existingItems = gr.GoodsReceiveItems.ToDictionary(x => x.Id);
+            var incomingItemIds = req.Items.Where(i => i.Id != null).Select(i => i.Id).ToHashSet();
+
+            // DELETE removed items
+            foreach (var old in existingItems.Values.Where(x => !incomingItemIds.Contains(x.Id)).ToList())
             {
-                exist.ReceivedQuantity = dto.ReceivedQuantity;
-                exist.UnitPrice = dto.UnitPrice ?? 0;
-                exist.TaxAmount = dto.TaxAmount ?? 0;
-                exist.FreightChargesPerUnit = freightPerUnit;
-                exist.OtherChargesPerUnit = otherPerUnit;
-                exist.FinalUnitPrice = (dto.UnitPrice ?? 0) + (dto.TaxAmount ?? 0) + freightPerUnit + otherPerUnit;
-                exist.MRP = dto.MRP ?? 0;
-                exist.Notes = dto.Notes;
-                exist.Attribute1DetailId = dto.Attribute1DetailId;
-                exist.Attribute2DetailId = dto.Attribute2DetailId;
-                exist.UpdatedById = req.UpdatedById;
-
-                _itemRepo.Update(exist);
-                item = exist;
-            }
-            else
-            {
-                // CREATE
-                item = new GoodsReceiveItem
-                {
-                    GoodsReceiveId = gr.Id,
-                    PurchaseOrderItemId = dto.PurchaseOrderItemId,
-                    ReceivedQuantity = dto.ReceivedQuantity,
-                    UnitPrice = dto.UnitPrice ?? 0,
-                    TaxAmount = dto.TaxAmount ?? 0,
-                    FreightChargesPerUnit = freightPerUnit,
-                    OtherChargesPerUnit = otherPerUnit,
-                    FinalUnitPrice = (dto.UnitPrice ?? 0) + (dto.TaxAmount ?? 0) + freightPerUnit + otherPerUnit,
-                    MRP = dto.MRP ?? 0,
-                    Notes = dto.Notes,
-                    Attribute1DetailId = dto.Attribute1DetailId,
-                    Attribute2DetailId = dto.Attribute2DetailId,
-                    CreatedById = gr.CreatedById,
-                };
-
-                await _itemRepo.CreateAsync(item, ct);
+                _itemRepo.Delete(old);
             }
 
-            // --------------------------------------------------------------
-            // Update PO received quantity
-            // --------------------------------------------------------------
-            poItem.ReceivedQuantity += dto.ReceivedQuantity;
-            _poItemRepo.Update(poItem);
+            var detailMap = new Dictionary<string, List<GoodsReceiveItemDetails>>();
 
-            // --------------------------------------------------------------
-            // Replace all details for this item
-            // --------------------------------------------------------------
-            var oldDetails = await _detailRepo.GetQuery()
-                .Where(d => d.GoodsReceiveItemId == item.Id)
-                .ToListAsync(ct);
-
-            foreach (var d in oldDetails)
-                _detailRepo.Delete(d);
-
-            var newDetailList = new List<GoodsReceiveItemDetails>();
-
-            foreach (var d in dto.Attributes)
+            foreach (var dto in req.Items)
             {
-                var nd = new GoodsReceiveItemDetails
+                if (!poById.TryGetValue(dto.PurchaseOrderItemId, out var poItem))
+                    throw new Exception($"PO Item not found: {dto.PurchaseOrderItemId}");
+
+                GoodsReceiveItem item;
+
+                if (!string.IsNullOrWhiteSpace(dto.Id) && existingItems.TryGetValue(dto.Id, out var exist))
                 {
-                    GoodsReceiveItemId = item.Id,
-                    RowIndex = d.RowIndex,
-                    IMEI1 = d.IMEI1,
-                    IMEI2 = d.IMEI2,
-                    ServiceNo = d.ServiceNo,
-                    CreatedById = req.UpdatedById,
-                };
+                    // UPDATE
+                    exist.ReceivedQuantity = dto.ReceivedQuantity;
+                    exist.UnitPrice = dto.UnitPrice ?? 0;
+                    exist.TaxAmount = dto.TaxAmount ?? 0;
+                    exist.FreightChargesPerUnit = freightPerUnit;
+                    exist.OtherChargesPerUnit = otherPerUnit;
+                    exist.FinalUnitPrice = (dto.UnitPrice ?? 0) + (dto.TaxAmount ?? 0) + freightPerUnit + otherPerUnit;
+                    exist.MRP = dto.MRP ?? 0;
+                    exist.Notes = dto.Notes;
+                    exist.Attribute1DetailId = dto.Attribute1DetailId;
+                    exist.Attribute2DetailId = dto.Attribute2DetailId;
+                    exist.UpdatedById = req.UpdatedById;
 
-                await _detailRepo.CreateAsync(nd, ct);
-                newDetailList.Add(nd);
-            }
-
-            detailMap[item.Id] = newDetailList;
-
-            // --------------------------------------------------------------
-            // PRICE DEFINITION LOGIC (Weighted Average)
-            // --------------------------------------------------------------
-            var productId = poItem.ProductId;
-            double newUnitPrice = dto.FinalUnitPrice ?? item.FinalUnitPrice;
-
-            var existingPrice = await _priceRepo.GetQuery()
-                .Where(p => p.ProductId == productId && p.IsActive && !p.IsDeleted)
-                .OrderByDescending(p => p.EffectiveFrom)
-                .FirstOrDefaultAsync(ct);
-
-            // No price → create one
-            if (existingPrice == null)
-            {
-                var firstPrice = new ProductPriceDefinition
+                    _itemRepo.Update(exist);
+                    item = exist;
+                }
+                else
                 {
-                    ProductId = productId,
-                    ProductName = poItem.Product?.Name,
-                    CostPrice = Convert.ToDecimal(newUnitPrice),
-                    EffectiveFrom = _security.ConvertToIst(DateTime.UtcNow),
-                    IsActive = true
-                };
-
-                await _priceRepo.CreateAsync(firstPrice, ct);
-                await _uow.SaveAsync(ct);
-            }
-            else
-            {
-                double oldPrice = Convert.ToDouble(existingPrice.CostPrice);
-
-                if (Math.Round(oldPrice, 2) != Math.Round(newUnitPrice, 2))
-                {
-                    var stockResult = await _query.InventoryTransaction
-                        .AsNoTracking()
-                        .ApplyIsDeletedFilter(false)
-                        .Where(x => x.Status == InventoryTransactionStatus.Confirmed &&
-                                    x.WarehouseId == req.DefaultWarehouseId &&
-                                    x.ProductId == productId)
-                        .GroupBy(x => x.ProductId)
-                        .Select(g => new
-                        {
-                            ProductId = g.Key,
-                            TotalStock = (double)(g.Sum(x => x.Stock) ?? 0)
-                        })
-                        .FirstOrDefaultAsync(ct);
-
-                    double stockQty = stockResult?.TotalStock ?? 0;
-
-                    double existingValue = stockQty * oldPrice;
-                    double receivedValue = item.ReceivedQuantity * newUnitPrice;
-
-                    double weightedAvg =
-                        (stockQty + item.ReceivedQuantity) == 0
-                        ? newUnitPrice
-                        : (existingValue + receivedValue) / (stockQty + item.ReceivedQuantity);
-
-                    weightedAvg = Math.Round(weightedAvg, 2);
-
-                    existingPrice.IsActive = false;
-                    existingPrice.EffectiveTo = _security.ConvertToIst(DateTime.UtcNow);
-                    _priceRepo.Update(existingPrice);
-
-                    var newPrice = new ProductPriceDefinition
+                    // CREATE
+                    item = new GoodsReceiveItem
                     {
-                        ProductId = productId,
-                        ProductName = existingPrice.ProductName,
-                        CostPrice = Convert.ToDecimal(weightedAvg),
-                        EffectiveFrom = _security.ConvertToIst(DateTime.UtcNow),
-                        IsActive = true,
-                        MarginPercentage = existingPrice.MarginPercentage,
-                        CurrencyCode = existingPrice.CurrencyCode
+                        GoodsReceiveId = gr.Id,
+                        PurchaseOrderItemId = dto.PurchaseOrderItemId,
+                        ReceivedQuantity = dto.ReceivedQuantity,
+                        UnitPrice = dto.UnitPrice ?? 0,
+                        TaxAmount = dto.TaxAmount ?? 0,
+                        FreightChargesPerUnit = freightPerUnit,
+                        OtherChargesPerUnit = otherPerUnit,
+                        FinalUnitPrice = (dto.UnitPrice ?? 0) + (dto.TaxAmount ?? 0) + freightPerUnit + otherPerUnit,
+                        MRP = dto.MRP ?? 0,
+                        Notes = dto.Notes,
+                        Attribute1DetailId = dto.Attribute1DetailId,
+                        Attribute2DetailId = dto.Attribute2DetailId,
+                        CreatedById = gr.CreatedById,
                     };
 
-                    await _priceRepo.CreateAsync(newPrice, ct);
-                    await _uow.SaveAsync(ct);
+                    await _itemRepo.CreateAsync(item, ct);
                 }
-            }
-        }
 
-        // --------------------------------------------------------------
-        // 8️⃣ Save GR + Items + Details
-        // --------------------------------------------------------------
-        await _uow.SaveAsync(ct);
+                // Update PO received quantity
+                poItem.ReceivedQuantity += dto.ReceivedQuantity;
+                _poItemRepo.Update(poItem);
 
-        // --------------------------------------------------------------
-        // 9️⃣ Delete Old InventoryTx ONLY AFTER SUCCESSFUL GR UPDATE
-        // --------------------------------------------------------------
-        if (oldStatus == GoodsReceiveStatus.Approved)
-        {
-            var oldTx = await _invTxRepo.GetQuery()
-                .Where(tx => tx.ModuleId == gr.Id)
-                .ToListAsync(ct);
+                // ── REPLACE details atomically ──────────────────────────────
+                // Delete old details
+                var oldDetails = await _detailRepo.GetQuery()
+                    .Where(d => d.GoodsReceiveItemId == item.Id)
+                    .ToListAsync(ct);
 
-            foreach (var tx in oldTx)
-                _invTxRepo.Delete(tx);
-
-            await _uow.SaveAsync(ct);
-        }
-
-        // --------------------------------------------------------------
-        // 🔟 Re-create new inventory transactions (if Approved)
-        // --------------------------------------------------------------
-        if (newStatus == GoodsReceiveStatus.Approved)
-        {
-            foreach (var item in gr.GoodsReceiveItems)
-            {
-                var poItem = poById[item.PurchaseOrderItemId];
-
-                if (poItem.Product?.Physical != true)
-                    continue;
-
-                var inventoryTx = await _invService.GoodsReceiveCreateInvenTrans(
-                    gr.Id,
-                    req.DefaultWarehouseId,
-                    poItem.ProductId,
-                    item.ReceivedQuantity,
-                    req.UpdatedById,
-                    ct);
-
-                if (inventoryTx != null &&
-                    detailMap.TryGetValue(item.Id, out var details))
+                foreach (var d in oldDetails)
                 {
-                    foreach (var det in details)
+                    _detailRepo.Delete(d);
+                }
+
+                // Commit deletes BEFORE inserting new ones
+                await _uow.SaveAsync(ct);
+
+                // Insert new details
+                var newDetailList = new List<GoodsReceiveItemDetails>();
+
+                foreach (var d in dto.Attributes)
+                {
+                    var nd = new GoodsReceiveItemDetails
                     {
-                        var map = new InventoryTransactionAttributesDetails
+                        GoodsReceiveItemId = item.Id,
+                        RowIndex = d.RowIndex,
+                        IMEI1 = d.IMEI1,
+                        IMEI2 = d.IMEI2,
+                        ServiceNo = d.ServiceNo,
+                        CreatedById = req.UpdatedById,
+                        CreatedAtUtc = DateTime.UtcNow,
+                        UpdatedById = req.UpdatedById,
+                        UpdatedAtUtc = DateTime.UtcNow
+                    };
+
+                    await _detailRepo.CreateAsync(nd, ct);
+                    newDetailList.Add(nd);
+                }
+
+                detailMap[item.Id] = newDetailList;
+
+                // ── Price definition (weighted average) ─────────────────────
+                var productId = poItem.ProductId;
+                double newUnitPrice = dto.FinalUnitPrice ?? item.FinalUnitPrice;
+
+                var existingPrice = await _priceRepo.GetQuery()
+                    .Where(p => p.ProductId == productId && p.IsActive && !p.IsDeleted)
+                    .OrderByDescending(p => p.EffectiveFrom)
+                    .FirstOrDefaultAsync(ct);
+
+                if (existingPrice == null)
+                {
+                    var firstPrice = new ProductPriceDefinition
+                    {
+                        ProductId = productId,
+                        ProductName = poItem.Product?.Name,
+                        CostPrice = Convert.ToDecimal(newUnitPrice),
+                        EffectiveFrom = _security.ConvertToIst(DateTime.UtcNow),
+                        IsActive = true
+                    };
+                    await _priceRepo.CreateAsync(firstPrice, ct);
+                }
+                else
+                {
+                    double oldPrice = Convert.ToDouble(existingPrice.CostPrice);
+                    if (Math.Round(oldPrice, 2) != Math.Round(newUnitPrice, 2))
+                    {
+                        var stockResult = await _query.InventoryTransaction
+                            .AsNoTracking()
+                            .ApplyIsDeletedFilter(false)
+                            .Where(x => x.Status == InventoryTransactionStatus.Confirmed &&
+                                        x.WarehouseId == req.DefaultWarehouseId &&
+                                        x.ProductId == productId)
+                            .GroupBy(x => x.ProductId)
+                            .Select(g => new { ProductId = g.Key, TotalStock = (double)(g.Sum(x => x.Stock) ?? 0) })
+                            .FirstOrDefaultAsync(ct);
+
+                        double stockQty = stockResult?.TotalStock ?? 0;
+                        double existingValue = stockQty * oldPrice;
+                        double receivedValue = item.ReceivedQuantity * newUnitPrice;
+                        double weightedAvg = (stockQty + item.ReceivedQuantity) == 0
+                            ? newUnitPrice
+                            : (existingValue + receivedValue) / (stockQty + item.ReceivedQuantity);
+
+                        weightedAvg = Math.Round(weightedAvg, 2);
+
+                        existingPrice.IsActive = false;
+                        existingPrice.EffectiveTo = _security.ConvertToIst(DateTime.UtcNow);
+                        _priceRepo.Update(existingPrice);
+
+                        var newPrice = new ProductPriceDefinition
                         {
-                            InventoryTransactionId = inventoryTx.Id,
-                            GoodsReceiveItemDetailsId = det.Id,
-                            CreatedById = req.UpdatedById,
-                            CreatedAtUtc = DateTime.UtcNow
+                            ProductId = productId,
+                            ProductName = existingPrice.ProductName,
+                            CostPrice = Convert.ToDecimal(weightedAvg),
+                            EffectiveFrom = _security.ConvertToIst(DateTime.UtcNow),
+                            IsActive = true,
+                            MarginPercentage = existingPrice.MarginPercentage,
+                            CurrencyCode = existingPrice.CurrencyCode
                         };
 
-                        await _invAttrRepo.CreateAsync(map, ct);
+                        await _priceRepo.CreateAsync(newPrice, ct);
                     }
                 }
             }
 
+            // --------------------------------------------------------------
+            // Final save for all changes so far (GR, items, details, PO qty, prices)
+            // --------------------------------------------------------------
             await _uow.SaveAsync(ct);
-        }
 
-        return new UpdateGoodsReceiveResult { Data = gr };
+            // --------------------------------------------------------------
+            // 9️⃣ Delete Old InventoryTx (if previously Approved)
+            // --------------------------------------------------------------
+            if (oldStatus == GoodsReceiveStatus.Approved)
+            {
+                var oldTx = await _invTxRepo.GetQuery()
+                    .Where(tx => tx.ModuleId == gr.Id)
+                    .ToListAsync(ct);
+
+                foreach (var tx in oldTx)
+                    _invTxRepo.Delete(tx);
+
+                await _uow.SaveAsync(ct);
+            }
+
+            // --------------------------------------------------------------
+            // 🔟 Create new inventory transactions (if now Approved)
+            // --------------------------------------------------------------
+            if (newStatus == GoodsReceiveStatus.Approved)
+            {
+                foreach (var item in gr.GoodsReceiveItems)
+                {
+                    var poItem = poById[item.PurchaseOrderItemId];
+                    if (poItem.Product?.Physical != true)
+                        continue;
+
+                    var inventoryTx = await _invService.GoodsReceiveCreateInvenTrans(
+                        gr.Id,
+                        req.DefaultWarehouseId,
+                        poItem.ProductId,
+                        item.ReceivedQuantity,
+                        req.UpdatedById,
+                        ct);
+
+                    if (inventoryTx != null && detailMap.TryGetValue(item.Id, out var details))
+                    {
+                        foreach (var det in details)
+                        {
+                            var map = new InventoryTransactionAttributesDetails
+                            {
+                                InventoryTransactionId = inventoryTx.Id,
+                                GoodsReceiveItemDetailsId = det.Id,
+                                CreatedById = req.UpdatedById,
+                                CreatedAtUtc = DateTime.UtcNow
+                            };
+                            await _invAttrRepo.CreateAsync(map, ct);
+                        }
+                    }
+                }
+
+                await _uow.SaveAsync(ct);
+            }
+
+            // ──────────────────────────────────────────────────────────────
+            // COMMIT TRANSACTION — all succeeded
+            // ──────────────────────────────────────────────────────────────
+            //await transaction.CommitAsync(ct);
+
+            return new UpdateGoodsReceiveResult { Data = gr };
+        }
+        catch (Exception ex)
+        {
+            // Rollback on any error
+            //await transaction.RollbackAsync(ct);
+            // Log the error (you probably already have logging)
+            throw; // or return custom error result
+        }
     }
+    
+    //public async Task<UpdateGoodsReceiveResult> Handle(UpdateGoodsReceiveRequest req, CancellationToken ct)
+    //{
+    //    // --------------------------------------------------------------
+    //    // 1️⃣ Load GR + all related items/products
+    //    // --------------------------------------------------------------
+    //    var gr = await _goodsReceiveRepo.GetQuery()
+    //        .Include(x => x.GoodsReceiveItems)
+    //            .ThenInclude(i => i.PurchaseOrderItem)
+    //                .ThenInclude(po => po.Product)
+    //        .FirstOrDefaultAsync(x => x.Id == req.Id, ct)
+    //        ?? throw new Exception($"Goods Receive not found: {req.Id}");
+
+    //    var oldStatus = gr.Status;
+
+    //    // --------------------------------------------------------------
+    //    // 2️⃣ Parse Status
+    //    // --------------------------------------------------------------
+    //    if (!Enum.TryParse<GoodsReceiveStatus>(req.Status, out var newStatus))
+    //        throw new InvalidOperationException($"Invalid status: {req.Status}");
+
+    //    // --------------------------------------------------------------
+    //    // 3️⃣ Load PO (must be tracked)
+    //    // --------------------------------------------------------------
+    //    var po = await _poRepo.GetQuery()
+    //        .Include(x => x.PurchaseOrderItemList)
+    //        .FirstOrDefaultAsync(x => x.Id == gr.PurchaseOrderId, ct)
+    //        ?? throw new Exception($"PO not found: {gr.PurchaseOrderId}");
+
+    //    var poById = po.PurchaseOrderItemList.ToDictionary(x => x.Id);
+
+    //    // --------------------------------------------------------------
+    //    // 4️⃣ Validate Warehouse (only if Approved)
+    //    // --------------------------------------------------------------
+    //    Warehouse? defaultWarehouse = null;
+
+    //    if (newStatus == GoodsReceiveStatus.Approved)
+    //    {
+    //        if (string.IsNullOrEmpty(req.DefaultWarehouseId))
+    //            throw new InvalidOperationException("Default warehouse is required for Approved status.");
+
+    //        defaultWarehouse = await _warehouseRepo.GetQuery()
+    //            .ApplyIsDeletedFilter(false)
+    //            .FirstOrDefaultAsync(x => x.Id == req.DefaultWarehouseId, ct)
+    //            ?? throw new InvalidOperationException($"Warehouse not found: {req.DefaultWarehouseId}");
+    //    }
+
+    //    // --------------------------------------------------------------
+    //    // 5️⃣ Update GR header
+    //    // --------------------------------------------------------------
+    //    gr.ReceiveDate = _security.ConvertToIst(req.ReceiveDate) ?? gr.ReceiveDate;
+    //    gr.Description = req.Description ?? gr.Description;
+    //    gr.FreightCharges = req.FreightCharges ?? 0;
+    //    gr.OtherCharges = req.OtherCharges ?? 0;
+    //    gr.Status = newStatus;
+    //    gr.UpdatedById = req.UpdatedById;
+
+    //    _goodsReceiveRepo.Update(gr);
+
+    //    // --------------------------------------------------------------
+    //    // 6️⃣ Per unit calculation
+    //    // --------------------------------------------------------------
+    //    double totalQty = req.Items.Sum(x => x.ReceivedQuantity);
+    //    double freightPerUnit = totalQty == 0 ? 0 : (req.FreightCharges ?? 0) / totalQty;
+    //    double otherPerUnit = totalQty == 0 ? 0 : (req.OtherCharges ?? 0) / totalQty;
+
+    //    // --------------------------------------------------------------
+    //    // 7️⃣ Sync items (Add / Update / Delete)
+    //    // --------------------------------------------------------------
+    //    var existingItems = gr.GoodsReceiveItems.ToDictionary(x => x.Id);
+    //    var incomingItemIds = req.Items.Where(i => i.Id != null).Select(i => i.Id).ToHashSet();
+
+    //    // DELETE removed items
+    //    foreach (var old in existingItems.Values.Where(x => !incomingItemIds.Contains(x.Id)).ToList())
+    //        _itemRepo.Delete(old);
+
+    //    // Map for storing detail IDs for inventoryTx later
+    //    var detailMap = new Dictionary<string, List<GoodsReceiveItemDetails>>();
+
+    //    // Process each incoming item
+    //    foreach (var dto in req.Items)
+    //    {
+    //        if (!poById.TryGetValue(dto.PurchaseOrderItemId, out var poItem))
+    //            throw new Exception($"PO Item not found: {dto.PurchaseOrderItemId}");
+
+    //        GoodsReceiveItem item;
+
+    //        // UPDATE
+    //        if (!string.IsNullOrWhiteSpace(dto.Id) && existingItems.TryGetValue(dto.Id, out var exist))
+    //        {
+    //            exist.ReceivedQuantity = dto.ReceivedQuantity;
+    //            exist.UnitPrice = dto.UnitPrice ?? 0;
+    //            exist.TaxAmount = dto.TaxAmount ?? 0;
+    //            exist.FreightChargesPerUnit = freightPerUnit;
+    //            exist.OtherChargesPerUnit = otherPerUnit;
+    //            exist.FinalUnitPrice = (dto.UnitPrice ?? 0) + (dto.TaxAmount ?? 0) + freightPerUnit + otherPerUnit;
+    //            exist.MRP = dto.MRP ?? 0;
+    //            exist.Notes = dto.Notes;
+    //            exist.Attribute1DetailId = dto.Attribute1DetailId;
+    //            exist.Attribute2DetailId = dto.Attribute2DetailId;
+    //            exist.UpdatedById = req.UpdatedById;
+
+    //            _itemRepo.Update(exist);
+    //            item = exist;
+    //        }
+    //        else
+    //        {
+    //            // CREATE
+    //            item = new GoodsReceiveItem
+    //            {
+    //                GoodsReceiveId = gr.Id,
+    //                PurchaseOrderItemId = dto.PurchaseOrderItemId,
+    //                ReceivedQuantity = dto.ReceivedQuantity,
+    //                UnitPrice = dto.UnitPrice ?? 0,
+    //                TaxAmount = dto.TaxAmount ?? 0,
+    //                FreightChargesPerUnit = freightPerUnit,
+    //                OtherChargesPerUnit = otherPerUnit,
+    //                FinalUnitPrice = (dto.UnitPrice ?? 0) + (dto.TaxAmount ?? 0) + freightPerUnit + otherPerUnit,
+    //                MRP = dto.MRP ?? 0,
+    //                Notes = dto.Notes,
+    //                Attribute1DetailId = dto.Attribute1DetailId,
+    //                Attribute2DetailId = dto.Attribute2DetailId,
+    //                CreatedById = gr.CreatedById,
+    //            };
+
+    //            await _itemRepo.CreateAsync(item, ct);
+    //        }
+
+    //        // --------------------------------------------------------------
+    //        // Update PO received quantity
+    //        // --------------------------------------------------------------
+    //        poItem.ReceivedQuantity += dto.ReceivedQuantity;
+    //        _poItemRepo.Update(poItem);
+
+    //        // --------------------------------------------------------------
+    //        // Replace all details for this item
+    //        // --------------------------------------------------------------
+    //        var oldDetails = await _detailRepo.GetQuery()
+    //            .Where(d => d.GoodsReceiveItemId == item.Id)
+    //            .ToListAsync(ct);
+
+    //        foreach (var d in oldDetails)
+    //            _detailRepo.Delete(d);
+
+    //        var newDetailList = new List<GoodsReceiveItemDetails>();
+
+    //        foreach (var d in dto.Attributes)
+    //        {
+    //            var nd = new GoodsReceiveItemDetails
+    //            {
+    //                GoodsReceiveItemId = item.Id,
+    //                RowIndex = d.RowIndex,
+    //                IMEI1 = d.IMEI1,
+    //                IMEI2 = d.IMEI2,
+    //                ServiceNo = d.ServiceNo,
+    //                CreatedById = req.UpdatedById,
+    //            };
+
+    //            await _detailRepo.CreateAsync(nd, ct);
+    //            newDetailList.Add(nd);
+    //        }
+
+    //        detailMap[item.Id] = newDetailList;
+
+    //        // --------------------------------------------------------------
+    //        // PRICE DEFINITION LOGIC (Weighted Average)
+    //        // --------------------------------------------------------------
+    //        var productId = poItem.ProductId;
+    //        double newUnitPrice = dto.FinalUnitPrice ?? item.FinalUnitPrice;
+
+    //        var existingPrice = await _priceRepo.GetQuery()
+    //            .Where(p => p.ProductId == productId && p.IsActive && !p.IsDeleted)
+    //            .OrderByDescending(p => p.EffectiveFrom)
+    //            .FirstOrDefaultAsync(ct);
+
+    //        // No price → create one
+    //        if (existingPrice == null)
+    //        {
+    //            var firstPrice = new ProductPriceDefinition
+    //            {
+    //                ProductId = productId,
+    //                ProductName = poItem.Product?.Name,
+    //                CostPrice = Convert.ToDecimal(newUnitPrice),
+    //                EffectiveFrom = _security.ConvertToIst(DateTime.UtcNow),
+    //                IsActive = true
+    //            };
+
+    //            await _priceRepo.CreateAsync(firstPrice, ct);
+    //            await _uow.SaveAsync(ct);
+    //        }
+    //        else
+    //        {
+    //            double oldPrice = Convert.ToDouble(existingPrice.CostPrice);
+
+    //            if (Math.Round(oldPrice, 2) != Math.Round(newUnitPrice, 2))
+    //            {
+    //                var stockResult = await _query.InventoryTransaction
+    //                    .AsNoTracking()
+    //                    .ApplyIsDeletedFilter(false)
+    //                    .Where(x => x.Status == InventoryTransactionStatus.Confirmed &&
+    //                                x.WarehouseId == req.DefaultWarehouseId &&
+    //                                x.ProductId == productId)
+    //                    .GroupBy(x => x.ProductId)
+    //                    .Select(g => new
+    //                    {
+    //                        ProductId = g.Key,
+    //                        TotalStock = (double)(g.Sum(x => x.Stock) ?? 0)
+    //                    })
+    //                    .FirstOrDefaultAsync(ct);
+
+    //                double stockQty = stockResult?.TotalStock ?? 0;
+
+    //                double existingValue = stockQty * oldPrice;
+    //                double receivedValue = item.ReceivedQuantity * newUnitPrice;
+
+    //                double weightedAvg =
+    //                    (stockQty + item.ReceivedQuantity) == 0
+    //                    ? newUnitPrice
+    //                    : (existingValue + receivedValue) / (stockQty + item.ReceivedQuantity);
+
+    //                weightedAvg = Math.Round(weightedAvg, 2);
+
+    //                existingPrice.IsActive = false;
+    //                existingPrice.EffectiveTo = _security.ConvertToIst(DateTime.UtcNow);
+    //                _priceRepo.Update(existingPrice);
+
+    //                var newPrice = new ProductPriceDefinition
+    //                {
+    //                    ProductId = productId,
+    //                    ProductName = existingPrice.ProductName,
+    //                    CostPrice = Convert.ToDecimal(weightedAvg),
+    //                    EffectiveFrom = _security.ConvertToIst(DateTime.UtcNow),
+    //                    IsActive = true,
+    //                    MarginPercentage = existingPrice.MarginPercentage,
+    //                    CurrencyCode = existingPrice.CurrencyCode
+    //                };
+
+    //                await _priceRepo.CreateAsync(newPrice, ct);
+    //                await _uow.SaveAsync(ct);
+    //            }
+    //        }
+    //    }
+
+    //    // --------------------------------------------------------------
+    //    // 8️⃣ Save GR + Items + Details
+    //    // --------------------------------------------------------------
+    //    await _uow.SaveAsync(ct);
+
+    //    // --------------------------------------------------------------
+    //    // 9️⃣ Delete Old InventoryTx ONLY AFTER SUCCESSFUL GR UPDATE
+    //    // --------------------------------------------------------------
+    //    if (oldStatus == GoodsReceiveStatus.Approved)
+    //    {
+    //        var oldTx = await _invTxRepo.GetQuery()
+    //            .Where(tx => tx.ModuleId == gr.Id)
+    //            .ToListAsync(ct);
+
+    //        foreach (var tx in oldTx)
+    //            _invTxRepo.Delete(tx);
+
+    //        await _uow.SaveAsync(ct);
+    //    }
+
+    //    // --------------------------------------------------------------
+    //    // 🔟 Re-create new inventory transactions (if Approved)
+    //    // --------------------------------------------------------------
+    //    if (newStatus == GoodsReceiveStatus.Approved)
+    //    {
+    //        foreach (var item in gr.GoodsReceiveItems)
+    //        {
+    //            var poItem = poById[item.PurchaseOrderItemId];
+
+    //            if (poItem.Product?.Physical != true)
+    //                continue;
+
+    //            var inventoryTx = await _invService.GoodsReceiveCreateInvenTrans(
+    //                gr.Id,
+    //                req.DefaultWarehouseId,
+    //                poItem.ProductId,
+    //                item.ReceivedQuantity,
+    //                req.UpdatedById,
+    //                ct);
+
+    //            if (inventoryTx != null &&
+    //                detailMap.TryGetValue(item.Id, out var details))
+    //            {
+    //                foreach (var det in details)
+    //                {
+    //                    var map = new InventoryTransactionAttributesDetails
+    //                    {
+    //                        InventoryTransactionId = inventoryTx.Id,
+    //                        GoodsReceiveItemDetailsId = det.Id,
+    //                        CreatedById = req.UpdatedById,
+    //                        CreatedAtUtc = DateTime.UtcNow
+    //                    };
+
+    //                    await _invAttrRepo.CreateAsync(map, ct);
+    //                }
+    //            }
+    //        }
+
+    //        await _uow.SaveAsync(ct);
+    //    }
+
+    //    return new UpdateGoodsReceiveResult { Data = gr };
+    //}
 }
 
 

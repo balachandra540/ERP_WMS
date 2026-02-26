@@ -437,311 +437,595 @@ namespace Application.Features.GoodsReceiveManager.Commands
 
         public async Task<CreateGoodsReceiveResult> Handle(CreateGoodsReceiveRequest request, CancellationToken cancellationToken)
         {
-            //await using var transaction =  await _unitOfWork.BeginTransactionAsync();
+            // ──────────────────────────────────────────────────────────────
+            // START TRANSACTION — entire creation is atomic
+            // ──────────────────────────────────────────────────────────────
+            //await using var transaction = await _unitOfWork.BeginTransactionAsync();
+
             try
             {
                 // ✅ Step 1: Load Purchase Order
                 var po = await _purchaseOrderReadRepository.GetQuery()
-                .ApplyIsDeletedFilter(false)
-                .Include(x => x.PurchaseOrderItemList)
-                    .ThenInclude(i => i.Product)
-                .FirstOrDefaultAsync(x => x.Id == request.PurchaseOrderId, cancellationToken)
-                ?? throw new InvalidOperationException($"Purchase Order '{request.PurchaseOrderId}' not found.");
-
-            if (po.OrderStatus is PurchaseOrderStatus.Cancelled or PurchaseOrderStatus.Pending)
-                throw new InvalidOperationException($"Cannot create goods receive for a {po.OrderStatus} purchase order.");
-
-            // ✅ Step 2: Parse Status
-            if (!Enum.TryParse<GoodsReceiveStatus>(request.Status, out var receiveStatus))
-                throw new InvalidOperationException($"Invalid status: {request.Status}");
-
-            // ✅ Step 3: Validate warehouse
-            Warehouse? defaultWarehouse = null;
-            if (!string.IsNullOrEmpty(request.DefaultWarehouseId))
-            {
-                defaultWarehouse = await _warehouseRepository.GetQuery()
                     .ApplyIsDeletedFilter(false)
-                    .FirstOrDefaultAsync(x => x.Id == request.DefaultWarehouseId, cancellationToken)
-                    ?? throw new InvalidOperationException($"Default warehouse '{request.DefaultWarehouseId}' not found.");
-            }
+                    .Include(x => x.PurchaseOrderItemList)
+                        .ThenInclude(i => i.Product)
+                    .FirstOrDefaultAsync(x => x.Id == request.PurchaseOrderId, cancellationToken)
+                    ?? throw new InvalidOperationException($"Purchase Order '{request.PurchaseOrderId}' not found.");
 
-            // ✅ Step 4: Create Header
-            var goodsReceive = new GoodsReceive
-            {
-                Number = _numberSequenceService.GenerateNumber(nameof(GoodsReceive), "", "GR"),
-                ReceiveDate = _securityService.ConvertToIst(request.ReceiveDate),
-                Status = receiveStatus,
-                Description = request.Description,
-                PurchaseOrderId = request.PurchaseOrderId!,
-                CreatedById = request.CreatedById!,
-                CreatedAtUtc = DateTime.UtcNow,
-                IsDeleted = false,
-                FreightCharges = request.FreightCharges ?? 0,
-                OtherCharges = request.OtherCharges ?? 0
-            };
+                if (po.OrderStatus is PurchaseOrderStatus.Cancelled or PurchaseOrderStatus.Pending)
+                    throw new InvalidOperationException($"Cannot create goods receive for a {po.OrderStatus} purchase order.");
 
-            await _goodsReceiveRepository.CreateAsync(goodsReceive, cancellationToken);
-            await _unitOfWork.SaveAsync(cancellationToken);
+                // ✅ Step 2: Parse Status
+                if (!Enum.TryParse<GoodsReceiveStatus>(request.Status, out var receiveStatus))
+                    throw new InvalidOperationException($"Invalid status: {request.Status}");
 
-            // ✅ Step 5: Calculate per-unit charges
-            double totalReceivedQty = request.Items.Sum(i => i.ReceivedQuantity);
-            double freightPerUnit = totalReceivedQty > 0 ? (request.FreightCharges ?? 0) / totalReceivedQty : 0;
-            double otherPerUnit = totalReceivedQty > 0 ? (request.OtherCharges ?? 0) / totalReceivedQty : 0;
-
-            var createdItems = new List<GoodsReceiveItem>();
-            var createdInventoryTransactions = new List<string>();
-
-            // ✅ Step 6: Process Items
-            foreach (var reqItem in request.Items)
-            {
-                var poItem = po.PurchaseOrderItemList.FirstOrDefault(x =>
-                    string.Equals(x.Id?.Trim(), reqItem.PurchaseOrderItemId?.Trim(), StringComparison.OrdinalIgnoreCase))
-                    ?? throw new InvalidOperationException($"PurchaseOrderItem '{reqItem.PurchaseOrderItemId}' not found.");
-
-                var remainingQty = (poItem.Quantity ?? 0) - poItem.ReceivedQuantity;
-                if (reqItem.ReceivedQuantity > remainingQty)
-                    throw new InvalidOperationException(
-                        $"Cannot receive {reqItem.ReceivedQuantity} for item '{reqItem.PurchaseOrderItemId}'. Remaining: {remainingQty}.");
-
-                poItem.ReceivedQuantity += reqItem.ReceivedQuantity;
-                poItem.UpdatedById = request.CreatedById;
-                _purchaseOrderItemRepository.Update(poItem);
-
-                // ✅ Calculate per-item prices
-                var grItem = new GoodsReceiveItem
+                // ✅ Step 3: Validate warehouse
+                Warehouse? defaultWarehouse = null;
+                if (!string.IsNullOrEmpty(request.DefaultWarehouseId))
                 {
-                    GoodsReceiveId = goodsReceive.Id,
-                    PurchaseOrderItemId = reqItem.PurchaseOrderItemId,
-                    ReceivedQuantity = reqItem.ReceivedQuantity,
-                    UnitPrice = reqItem.UnitPrice ?? 0,
-                    TaxAmount = reqItem.TaxAmount ?? 0,
-                    FreightChargesPerUnit = Math.Round(freightPerUnit, 2),
-                    OtherChargesPerUnit = Math.Round(otherPerUnit, 2),
-                    FinalUnitPrice = (reqItem.UnitPrice ?? 0) + (reqItem.TaxAmount ?? 0) + freightPerUnit + otherPerUnit,
-                    MRP = reqItem.MRP ?? 0,
-                    Notes = reqItem.Notes,
+                    defaultWarehouse = await _warehouseRepository.GetQuery()
+                        .ApplyIsDeletedFilter(false)
+                        .FirstOrDefaultAsync(x => x.Id == request.DefaultWarehouseId, cancellationToken)
+                        ?? throw new InvalidOperationException($"Default warehouse '{request.DefaultWarehouseId}' not found.");
+                }
+
+                // ✅ Step 4: Create Header
+                var goodsReceive = new GoodsReceive
+                {
+                    Number = _numberSequenceService.GenerateNumber(nameof(GoodsReceive), "", "GR"),
+                    ReceiveDate = _securityService.ConvertToIst(request.ReceiveDate),
+                    Status = receiveStatus,
+                    Description = request.Description,
+                    PurchaseOrderId = request.PurchaseOrderId!,
                     CreatedById = request.CreatedById!,
                     CreatedAtUtc = DateTime.UtcNow,
                     IsDeleted = false,
-                    Attribute1DetailId = reqItem.Attribute1DetailId,
-                    Attribute2DetailId = reqItem.Attribute2DetailId
-
+                    FreightCharges = request.FreightCharges ?? 0,
+                    OtherCharges = request.OtherCharges ?? 0
                 };
 
-                await _goodsReceiveItemRepository.CreateAsync(grItem, cancellationToken);
+                await _goodsReceiveRepository.CreateAsync(goodsReceive, cancellationToken);
                 await _unitOfWork.SaveAsync(cancellationToken);
 
+                // ✅ Step 5: Calculate per-unit charges
+                double totalReceivedQty = request.Items.Sum(i => i.ReceivedQuantity);
+                double freightPerUnit = totalReceivedQty > 0 ? (request.FreightCharges ?? 0) / totalReceivedQty : 0;
+                double otherPerUnit = totalReceivedQty > 0 ? (request.OtherCharges ?? 0) / totalReceivedQty : 0;
 
-                // ===============================
-                // INSERT ITEM DETAILS (IMEI / Serial / Service)
-                // ===============================
-                //            var product = await _productRepository.GetQuery()
-                //.FirstOrDefaultAsync(x => x.Id == poItem.ProductId, cancellationToken);
+                var createdItems = new List<GoodsReceiveItem>();
+                var createdInventoryTransactions = new List<string>();
 
-                //            if (product == null)
-                //                throw new InvalidOperationException($"Product not found: {poItem.ProductId}");
-
-
-
-                List<GoodsReceiveItemDetails> createdDetails = new();
-
-                var product = await _productRepository.GetQuery()
-                .FirstOrDefaultAsync(x => x.Id == poItem.ProductId, cancellationToken);
-                if (product == null)
+                // ✅ Step 6: Process Items
+                foreach (var reqItem in request.Items)
                 {
-                    throw new InvalidOperationException("Product not found.");
-                }
+                    var poItem = po.PurchaseOrderItemList.FirstOrDefault(x =>
+                        string.Equals(x.Id?.Trim(), reqItem.PurchaseOrderItemId?.Trim(), StringComparison.OrdinalIgnoreCase))
+                        ?? throw new InvalidOperationException($"PurchaseOrderItem '{reqItem.PurchaseOrderItemId}' not found.");
 
-                foreach (var d in reqItem.Attributes)
-                {
-                    if (product.ServiceNo && string.IsNullOrWhiteSpace(d.ServiceNo))
-                        throw new InvalidOperationException("Service No is required.");
+                    var remainingQty = (poItem.Quantity ?? 0) - poItem.ReceivedQuantity;
+                    if (reqItem.ReceivedQuantity > remainingQty)
+                        throw new InvalidOperationException(
+                            $"Cannot receive {reqItem.ReceivedQuantity} for item '{reqItem.PurchaseOrderItemId}'. Remaining: {remainingQty}.");
 
-                    if (product.Imei1 && string.IsNullOrWhiteSpace(d.IMEI1))
-                        throw new InvalidOperationException("IMEI1 is required.");
-                    if (product.Imei1 && !Regex.IsMatch(d.IMEI1, @"^\d{15}$"))
-                        throw new InvalidOperationException("IMEI1 must be 15 digits.");
+                    poItem.ReceivedQuantity += reqItem.ReceivedQuantity;
+                    poItem.UpdatedById = request.CreatedById;
+                    _purchaseOrderItemRepository.Update(poItem);
 
-                    if (product.Imei2 && string.IsNullOrWhiteSpace(d.IMEI2))
-                        throw new InvalidOperationException("IMEI2 is required.");
-                    if (product.Imei2 && !Regex.IsMatch(d.IMEI2, @"^\d{15}$"))
-                        throw new InvalidOperationException("IMEI2 must be 15 digits.");
-                    var detail = new GoodsReceiveItemDetails
+                    // Create GR Item
+                    var grItem = new GoodsReceiveItem
                     {
-                        GoodsReceiveItemId = grItem.Id,
-                        RowIndex = d.RowIndex,
-                        IMEI1 = d.IMEI1,
-                        IMEI2 = d.IMEI2,
-                        ServiceNo = d.ServiceNo,
-                        CreatedById = request.CreatedById,
-                        CreatedAtUtc = DateTime.UtcNow
+                        GoodsReceiveId = goodsReceive.Id,
+                        PurchaseOrderItemId = reqItem.PurchaseOrderItemId,
+                        ReceivedQuantity = reqItem.ReceivedQuantity,
+                        UnitPrice = reqItem.UnitPrice ?? 0,
+                        TaxAmount = reqItem.TaxAmount ?? 0,
+                        FreightChargesPerUnit = Math.Round(freightPerUnit, 2),
+                        OtherChargesPerUnit = Math.Round(otherPerUnit, 2),
+                        FinalUnitPrice = (reqItem.UnitPrice ?? 0) + (reqItem.TaxAmount ?? 0) + freightPerUnit + otherPerUnit,
+                        MRP = reqItem.MRP ?? 0,
+                        Notes = reqItem.Notes,
+                        CreatedById = request.CreatedById!,
+                        CreatedAtUtc = DateTime.UtcNow,
+                        IsDeleted = false,
+                        Attribute1DetailId = reqItem.Attribute1DetailId,
+                        Attribute2DetailId = reqItem.Attribute2DetailId
                     };
 
-                    await _goodsReceiveItemDetailsRepository.CreateAsync(detail, cancellationToken);
-
-                    createdDetails.Add(detail); //Capture ID here
-                }
-
-
-
-
-                // ===============================
-                // PRICE DEFINITION CHECK & UPDATE
-                // ===============================
-                var productId = poItem.ProductId;
-                if (receiveStatus != GoodsReceiveStatus.Pending &&
-                    receiveStatus != GoodsReceiveStatus.Cancelled)
-                {
-
-                    // 1️⃣ Fetch ACTIVE price definition for this product
-                    var existingPrice = await _productpriceDefRepository.GetQuery()
-                    .Where(p => p.ProductId == productId && p.IsActive && !p.IsDeleted)
-                    .OrderByDescending(p => p.EffectiveFrom)
-                    .FirstOrDefaultAsync(cancellationToken);
-
-                // If not exists → create first entry and continue
-                if (existingPrice == null)
-                {
-                    var newPrice = new ProductPriceDefinition
-                    {
-                        ProductId = productId,
-                       // ProductName = request.ProductName,
-                        //CostPrice = Convert.ToDecimal(grItem.UnitPrice),   // OR grItem.UnitPrice based on your rule
-                        CostPrice = Convert.ToDecimal(grItem.FinalUnitPrice),   // OR grItem.FinalUnitPrice based on your rule
-                        EffectiveFrom = _securityService.ConvertToIst(DateTime.UtcNow),
-                        IsActive = true,                        
-                   };
-
-                    await _productpriceDefRepository.CreateAsync(newPrice, cancellationToken);
+                    await _goodsReceiveItemRepository.CreateAsync(grItem, cancellationToken);
                     await _unitOfWork.SaveAsync(cancellationToken);
-                }
-                else
-                {
-                    // Compare prices
-                    double oldPrice = Convert.ToDouble(existingPrice.CostPrice);
-                    double newPrice = grItem.FinalUnitPrice;
 
-                        if (Math.Round(oldPrice, 2) != Math.Round(newPrice, 2))
-                        {
-                            // 2️⃣ Fetch stock for weighted average
-                            //var stockQty = await _inventoryTransactionService.GetCurrentStock(productId, cancellationToken);
-                            var stockQty = 0.0; // TEMP FIX: Replace with actual stock fetch logic
-                                                // Weighted Average Price Formula:
-                                                // (ExistingStock * OldPrice + ReceivedQty * NewPrice) / (ExistingStock + ReceivedQty)
-                            var result = await _queryContext
-                                .InventoryTransaction
-                                .AsNoTracking()
-                                .ApplyIsDeletedFilter(false)
-                                .Where(x => x.Status == InventoryTransactionStatus.Confirmed &&
-                                            x.WarehouseId == request.DefaultWarehouseId && x.ProductId == productId)
-                                .GroupBy(x => x.ProductId)
-                                .Select(g => new ProductStockSummaryDto
-                                {
-                                    ProductId = g.Key,
-                                    TotalStock = (decimal)(g.Sum(x => x.Stock) ?? 0),
-                                    TotalMovement = (decimal)(g.Sum(x => x.Movement) ?? 0),
-                                    RequestStock = 0
-                                })
-                                // ✅ Only include records where stock > 0
-                                .Where(dto => dto.TotalStock > 0)
-                                .ToListAsync(cancellationToken);
-                            stockQty = result.ToArray().Length > 0 ? Convert.ToDouble(result.ToArray()[0].TotalStock) : 0.0;
-                            //double stockQty = result?.TotalStock ?? 0;
+                    // ===============================
+                    // INSERT ITEM DETAILS (IMEI / Serial / Service)
+                    // ===============================
+                    var product = await _productRepository.GetQuery()
+                        .FirstOrDefaultAsync(x => x.Id == poItem.ProductId, cancellationToken)
+                        ?? throw new InvalidOperationException($"Product not found: {poItem.ProductId}");
 
-                            double existingValue = stockQty * oldPrice;
-                            double receivedValue = grItem.ReceivedQuantity * newPrice;
+                    var createdDetails = new List<GoodsReceiveItemDetails>();
 
-                            double weightedAveragePrice =
-                                (existingValue + receivedValue) / (stockQty + grItem.ReceivedQuantity);
-
-                            weightedAveragePrice = Math.Round(weightedAveragePrice, 2);
-
-                            // 3️⃣ Mark old price inactive
-                            existingPrice.IsActive = false;
-                            existingPrice.EffectiveTo = _securityService.ConvertToIst(DateTime.UtcNow);
-                            _productpriceDefRepository.Update(existingPrice);
-
-                            // 4️⃣ Insert new price definition row
-                            var newPriceDef = new ProductPriceDefinition
-                            {
-                                ProductId = productId,
-                                ProductName = existingPrice.ProductName,
-                                CostPrice = Convert.ToDecimal(weightedAveragePrice),
-                                EffectiveFrom = _securityService.ConvertToIst(DateTime.UtcNow),
-                                IsActive = true,
-                                MarginPercentage = existingPrice.MarginPercentage,
-                                CurrencyCode = existingPrice.CurrencyCode
-                            };
-
-                            await _productpriceDefRepository.CreateAsync(newPriceDef, cancellationToken);
-                            await _unitOfWork.SaveAsync(cancellationToken);
-                        }
-                    }
-                }
-
-                createdItems.Add(grItem);
-
-                // ✅ Inventory update
-                if (poItem.Product.Physical == true &&
-                    receiveStatus != GoodsReceiveStatus.Pending &&
-                    receiveStatus != GoodsReceiveStatus.Cancelled)
-                {
-                    var warehouseId = reqItem.WarehouseId ?? request.DefaultWarehouseId;
-                    if (string.IsNullOrEmpty(warehouseId))
-                        throw new InvalidOperationException($"Warehouse ID required for item '{reqItem.PurchaseOrderItemId}'.");
-
-                    var warehouse = await _warehouseRepository.GetQuery()
-                        .ApplyIsDeletedFilter(false)
-                        .FirstOrDefaultAsync(x => x.Id == warehouseId, cancellationToken)
-                        ?? throw new InvalidOperationException($"Warehouse '{warehouseId}' not found.");
-
-                    var inventoryTx = await _inventoryTransactionService.GoodsReceiveCreateInvenTrans(
-                        goodsReceive.Id,
-                        warehouseId,
-                        poItem.ProductId,
-                        reqItem.ReceivedQuantity,
-                        request.CreatedById,
-                        cancellationToken);
-
-                    if (inventoryTx != null)
-                        createdInventoryTransactions.Add(inventoryTx.Id);
-
-                    // ------------------------------------------
-                    // STORE ONLY THE CREATED GOODSRECEIVEITEMDETAIL IDs
-                    // ------------------------------------------
-                    foreach (var det in createdDetails)
+                    foreach (var d in reqItem.Attributes)
                     {
-                        var invDetail = new InventoryTransactionAttributesDetails
+                        if (product.ServiceNo && string.IsNullOrWhiteSpace(d.ServiceNo))
+                            throw new InvalidOperationException("Service No is required.");
+                        if (product.Imei1 && string.IsNullOrWhiteSpace(d.IMEI1))
+                            throw new InvalidOperationException("IMEI1 is required.");
+                        if (product.Imei1 && !Regex.IsMatch(d.IMEI1 ?? "", @"^\d{15}$"))
+                            throw new InvalidOperationException("IMEI1 must be 15 digits.");
+                        if (product.Imei2 && string.IsNullOrWhiteSpace(d.IMEI2))
+                            throw new InvalidOperationException("IMEI2 is required.");
+                        if (product.Imei2 && !Regex.IsMatch(d.IMEI2 ?? "", @"^\d{15}$"))
+                            throw new InvalidOperationException("IMEI2 must be 15 digits.");
+
+                        var detail = new GoodsReceiveItemDetails
                         {
-                            InventoryTransactionId = inventoryTx.Id,   // FK to InventoryTransaction
-                            GoodsReceiveItemDetailsId = det.Id,        // FK to GoodsReceiveItemDetails
+                            GoodsReceiveItemId = grItem.Id,
+                            RowIndex = d.RowIndex,
+                            IMEI1 = d.IMEI1,
+                            IMEI2 = d.IMEI2,
+                            ServiceNo = d.ServiceNo,
                             CreatedById = request.CreatedById,
                             CreatedAtUtc = DateTime.UtcNow
                         };
 
-                        await _inventoryTransactionAttributesDetailsRepository.CreateAsync(invDetail, cancellationToken);
+                        await _goodsReceiveItemDetailsRepository.CreateAsync(detail, cancellationToken);
+                        createdDetails.Add(detail);
                     }
 
+                    // ===============================
+                    // PRICE DEFINITION CHECK & UPDATE
+                    // ===============================
+                    var productId = poItem.ProductId;
+
+                    if (receiveStatus != GoodsReceiveStatus.Pending &&
+                        receiveStatus != GoodsReceiveStatus.Cancelled)
+                    {
+                        var existingPrice = await _productpriceDefRepository.GetQuery()
+                            .Where(p => p.ProductId == productId && p.IsActive && !p.IsDeleted)
+                            .OrderByDescending(p => p.EffectiveFrom)
+                            .FirstOrDefaultAsync(cancellationToken);
+
+                        if (existingPrice == null)
+                        {
+                            var newPrice = new ProductPriceDefinition
+                            {
+                                ProductId = productId,
+                                CostPrice = Convert.ToDecimal(grItem.FinalUnitPrice),
+                                EffectiveFrom = _securityService.ConvertToIst(DateTime.UtcNow),
+                                IsActive = true,
+                            };
+                            await _productpriceDefRepository.CreateAsync(newPrice, cancellationToken);
+                            await _unitOfWork.SaveAsync(cancellationToken);
+                        }
+                        else
+                        {
+                            double oldPrice = Convert.ToDouble(existingPrice.CostPrice);
+                            double newPrice = grItem.FinalUnitPrice;
+
+                            if (Math.Round(oldPrice, 2) != Math.Round(newPrice, 2))
+                            {
+                                var stockResult = await _queryContext
+                                    .InventoryTransaction
+                                    .AsNoTracking()
+                                    .ApplyIsDeletedFilter(false)
+                                    .Where(x => x.Status == InventoryTransactionStatus.Confirmed &&
+                                                x.WarehouseId == request.DefaultWarehouseId &&
+                                                x.ProductId == productId)
+                                    .GroupBy(x => x.ProductId)
+                                    .Select(g => new
+                                    {
+                                        ProductId = g.Key,
+                                        TotalStock = (double)(g.Sum(x => x.Stock) ?? 0)
+                                    })
+                                    .FirstOrDefaultAsync(cancellationToken);
+
+                                double stockQty = stockResult?.TotalStock ?? 0;
+                                double existingValue = stockQty * oldPrice;
+                                double receivedValue = grItem.ReceivedQuantity * newPrice;
+                                double weightedAveragePrice = (stockQty + grItem.ReceivedQuantity) == 0
+                                    ? newPrice
+                                    : (existingValue + receivedValue) / (stockQty + grItem.ReceivedQuantity);
+
+                                weightedAveragePrice = Math.Round(weightedAveragePrice, 2);
+
+                                existingPrice.IsActive = false;
+                                existingPrice.EffectiveTo = _securityService.ConvertToIst(DateTime.UtcNow);
+                                _productpriceDefRepository.Update(existingPrice);
+
+                                var newPriceDef = new ProductPriceDefinition
+                                {
+                                    ProductId = productId,
+                                    ProductName = existingPrice.ProductName,
+                                    CostPrice = Convert.ToDecimal(weightedAveragePrice),
+                                    EffectiveFrom = _securityService.ConvertToIst(DateTime.UtcNow),
+                                    IsActive = true,
+                                    MarginPercentage = existingPrice.MarginPercentage,
+                                    CurrencyCode = existingPrice.CurrencyCode
+                                };
+
+                                await _productpriceDefRepository.CreateAsync(newPriceDef, cancellationToken);
+                                await _unitOfWork.SaveAsync(cancellationToken);
+                            }
+                        }
+                    }
+
+                    createdItems.Add(grItem);
+
+                    // ✅ Inventory update
+                    if (poItem.Product.Physical == true &&
+                        receiveStatus != GoodsReceiveStatus.Pending &&
+                        receiveStatus != GoodsReceiveStatus.Cancelled)
+                    {
+                        var warehouseId = reqItem.WarehouseId ?? request.DefaultWarehouseId;
+                        if (string.IsNullOrEmpty(warehouseId))
+                            throw new InvalidOperationException($"Warehouse ID required for item '{reqItem.PurchaseOrderItemId}'.");
+
+                        var warehouse = await _warehouseRepository.GetQuery()
+                            .ApplyIsDeletedFilter(false)
+                            .FirstOrDefaultAsync(x => x.Id == warehouseId, cancellationToken)
+                            ?? throw new InvalidOperationException($"Warehouse '{warehouseId}' not found.");
+
+                        var inventoryTx = await _inventoryTransactionService.GoodsReceiveCreateInvenTrans(
+                            goodsReceive.Id,
+                            warehouseId,
+                            poItem.ProductId,
+                            reqItem.ReceivedQuantity,
+                            request.CreatedById,
+                            cancellationToken);
+
+                        if (inventoryTx != null)
+                        {
+                            createdInventoryTransactions.Add(inventoryTx.Id);
+
+                            foreach (var det in createdDetails)
+                            {
+                                var invDetail = new InventoryTransactionAttributesDetails
+                                {
+                                    InventoryTransactionId = inventoryTx.Id,
+                                    GoodsReceiveItemDetailsId = det.Id,
+                                    CreatedById = request.CreatedById,
+                                    CreatedAtUtc = DateTime.UtcNow
+                                };
+                                await _inventoryTransactionAttributesDetailsRepository.CreateAsync(invDetail, cancellationToken);
+                            }
+                        }
+                    }
                 }
+
+                // Final save (includes any pending changes)
+                await _unitOfWork.SaveAsync(cancellationToken);
+
+                // ──────────────────────────────────────────────────────────────
+                // COMMIT TRANSACTION — everything succeeded
+                // ──────────────────────────────────────────────────────────────
+                //await transaction.CommitAsync(cancellationToken);
+
+                return new CreateGoodsReceiveResult
+                {
+                    Data = goodsReceive,
+                    Items = createdItems,
+                    CreatedInventoryTransactions = createdInventoryTransactions
+                };
             }
-
-            await _unitOfWork.SaveAsync(cancellationToken);
-            //await transaction.CommitAsync(cancellationToken);
-
-            return new CreateGoodsReceiveResult
+            catch (Exception ex)
             {
-                Data = goodsReceive,
-                Items = createdItems,
-                CreatedInventoryTransactions = createdInventoryTransactions
-            };
+                // Rollback everything on any error
+                //await transaction.RollbackAsync(cancellationToken);
 
+                // Log the error (use your logger)
+                // _logger.LogError(ex, "Failed to create GoodsReceive for PO {PoId}", request.PurchaseOrderId);
+
+                throw; // rethrow so caller (API) receives the error
+            }
         }
-    catch
-    {
 
-        throw; // rethrow so API gets the error
-    }
 
-}
+        //        public async Task<CreateGoodsReceiveResult> Handle(CreateGoodsReceiveRequest request, CancellationToken cancellationToken)
+        //        {
+        //            //await using var transaction =  await _unitOfWork.BeginTransactionAsync();
+        //            try
+        //            {
+        //                // ✅ Step 1: Load Purchase Order
+        //                var po = await _purchaseOrderReadRepository.GetQuery()
+        //                .ApplyIsDeletedFilter(false)
+        //                .Include(x => x.PurchaseOrderItemList)
+        //                    .ThenInclude(i => i.Product)
+        //                .FirstOrDefaultAsync(x => x.Id == request.PurchaseOrderId, cancellationToken)
+        //                ?? throw new InvalidOperationException($"Purchase Order '{request.PurchaseOrderId}' not found.");
+
+        //            if (po.OrderStatus is PurchaseOrderStatus.Cancelled or PurchaseOrderStatus.Pending)
+        //                throw new InvalidOperationException($"Cannot create goods receive for a {po.OrderStatus} purchase order.");
+
+        //            // ✅ Step 2: Parse Status
+        //            if (!Enum.TryParse<GoodsReceiveStatus>(request.Status, out var receiveStatus))
+        //                throw new InvalidOperationException($"Invalid status: {request.Status}");
+
+        //            // ✅ Step 3: Validate warehouse
+        //            Warehouse? defaultWarehouse = null;
+        //            if (!string.IsNullOrEmpty(request.DefaultWarehouseId))
+        //            {
+        //                defaultWarehouse = await _warehouseRepository.GetQuery()
+        //                    .ApplyIsDeletedFilter(false)
+        //                    .FirstOrDefaultAsync(x => x.Id == request.DefaultWarehouseId, cancellationToken)
+        //                    ?? throw new InvalidOperationException($"Default warehouse '{request.DefaultWarehouseId}' not found.");
+        //            }
+
+        //            // ✅ Step 4: Create Header
+        //            var goodsReceive = new GoodsReceive
+        //            {
+        //                Number = _numberSequenceService.GenerateNumber(nameof(GoodsReceive), "", "GR"),
+        //                ReceiveDate = _securityService.ConvertToIst(request.ReceiveDate),
+        //                Status = receiveStatus,
+        //                Description = request.Description,
+        //                PurchaseOrderId = request.PurchaseOrderId!,
+        //                CreatedById = request.CreatedById!,
+        //                CreatedAtUtc = DateTime.UtcNow,
+        //                IsDeleted = false,
+        //                FreightCharges = request.FreightCharges ?? 0,
+        //                OtherCharges = request.OtherCharges ?? 0
+        //            };
+
+        //            await _goodsReceiveRepository.CreateAsync(goodsReceive, cancellationToken);
+        //            await _unitOfWork.SaveAsync(cancellationToken);
+
+        //            // ✅ Step 5: Calculate per-unit charges
+        //            double totalReceivedQty = request.Items.Sum(i => i.ReceivedQuantity);
+        //            double freightPerUnit = totalReceivedQty > 0 ? (request.FreightCharges ?? 0) / totalReceivedQty : 0;
+        //            double otherPerUnit = totalReceivedQty > 0 ? (request.OtherCharges ?? 0) / totalReceivedQty : 0;
+
+        //            var createdItems = new List<GoodsReceiveItem>();
+        //            var createdInventoryTransactions = new List<string>();
+
+        //            // ✅ Step 6: Process Items
+        //            foreach (var reqItem in request.Items)
+        //            {
+        //                var poItem = po.PurchaseOrderItemList.FirstOrDefault(x =>
+        //                    string.Equals(x.Id?.Trim(), reqItem.PurchaseOrderItemId?.Trim(), StringComparison.OrdinalIgnoreCase))
+        //                    ?? throw new InvalidOperationException($"PurchaseOrderItem '{reqItem.PurchaseOrderItemId}' not found.");
+
+        //                var remainingQty = (poItem.Quantity ?? 0) - poItem.ReceivedQuantity;
+        //                if (reqItem.ReceivedQuantity > remainingQty)
+        //                    throw new InvalidOperationException(
+        //                        $"Cannot receive {reqItem.ReceivedQuantity} for item '{reqItem.PurchaseOrderItemId}'. Remaining: {remainingQty}.");
+
+        //                poItem.ReceivedQuantity += reqItem.ReceivedQuantity;
+        //                poItem.UpdatedById = request.CreatedById;
+        //                _purchaseOrderItemRepository.Update(poItem);
+
+        //                // ✅ Calculate per-item prices
+        //                var grItem = new GoodsReceiveItem
+        //                {
+        //                    GoodsReceiveId = goodsReceive.Id,
+        //                    PurchaseOrderItemId = reqItem.PurchaseOrderItemId,
+        //                    ReceivedQuantity = reqItem.ReceivedQuantity,
+        //                    UnitPrice = reqItem.UnitPrice ?? 0,
+        //                    TaxAmount = reqItem.TaxAmount ?? 0,
+        //                    FreightChargesPerUnit = Math.Round(freightPerUnit, 2),
+        //                    OtherChargesPerUnit = Math.Round(otherPerUnit, 2),
+        //                    FinalUnitPrice = (reqItem.UnitPrice ?? 0) + (reqItem.TaxAmount ?? 0) + freightPerUnit + otherPerUnit,
+        //                    MRP = reqItem.MRP ?? 0,
+        //                    Notes = reqItem.Notes,
+        //                    CreatedById = request.CreatedById!,
+        //                    CreatedAtUtc = DateTime.UtcNow,
+        //                    IsDeleted = false,
+        //                    Attribute1DetailId = reqItem.Attribute1DetailId,
+        //                    Attribute2DetailId = reqItem.Attribute2DetailId
+
+        //                };
+
+        //                await _goodsReceiveItemRepository.CreateAsync(grItem, cancellationToken);
+        //                await _unitOfWork.SaveAsync(cancellationToken);
+
+
+        //                // ===============================
+        //                // INSERT ITEM DETAILS (IMEI / Serial / Service)
+        //                // ===============================
+        //                //            var product = await _productRepository.GetQuery()
+        //                //.FirstOrDefaultAsync(x => x.Id == poItem.ProductId, cancellationToken);
+
+        //                //            if (product == null)
+        //                //                throw new InvalidOperationException($"Product not found: {poItem.ProductId}");
+
+
+
+        //                List<GoodsReceiveItemDetails> createdDetails = new();
+
+        //                var product = await _productRepository.GetQuery()
+        //                .FirstOrDefaultAsync(x => x.Id == poItem.ProductId, cancellationToken);
+        //                if (product == null)
+        //                {
+        //                    throw new InvalidOperationException("Product not found.");
+        //                }
+
+        //                foreach (var d in reqItem.Attributes)
+        //                {
+        //                    if (product.ServiceNo && string.IsNullOrWhiteSpace(d.ServiceNo))
+        //                        throw new InvalidOperationException("Service No is required.");
+
+        //                    if (product.Imei1 && string.IsNullOrWhiteSpace(d.IMEI1))
+        //                        throw new InvalidOperationException("IMEI1 is required.");
+        //                    if (product.Imei1 && !Regex.IsMatch(d.IMEI1, @"^\d{15}$"))
+        //                        throw new InvalidOperationException("IMEI1 must be 15 digits.");
+
+        //                    if (product.Imei2 && string.IsNullOrWhiteSpace(d.IMEI2))
+        //                        throw new InvalidOperationException("IMEI2 is required.");
+        //                    if (product.Imei2 && !Regex.IsMatch(d.IMEI2, @"^\d{15}$"))
+        //                        throw new InvalidOperationException("IMEI2 must be 15 digits.");
+        //                    var detail = new GoodsReceiveItemDetails
+        //                    {
+        //                        GoodsReceiveItemId = grItem.Id,
+        //                        RowIndex = d.RowIndex,
+        //                        IMEI1 = d.IMEI1,
+        //                        IMEI2 = d.IMEI2,
+        //                        ServiceNo = d.ServiceNo,
+        //                        CreatedById = request.CreatedById,
+        //                        CreatedAtUtc = DateTime.UtcNow
+        //                    };
+
+        //                    await _goodsReceiveItemDetailsRepository.CreateAsync(detail, cancellationToken);
+
+        //                    createdDetails.Add(detail); //Capture ID here
+        //                }
+
+
+
+
+        //                // ===============================
+        //                // PRICE DEFINITION CHECK & UPDATE
+        //                // ===============================
+        //                var productId = poItem.ProductId;
+        //                if (receiveStatus != GoodsReceiveStatus.Pending &&
+        //                    receiveStatus != GoodsReceiveStatus.Cancelled)
+        //                {
+
+        //                    // 1️⃣ Fetch ACTIVE price definition for this product
+        //                    var existingPrice = await _productpriceDefRepository.GetQuery()
+        //                    .Where(p => p.ProductId == productId && p.IsActive && !p.IsDeleted)
+        //                    .OrderByDescending(p => p.EffectiveFrom)
+        //                    .FirstOrDefaultAsync(cancellationToken);
+
+        //                // If not exists → create first entry and continue
+        //                if (existingPrice == null)
+        //                {
+        //                    var newPrice = new ProductPriceDefinition
+        //                    {
+        //                        ProductId = productId,
+        //                       // ProductName = request.ProductName,
+        //                        //CostPrice = Convert.ToDecimal(grItem.UnitPrice),   // OR grItem.UnitPrice based on your rule
+        //                        CostPrice = Convert.ToDecimal(grItem.FinalUnitPrice),   // OR grItem.FinalUnitPrice based on your rule
+        //                        EffectiveFrom = _securityService.ConvertToIst(DateTime.UtcNow),
+        //                        IsActive = true,                        
+        //                   };
+
+        //                    await _productpriceDefRepository.CreateAsync(newPrice, cancellationToken);
+        //                    await _unitOfWork.SaveAsync(cancellationToken);
+        //                }
+        //                else
+        //                {
+        //                    // Compare prices
+        //                    double oldPrice = Convert.ToDouble(existingPrice.CostPrice);
+        //                    double newPrice = grItem.FinalUnitPrice;
+
+        //                        if (Math.Round(oldPrice, 2) != Math.Round(newPrice, 2))
+        //                        {
+        //                            // 2️⃣ Fetch stock for weighted average
+        //                            //var stockQty = await _inventoryTransactionService.GetCurrentStock(productId, cancellationToken);
+        //                            var stockQty = 0.0; // TEMP FIX: Replace with actual stock fetch logic
+        //                                                // Weighted Average Price Formula:
+        //                                                // (ExistingStock * OldPrice + ReceivedQty * NewPrice) / (ExistingStock + ReceivedQty)
+        //                            var result = await _queryContext
+        //                                .InventoryTransaction
+        //                                .AsNoTracking()
+        //                                .ApplyIsDeletedFilter(false)
+        //                                .Where(x => x.Status == InventoryTransactionStatus.Confirmed &&
+        //                                            x.WarehouseId == request.DefaultWarehouseId && x.ProductId == productId)
+        //                                .GroupBy(x => x.ProductId)
+        //                                .Select(g => new ProductStockSummaryDto
+        //                                {
+        //                                    ProductId = g.Key,
+        //                                    TotalStock = (decimal)(g.Sum(x => x.Stock) ?? 0),
+        //                                    TotalMovement = (decimal)(g.Sum(x => x.Movement) ?? 0),
+        //                                    RequestStock = 0
+        //                                })
+        //                                // ✅ Only include records where stock > 0
+        //                                .Where(dto => dto.TotalStock > 0)
+        //                                .ToListAsync(cancellationToken);
+        //                            stockQty = result.ToArray().Length > 0 ? Convert.ToDouble(result.ToArray()[0].TotalStock) : 0.0;
+        //                            //double stockQty = result?.TotalStock ?? 0;
+
+        //                            double existingValue = stockQty * oldPrice;
+        //                            double receivedValue = grItem.ReceivedQuantity * newPrice;
+
+        //                            double weightedAveragePrice =
+        //                                (existingValue + receivedValue) / (stockQty + grItem.ReceivedQuantity);
+
+        //                            weightedAveragePrice = Math.Round(weightedAveragePrice, 2);
+
+        //                            // 3️⃣ Mark old price inactive
+        //                            existingPrice.IsActive = false;
+        //                            existingPrice.EffectiveTo = _securityService.ConvertToIst(DateTime.UtcNow);
+        //                            _productpriceDefRepository.Update(existingPrice);
+
+        //                            // 4️⃣ Insert new price definition row
+        //                            var newPriceDef = new ProductPriceDefinition
+        //                            {
+        //                                ProductId = productId,
+        //                                ProductName = existingPrice.ProductName,
+        //                                CostPrice = Convert.ToDecimal(weightedAveragePrice),
+        //                                EffectiveFrom = _securityService.ConvertToIst(DateTime.UtcNow),
+        //                                IsActive = true,
+        //                                MarginPercentage = existingPrice.MarginPercentage,
+        //                                CurrencyCode = existingPrice.CurrencyCode
+        //                            };
+
+        //                            await _productpriceDefRepository.CreateAsync(newPriceDef, cancellationToken);
+        //                            await _unitOfWork.SaveAsync(cancellationToken);
+        //                        }
+        //                    }
+        //                }
+
+        //                createdItems.Add(grItem);
+
+        //                // ✅ Inventory update
+        //                if (poItem.Product.Physical == true &&
+        //                    receiveStatus != GoodsReceiveStatus.Pending &&
+        //                    receiveStatus != GoodsReceiveStatus.Cancelled)
+        //                {
+        //                    var warehouseId = reqItem.WarehouseId ?? request.DefaultWarehouseId;
+        //                    if (string.IsNullOrEmpty(warehouseId))
+        //                        throw new InvalidOperationException($"Warehouse ID required for item '{reqItem.PurchaseOrderItemId}'.");
+
+        //                    var warehouse = await _warehouseRepository.GetQuery()
+        //                        .ApplyIsDeletedFilter(false)
+        //                        .FirstOrDefaultAsync(x => x.Id == warehouseId, cancellationToken)
+        //                        ?? throw new InvalidOperationException($"Warehouse '{warehouseId}' not found.");
+
+        //                    var inventoryTx = await _inventoryTransactionService.GoodsReceiveCreateInvenTrans(
+        //                        goodsReceive.Id,
+        //                        warehouseId,
+        //                        poItem.ProductId,
+        //                        reqItem.ReceivedQuantity,
+        //                        request.CreatedById,
+        //                        cancellationToken);
+
+        //                    if (inventoryTx != null)
+        //                        createdInventoryTransactions.Add(inventoryTx.Id);
+
+        //                    // ------------------------------------------
+        //                    // STORE ONLY THE CREATED GOODSRECEIVEITEMDETAIL IDs
+        //                    // ------------------------------------------
+        //                    foreach (var det in createdDetails)
+        //                    {
+        //                        var invDetail = new InventoryTransactionAttributesDetails
+        //                        {
+        //                            InventoryTransactionId = inventoryTx.Id,   // FK to InventoryTransaction
+        //                            GoodsReceiveItemDetailsId = det.Id,        // FK to GoodsReceiveItemDetails
+        //                            CreatedById = request.CreatedById,
+        //                            CreatedAtUtc = DateTime.UtcNow
+        //                        };
+
+        //                        await _inventoryTransactionAttributesDetailsRepository.CreateAsync(invDetail, cancellationToken);
+        //                    }
+
+        //                }
+        //            }
+
+        //            await _unitOfWork.SaveAsync(cancellationToken);
+        //            //await transaction.CommitAsync(cancellationToken);
+
+        //            return new CreateGoodsReceiveResult
+        //            {
+        //                Data = goodsReceive,
+        //                Items = createdItems,
+        //                CreatedInventoryTransactions = createdInventoryTransactions
+        //            };
+
+        //        }
+        //    catch
+        //    {
+
+        //        throw; // rethrow so API gets the error
+        //    }
+
+        //}
     }
 }

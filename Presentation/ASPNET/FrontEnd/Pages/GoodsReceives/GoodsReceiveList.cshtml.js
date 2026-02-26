@@ -922,11 +922,19 @@ const App = {
         // **ENHANCED VALIDATION FUNCTION - SUBMIT TIME ONLY**
         const validateForm = function () {
             debugger;
+           
             // Reset errors...
             let isValid = true;
             let hasValidReceivedQuantity = false;
             let hasValidMrp = false;
-             
+
+            state.errors.status = '';        // ← add this
+            // ── Status validation ──────────────────────────────────────
+            if (!state.status) {
+                state.errors.status = 'Status is required.';
+                isValid = false;
+            }
+
             if (!state.deleteMode && state.secondaryData.length > 0) {
                 debugger;
 
@@ -2397,7 +2405,22 @@ const App = {
                     });
                     return;
                 }
-                secondaryGrid.refresh(state.secondaryData);
+                //secondaryGrid.refresh(state.secondaryData);
+                // ── Best way: update only the changed row ───────────────────────────────
+                if (secondaryGrid?.obj) {
+                    // Method 1: Update specific row by index (preserves everything else)
+                    secondaryGrid.obj.updateRow(rowIndex, rowData);
+
+                    // Method 2: Or refresh only the changed row (if updateRow not available)
+                    // secondaryGrid.obj.refreshRow(rowIndex);
+
+                    // Optional: force full visual refresh only if needed
+                    // secondaryGrid.obj.refresh();
+                } else {
+                    console.warn("Grid not initialized");
+                }
+
+                console.log("Saved detail entries:", entries);
 
                 console.log("Saved:", entries);
             },
@@ -2511,6 +2534,13 @@ const App = {
                 const Attributes = [];
                 const errors = [];
 
+                const safeTrim = (value) => {
+                    if (value == null) return null;
+                    if (typeof value !== 'string') return null;
+                    const trimmed = value.trim();
+                    return trimmed === '' ? null : trimmed;
+                };
+
                 const product = state.productListLookupData.find(p => p.id === row.productId);
                 if (!product) {
                     errors.push(`Product not found for row with productId = ${row.productId}`);
@@ -2518,7 +2548,6 @@ const App = {
                 }
 
                 const detailEntries = row.detailEntries || [];
-
                 if ((product.imei1 || product.imei2 || product.serviceNo) && detailEntries.length === 0) {
                     errors.push(`Please enter required product attributes (IMEI / Service No) for product`);
                     return { Attributes, errors };
@@ -2528,27 +2557,33 @@ const App = {
                 // BUILD GLOBAL SETS FROM TABLE DATA
                 // --------------------------------------------------
                 const globalList = state.globalAttributes || [];
+                const globalIMEI1Set = new Set(
+                    globalList.map(x => safeTrim(x.imei1 || x.imeI1)).filter(Boolean)
+                );
+                const globalIMEI2Set = new Set(
+                    globalList.map(x => safeTrim(x.imei2 || x.imeI2)).filter(Boolean)
+                );
+                const globalServiceSet = new Set(
+                    globalList.map(x => safeTrim(x.serviceNo || x.serviceno)).filter(Boolean)
+                );
 
-                const globalIMEI1Set = new Set(globalList.map(x => (x.imei1 || x.imeI1 || "").trim()).filter(Boolean));
-                const globalIMEI2Set = new Set(globalList.map(x => (x.imei2 || x.imeI2 || "").trim()).filter(Boolean));
-                const globalServiceSet = new Set(globalList.map(x => (x.serviceNo || x.serviceno || "").trim()).filter(Boolean));
                 // --------------------------------------------------
                 // EXCLUDE ORIGINAL VALUES OF THIS ROW (EDIT MODE FIX)
                 // --------------------------------------------------
                 const original = (detailEntries || []).map(x => ({
-                    imei1: (x.IMEI1 || "").trim(),
-                    imei2: (x.IMEI2 || "").trim(),
-                    serviceNo: (x.ServiceNo || "").trim()
+                    imei1: safeTrim(x.IMEI1),
+                    imei2: safeTrim(x.IMEI2),
+                    serviceNo: safeTrim(x.ServiceNo)
                 }));
 
                 original.forEach(x => {
-                    globalIMEI1Set.delete(x.imei1);
-                    globalIMEI2Set.delete(x.imei2);
-                    globalServiceSet.delete(x.serviceNo);
+                    if (x.imei1) globalIMEI1Set.delete(x.imei1);
+                    if (x.imei2) globalIMEI2Set.delete(x.imei2);
+                    if (x.serviceNo) globalServiceSet.delete(x.serviceNo);
                 });
 
                 // --------------------------------------------------
-                // LOCAL DUPLICATE TRACKING (WITHIN SAME GR LINE)
+                // LOCAL DUPLICATE TRACKING
                 // --------------------------------------------------
                 const localIMEI1 = new Set();
                 const localIMEI2 = new Set();
@@ -2558,25 +2593,22 @@ const App = {
                 // PROCESS EACH ENTRY
                 // --------------------------------------------------
                 detailEntries.forEach((entry, index) => {
-                    const imei1 = (entry.IMEI1 || "").trim();
-                    const imei2 = (entry.IMEI2 || "").trim();
-                    const serviceNo = (entry.ServiceNo || "").trim();
+                    const imei1 = safeTrim(entry.IMEI1 || entry.imeI1);
+                    const imei2 = safeTrim(entry.IMEI2 || entry.imeI2);
+                    const serviceNo = safeTrim(entry.ServiceNo || entry.serviceNo);
 
                     // Required validations
                     if (product.imei1) {
                         if (!imei1) errors.push(`IMEI1 missing at row ${index + 1}`);
                         else if (!/^\d{15}$/.test(imei1)) errors.push(`IMEI1 must be 15 digits at row ${index + 1}`);
                     }
-
                     if (product.imei2) {
                         if (!imei2) errors.push(`IMEI2 missing at row ${index + 1}`);
                         else if (!/^\d{15}$/.test(imei2)) errors.push(`IMEI2 must be 15 digits at row ${index + 1}`);
                     }
-
                     if (product.serviceNo && !serviceNo) {
                         errors.push(`Service No missing at row ${index + 1}`);
                     }
-
                     if (imei1 && imei2 && imei1 === imei2) {
                         errors.push(`IMEI1 and IMEI2 cannot be same at row ${index + 1}`);
                     }
@@ -2593,7 +2625,7 @@ const App = {
                     localIMEI2.add(imei2);
                     localServiceNo.add(serviceNo);
 
-                    // Global duplicates (database-level)
+                    // Global duplicates
                     if (imei1 && globalIMEI1Set.has(imei1))
                         errors.push(`IMEI1 (${imei1}) already exists in system`);
                     if (imei2 && globalIMEI2Set.has(imei2))
@@ -2601,10 +2633,10 @@ const App = {
                     if (serviceNo && globalServiceSet.has(serviceNo))
                         errors.push(`Service No (${serviceNo}) already exists in system`);
 
-                    // Add to payload
+                    // Add to payload – keep null values as null
                     Attributes.push({
                         RowIndex: index + 1,
-                        IMEI1: imei1,
+                        IMEI1: imei1,       // null if not provided
                         IMEI2: imei2,
                         ServiceNo: serviceNo
                     });
@@ -2616,7 +2648,6 @@ const App = {
 
                 return { Attributes, errors };
             },
-
             
             //validateDetailEntries: (row) => {
             //    const errors = [];
@@ -3337,12 +3368,36 @@ const App = {
                             debugger;
                             state.deleteMode = false;
 
+                            // ────────────────────────────────────────────────
+                            // Default to empty — will be set below
+                            // ────────────────────────────────────────────────
+                            let selectedStatusId = '';
+
+                            // Try to find matching ID from the dropdown's data source
+                            if (row.statusName && state.goodsReceiveStatusListLookupData?.length > 0) {
+                                const matchingStatus = state.goodsReceiveStatusListLookupData.find(
+                                    item =>
+                                        item.name?.trim().toLowerCase() === row.statusName?.trim().toLowerCase()
+                                );
+
+                                if (matchingStatus?.id) {
+                                    selectedStatusId = matchingStatus.id;
+                                } else {
+                                    console.warn(`No matching status ID found for name: "${row.statusName}"`);
+                                    // Optional fallback: first item or leave empty
+                                    // selectedStatusId = state.goodsReceiveStatusListLookupData[0]?.id || '';
+                                }
+                            }
+
                             Object.assign(state, {
                                 id: row.id,
                                 number: row.number,
                                 name: row.name,
                                 description: row.description,
-                                status: row.statusName,
+
+                                // Use the looked-up ID
+                                status: selectedStatusId,
+
                                 transportCharges: row.freightCharges,
                                 otherCharges: row.otherCharges,
                                 receiveDate: row.receiveDate,
@@ -3351,15 +3406,9 @@ const App = {
                             });
 
                             numberText.refresh();
-                            //if (secondaryGrid && typeof secondaryGrid?.clearBatchChanges === "function") {
-                            //    secondaryGrid.clearBatchChanges();
-                            //}
 
-
-                            // Load secondary data from API
                             await methods.populateSecondaryData(row.id);
 
-                            // Create or refresh grid
                             if (!secondaryGrid.obj) {
                                 await secondaryGrid.create(state.secondaryData);
                             } else {
@@ -3369,17 +3418,23 @@ const App = {
                             mainModal.obj.show();
                             state.showComplexDiv = true;
 
+                            // Give time for modal + dropdown to render
                             setTimeout(() => {
-                                if (secondaryGrid.obj) secondaryGrid.obj.refresh();
-                            }, 100);
+                                if (secondaryGrid.obj) {
+                                    secondaryGrid.obj.refresh();
+                                }
 
-                            if (goodsReceiveStatusListLookup.obj) {
-                                goodsReceiveStatusListLookup.obj.value = state.status;
-                            }
-                            
+                                if (goodsReceiveStatusListLookup?.obj) {
+                                    console.log('Setting status dropdown to ID:', state.status);
+                                    goodsReceiveStatusListLookup.obj.value = state.status;
+
+                                    // Force visual update (sometimes needed)
+                                    goodsReceiveStatusListLookup.obj.refresh();
+                                }
+                            }, 150);   // increased slightly — can use Vue.nextTick() if in Vue
+
                             return;
                         }
-
                         // DELETE
                         if (args.item.id === 'DeleteCustom') {
                             state.deleteMode = true;
@@ -3580,6 +3635,21 @@ const App = {
                                 }
                             }, 0); // wait for next render tick
                         }
+                        if (args.columnName === 'mrp') {
+                            setTimeout(() => {
+                                const inputEl = args.element?.querySelector('input');
+                                if (inputEl) {
+                                    inputEl.addEventListener('input', (e) => {
+                                        const val = parseFloat(e.target.value || 0);
+                                        const rowIndex = args.row?.rowIndex ?? 0;
+
+                                        if (state.secondaryData[rowIndex]) {
+                                            state.secondaryData[rowIndex].mrp = val;
+                                        }
+                                    });
+                                }
+                            }, 0); // wait for next render tick
+                        }
                     },
 
                     // ✅ Save handler when cell edit completes
@@ -3598,6 +3668,21 @@ const App = {
 
                             // Recalculate all after save
                             methods.recalculateFinalPrices();
+                        }
+                        if (args.columnName === 'mrp') {
+                            setTimeout(() => {
+                                const inputEl = args.element?.querySelector('input');
+                                if (inputEl) {
+                                    inputEl.addEventListener('input', (e) => {
+                                        const val = parseFloat(e.target.value || 0);
+                                        const rowIndex = args.row?.rowIndex ?? 0;
+
+                                        if (state.secondaryData[rowIndex]) {
+                                            state.secondaryData[rowIndex].mrp = val;
+                                        }
+                                    });
+                                }
+                            }, 0); // wait for next render tick
                         }
                     },
                     queryCellInfo: (args) => {

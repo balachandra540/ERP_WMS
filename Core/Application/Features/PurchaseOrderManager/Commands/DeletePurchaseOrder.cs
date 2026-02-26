@@ -50,7 +50,7 @@ public class DeletePurchaseOrderHandler : IRequestHandler<DeletePurchaseOrderReq
         }
 
         entity.UpdatedById = request.DeletedById;
-
+        entity.UpdatedAtUtc = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
         _repository.Delete(entity);
         await _unitOfWork.SaveAsync(cancellationToken);
 

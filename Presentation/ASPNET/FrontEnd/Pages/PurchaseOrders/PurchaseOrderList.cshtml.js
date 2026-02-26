@@ -47,6 +47,7 @@
         const secondaryGridRef = Vue.ref(null);
 
         const validateForm = function () {
+            // Reset errors
             state.errors.orderDate = '';
             state.errors.vendorId = '';
             state.errors.taxId = '';
@@ -55,124 +56,148 @@
 
             let isValid = true;
 
-            // Validate form fields
+            // ── Validate main form fields ────────────────────────────────────────
             if (!state.orderDate) {
                 state.errors.orderDate = 'Order date is required.';
                 isValid = false;
             }
+
             if (!state.vendorId) {
                 state.errors.vendorId = 'Vendor is required.';
                 isValid = false;
-            }            
+            }
+
             if (!state.orderStatus) {
                 state.errors.orderStatus = 'Order status is required.';
                 isValid = false;
             }
-            debugger;
 
-            // 🔥 FORCE grid to commit the current edit
+            // ── Force commit any in-progress cell/row edit ───────────────────────
             if (secondaryGrid.obj && secondaryGrid.obj.isEdit) {
                 console.log("Ending edit mode before validation...");
-                 secondaryGrid.obj.endEdit();
+                secondaryGrid.obj.endEdit();
             }
 
-            // GET BATCH CHANGES HERE
+            // ── Read current batch state ─────────────────────────────────────────
             const batchChanges = secondaryGrid.getBatchChanges();
 
-            console.log('Validation Time - Reading Batch Changes:');
-            console.log('Added Records:', batchChanges.addedRecords);
-            console.log('Changed Records:', batchChanges.changedRecords);
-            console.log('Deleted Records:', batchChanges.deletedRecords);
-
-            // Initialize data
-            //let currentSecondaryData = state.id !== ""
-            //    ? [...state.secondaryData]
-            //    : [...(batchChanges.changedRecords || [])];
+            console.log('Validation Time - Batch Changes:');
+            console.log('Added:', batchChanges.addedRecords || []);
+            console.log('Changed:', batchChanges.changedRecords || []);
+            console.log('Deleted:', batchChanges.deletedRecords || []);
 
             let currentSecondaryData = [...state.secondaryData];
 
-            // Helper function to match records
-            const matchRecord = (a, b) => {
-                if (a.purchaseOrderItemId && b.purchaseOrderItemId) {
-                    return a.purchaseOrderItemId === b.purchaseOrderItemId;
-                }
+            // ── Match helper ── only by ID when we have real persisted records ───
+            const matchById = (a, b) => {
                 if (a.id && b.id) {
                     return a.id === b.id;
                 }
                 return false;
             };
 
-            // Apply batch changes
+            // ── Apply changed records (merge updates) ────────────────────────────
             const changedRecords = batchChanges.changedRecords || [];
-            for (let changed of changedRecords) {
-                const index = currentSecondaryData.findIndex(item => matchRecord(item, changed));
+            for (const changed of changedRecords) {
+                const index = currentSecondaryData.findIndex(item => matchById(item, changed));
                 if (index !== -1) {
-                    currentSecondaryData[index] = { ...currentSecondaryData[index], ...changed };
+                    currentSecondaryData[index] = {
+                        ...currentSecondaryData[index],
+                        ...changed,
+                        // Protect important / calculated fields if needed
+                        unitPrice: changed.unitPrice ?? currentSecondaryData[index].unitPrice,
+                        quantity: changed.quantity ?? currentSecondaryData[index].quantity,
+                        taxId: changed.taxId ?? currentSecondaryData[index].taxId,
+                        taxAmount: changed.taxAmount ?? currentSecondaryData[index].taxAmount,
+                        totalAfterTax: changed.totalAfterTax ?? currentSecondaryData[index].totalAfterTax,
+                        total: changed.total ?? currentSecondaryData[index].total,
+                        attribute1DetailId: changed.attribute1DetailId ?? currentSecondaryData[index].attribute1DetailId,
+                        attribute2DetailId: changed.attribute2DetailId ?? currentSecondaryData[index].attribute2DetailId
+                    };
                 }
             }
 
-            // Filter deleted records
-            const deletedRecords = batchChanges.deletedRecords || [];
+            // ── Remove deleted records (by ID) ───────────────────────────────────
+            const deletedRecords = (batchChanges.deletedRecords || []).flat(Infinity);
+
             if (deletedRecords.length > 0) {
-                currentSecondaryData = currentSecondaryData.filter(item =>
-                    !deletedRecords.some(deleted => matchRecord(item, deleted))
+                const deletedIds = new Set(
+                    deletedRecords.filter(r => r.id).map(r => r.id)
+                );
+                currentSecondaryData = currentSecondaryData.filter(
+                    item => !deletedIds.has(item.id)
                 );
             }
 
-            //// Add new records
-            //const addedRecords = batchChanges.addedRecords || [];
-            //if (addedRecords.length > 0) {
-            //    currentSecondaryData = [...currentSecondaryData, ...addedRecords];
-            //}
-
-            const addedRecords = batchChanges.addedRecords || [];
-
-            for (let added of addedRecords) {
-                const exists = currentSecondaryData.some(item => matchRecord(item, added));
-
-                if (!exists) {
-                    currentSecondaryData.push(added);
-                } else {
-                    console.warn("Duplicate prevented for product:", added.productId);
-                }
+            // ── Helper: decide if two rows are "business duplicates" ────────────────
+            function isBusinessDuplicate(a, b) {
+                // Must match on product + both attributes + quantity + rate (adjust as needed)
+                return (
+                    String(a.productId || '') === String(b.productId || '') &&
+                    String(a.attribute1DetailId || a.attribute1 || '') === String(b.attribute1DetailId || b.attribute1 || '') &&
+                    String(a.attribute2DetailId || a.attribute2 || '') === String(b.attribute2DetailId || b.attribute2 || '') &&
+                    Number(a.quantity) === Number(b.quantity) &&
+                    Number(a.unitPrice || a.rate) === Number(b.unitPrice || b.rate)
+                    // Add more fields if needed: discount, batchNo, expiry, etc.
+                );
             }
 
-            console.log('Final data for validation:', currentSecondaryData);
+            // ── In the ADD loop (replace existing for-of addedRecords) ───────────────
+            const addedRecords = batchChanges.addedRecords || [];
 
-            // Check if there are items
+            for (const added of addedRecords) {
+                if (!added.productId) continue;
+
+                // Check if this exact combination already exists in current data
+                const isDup = currentSecondaryData.some(existing =>
+                    isBusinessDuplicate(existing, added)
+                );
+
+                if (isDup) {
+                    console.warn(`Prevented identical duplicate line: ${added.productId} / ${added.attribute1 || ''} / ${added.attribute2 || ''}`);
+                    continue;  // skip adding
+                }
+
+                // Safe to add
+                currentSecondaryData.push({ ...added });
+            }
+            console.log('Final data after applying batch changes:', currentSecondaryData);
+
+            // ── Grid-level validation ────────────────────────────────────────────
             if (currentSecondaryData.length === 0) {
                 state.errors.gridItems.push('At least one item must be added to the order.');
                 isValid = false;
             }
 
-            // Validate each item
-            for (let i = 0; i < currentSecondaryData.length; i++) {
-                const record = currentSecondaryData[i];
+            // ── Per-row validation ───────────────────────────────────────────────
+            currentSecondaryData.forEach((record, i) => {
+                const rowNum = i + 1;
 
                 if (!record.productId) {
-                    state.errors.gridItems.push(`Row ${i + 1}: Product is required.`);
+                    state.errors.gridItems.push(`Row ${rowNum}: Product is required.`);
                     isValid = false;
                 }
 
                 if (!record.taxId) {
-                    state.errors.gridItems.push(`Row ${i + 1}: Tax is required.`);
+                    state.errors.gridItems.push(`Row ${rowNum}: Tax is required.`);
                     isValid = false;
                 }
 
-                if (!record.quantity || record.quantity <= 0) {
-                    state.errors.gridItems.push(`Row ${i + 1}: Quantity must be greater than 0.`);
+                if (record.quantity == null || record.quantity <= 0) {
+                    state.errors.gridItems.push(`Row ${rowNum}: Quantity must be greater than 0.`);
                     isValid = false;
                 }
 
-                if (!record.unitPrice || record.unitPrice <= 0) {
-                    state.errors.gridItems.push(`Row ${i + 1}: Unit price must be greater than 0.`);
+                if (record.unitPrice == null || record.unitPrice <= 0) {
+                    state.errors.gridItems.push(`Row ${rowNum}: Unit price must be greater than 0.`);
                     isValid = false;
                 }
-            }
+
+                // Optional: add more rules here (e.g. attribute1DetailId if mandatory)
+            });
 
             return isValid;
         };
-
         const resetFormState = () => {
             state.id = '';
             state.number = '';
@@ -538,86 +563,102 @@
                 state.totalAmount = NumberFormatManager.formatToLocale(grandTotal ?? 0);
             },
             prepareSecondaryDataForSubmission: function () {
-                // Get batch changes from grid
                 const batchChanges = secondaryGrid.getBatchChanges();
-
                 console.log('Batch Changes:', batchChanges);
 
-                // Initialize with existing data if record exists, otherwise use changed records
-                //let currentSecondaryData = state.id !== ""
-                //    ? [...state.secondaryData]
-                //    : [...(batchChanges.changedRecords || [])];
-
                 let currentSecondaryData = [...state.secondaryData];
-                   
 
-                // Helper function to match records by ID or purchaseOrderItemId
-                const matchRecord = (a, b) => {
-                    if (a.purchaseOrderItemId && b.purchaseOrderItemId) {
-                        return a.purchaseOrderItemId === b.purchaseOrderItemId;
-                    }
+                // ────────────────────────────────────────────────
+                // Helper: match records by ID when editing (most reliable)
+                // ────────────────────────────────────────────────
+                const matchById = (a, b) => {
+                    // Only use real persisted IDs
                     if (a.id && b.id) {
                         return a.id === b.id;
                     }
                     return false;
                 };
 
-                // Apply changed records - merge updates with existing data
+               
+                // ────────────────────────────────────────────────
+                // Apply changed records (only by ID when editing)
+                // ────────────────────────────────────────────────
                 const changedRecords = batchChanges.changedRecords || [];
-                for (let changed of changedRecords) {
-                    const index = currentSecondaryData.findIndex(item =>
-                        matchRecord(item, changed)
-                    );
+                for (const changed of changedRecords) {
+                    const index = currentSecondaryData.findIndex(item => matchById(item, changed));
 
                     if (index !== -1) {
-                        // Merge changed data with existing record, preserving important fields
                         currentSecondaryData[index] = {
                             ...currentSecondaryData[index],
                             ...changed,
-                            // Ensure these critical fields are properly set
+                            // Explicitly preserve / override important calculated fields
                             unitPrice: changed.unitPrice ?? currentSecondaryData[index].unitPrice,
                             quantity: changed.quantity ?? currentSecondaryData[index].quantity,
                             taxId: changed.taxId ?? currentSecondaryData[index].taxId,
                             taxAmount: changed.taxAmount ?? currentSecondaryData[index].taxAmount,
                             totalAfterTax: changed.totalAfterTax ?? currentSecondaryData[index].totalAfterTax,
                             total: changed.total ?? currentSecondaryData[index].total,
-                            // 🔥 ADD ATTRIBUTE FIELDS
                             attribute1DetailId: changed.attribute1DetailId ?? currentSecondaryData[index].attribute1DetailId,
                             attribute2DetailId: changed.attribute2DetailId ?? currentSecondaryData[index].attribute2DetailId
                         };
                     }
+                    // If not found → ignore (maybe already deleted or new row changed before save)
                 }
 
-                // Remove deleted items from the data array - FLATTEN IF NESTED
-                let deletedRecords = batchChanges.deletedRecords || [];
-                deletedRecords = deletedRecords.flat(Infinity);  // ADD THIS LINE
+                // ────────────────────────────────────────────────
+                // Handle deletions (by ID)
+                // ────────────────────────────────────────────────
+                let deletedRecords = (batchChanges.deletedRecords || []).flat(Infinity);
 
-                //// Add newly created records
-                //const addedRecords = batchChanges.addedRecords || [];
-                //if (addedRecords.length > 0) {
-                //    currentSecondaryData = [...currentSecondaryData, ...addedRecords];
-                //}
+                if (deletedRecords.length > 0) {
+                    const deletedIds = new Set(
+                        deletedRecords
+                            .filter(r => r.id)
+                            .map(r => r.id)
+                    );
 
+                    currentSecondaryData = currentSecondaryData.filter(item => !deletedIds.has(item.id));
+                }
+
+                // ── Helper: decide if two rows are "business duplicates" ────────────────
+                function isBusinessDuplicate(a, b) {
+                    // Must match on product + both attributes + quantity + rate (adjust as needed)
+                    return (
+                        String(a.productId || '') === String(b.productId || '') &&
+                        String(a.attribute1DetailId || a.attribute1 || '') === String(b.attribute1DetailId || b.attribute1 || '') &&
+                        String(a.attribute2DetailId || a.attribute2 || '') === String(b.attribute2DetailId || b.attribute2 || '') &&
+                        Number(a.quantity) === Number(b.quantity) &&
+                        Number(a.unitPrice || a.rate) === Number(b.unitPrice || b.rate)
+                        // Add more fields if needed: discount, batchNo, expiry, etc.
+                    );
+                }
+
+                // ── In the ADD loop (replace existing for-of addedRecords) ───────────────
                 const addedRecords = batchChanges.addedRecords || [];
 
-                for (let added of addedRecords) {
-                    const exists = currentSecondaryData.some(item => matchRecord(item, added));
+                for (const added of addedRecords) {
+                    if (!added.productId) continue;
 
-                    if (!exists) {
-                        currentSecondaryData.push(added);
-                    } else {
-                        console.warn("Duplicate prevented for product:", added.productId);
+                    // Check if this exact combination already exists in current data
+                    const isDup = currentSecondaryData.some(existing =>
+                        isBusinessDuplicate(existing, added)
+                    );
+
+                    if (isDup) {
+                        console.warn(`Prevented identical duplicate line: ${added.productId} / ${added.attribute1 || ''} / ${added.attribute2 || ''}`);
+                        continue;  // skip adding
                     }
+
+                    // Safe to add
+                    currentSecondaryData.push({ ...added });
                 }
-
-                // Validate and filter final items
+                // ────────────────────────────────────────────────
+                // Final validation
+                // ────────────────────────────────────────────────
                 const validItems = currentSecondaryData.filter(item => {
-                    // Check required fields
-                    if (!item.productId || item.productId === undefined) return false;
-                    if (item.quantity === undefined || item.quantity === null || item.quantity <= 0) return false;
-                    if (item.unitPrice === undefined || item.unitPrice === null) return false;
-
-                    
+                    if (!item.productId) return false;
+                    if (item.quantity == null || item.quantity <= 0) return false;
+                    if (item.unitPrice == null) return false;
                     return true;
                 });
 
@@ -635,7 +676,6 @@
                     }
                 };
             },
-
             handleFormSubmit: async () => {
                 try {
                     state.isSubmitting = true;
@@ -1191,7 +1231,17 @@
                                 state.vendorId = selectedRecord.vendorId ?? '';
                                 state.taxId = selectedRecord.taxId ?? '';
                                 taxListLookup.trackingChange = true;
-                                state.orderStatus = String(selectedRecord.orderStatusName ?? '');
+                                //state.orderStatus = String(selectedRecord.orderStatusName ?? '');
+                                state.orderStatus = ''; // default
+
+                                if (selectedRecord.orderStatusName && state.purchaseOrderStatusListLookupData) {
+                                    const matchingItem = state.purchaseOrderStatusListLookupData.find(
+                                        item => item.name === selectedRecord.orderStatusName
+                                    );
+                                    if (matchingItem) {
+                                        state.orderStatus = matchingItem.id;
+                                    }
+                                }
                                 state.showComplexDiv = true;
 
                                 await methods.populateSecondaryData(selectedRecord.id);
@@ -1497,7 +1547,7 @@
                         {
                             field: 'quantity',
                             headerText: 'Quantity',
-                            width: 100,
+                            width: 140,
                             validationRules: {
                                 required: true,
                                 custom: [(args) => {
