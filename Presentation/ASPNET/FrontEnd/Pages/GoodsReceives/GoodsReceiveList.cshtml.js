@@ -3509,7 +3509,7 @@ const App = {
                         {
                             field: 'receivedQuantity',
                             headerText: 'Received Quantity',
-                            width: 100,
+                            width: 140,
                             textAlign: 'Right',
                             format: 'N0',
                             editType: 'numericedit',

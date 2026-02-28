@@ -644,7 +644,7 @@
                     let currentSecondaryData = [...state.secondaryData];
 
                     const matchRecord = (a, b) =>
-                        (a.productId && b.productId && a.productId === b.productId) ||
+                        (a.productId && b.productId && a.pluCode && b.pluCode && a.productId === b.productId && a.pluCode == b.pluCode) ||
                         (a.id && b.id && a.id === b.id);
 
                     // -------------------------------
@@ -785,6 +785,9 @@
                 state.errors.warehouseFromId = '';
                 state.errors.warehouseToId = '';
                 state.errors.status = '';
+                secondaryGrid.clearBatchChanges();
+
+
             },
             onMainModalShown: () => {
                 if (state.isAddMode) {
@@ -794,47 +797,44 @@
                 }
 
             },
-            openDetailModal:  (RowIndex) => {
-                debugger;
+            openDetailModal: (rowIndex) => {
 
-
-                if (RowIndex === -1) {
-                    console.error("Row not found for PO:", saleItemId);
+                if (rowIndex === -1 || !state.secondaryData[rowIndex]) {
+                    console.error("Row not found.");
                     return;
                 }
 
-                //state.currentDetailSaleItemId = saleItemId;
-                state.currentDetailRowIndex = RowIndex;
+                state.currentDetailRowIndex = rowIndex;
 
-                const originalRow = state.secondaryData[RowIndex];
+                const originalRow = state.secondaryData[rowIndex];
 
-                // -------------------------------------------------------
-                // -------------------------------------------------------
+                // Deep clone row
                 state.activeDetailRow = JSON.parse(JSON.stringify(originalRow));
-
                 const rowData = state.activeDetailRow;
 
-                // -------------------------------------------------------
-                // 3. LOAD PRODUCT
-                // -------------------------------------------------------
+                // -------------------------------
+                // LOAD PRODUCT
+                // -------------------------------
                 const product = state.productListLookupData.find(p => p.id === rowData.productId);
+
                 if (!product) {
                     Swal.fire("Error", "Product not found.", "error");
                     return;
                 }
 
-                // -------------------------------------------------------
-                // 4. CHECK RECEIVED QUANTITY FIRST
-                // -------------------------------------------------------
-                const qty = parseFloat(rowData.requestStock || 0);
+                // -------------------------------
+                // CHECK QUANTITY
+                // -------------------------------
+                const qty = parseInt(rowData.requestStock || 0);
 
                 if (!qty || qty <= 0) {
                     document.getElementById("detailFormArea").innerHTML = `
             <div class="alert alert-warning text-center p-2">
                 <strong>No Quantity Entered.</strong><br/>
-                Please enter Received Quantity first.
+                Please enter received quantity first.
             </div>
         `;
+
                     Swal.fire({
                         icon: "error",
                         title: "Validation Error",
@@ -843,24 +843,25 @@
                     return;
                 }
 
-                // -------------------------------------------------------
-                // 5. BUILD FIELDS BASED ON PRODUCT CONFIG
-                // -------------------------------------------------------
-                let fields = [];
-                if (product.imei1) fields.push("imeI1");
-                if (product.imei2) fields.push("imeI2");
+                // -------------------------------
+                // BUILD FIELD LIST (CASE SAFE)
+                // -------------------------------
+                const fields = [];
+
+                if (product.imei1) fields.push("imei1");
+                if (product.imei2) fields.push("imei2");
                 if (product.serviceNo) fields.push("serviceNo");
 
                 const existingDetails = rowData.detailEntries || [];
 
-                // -------------------------------------------------------
-                // 6. BUILD HTML TABLE
-                // -------------------------------------------------------
+                // -------------------------------
+                // BUILD TABLE
+                // -------------------------------
                 let html = `
         <table class="table table-bordered table-sm">
             <thead>
                 <tr>
-                    ${fields.map(f => `<th>${f}</th>`).join("")}
+                    ${fields.map(f => `<th>${f.toUpperCase()}</th>`).join("")}
                 </tr>
             </thead>
             <tbody>
@@ -868,21 +869,32 @@
 
                 for (let i = 0; i < qty; i++) {
                     html += `<tr>`;
+
                     fields.forEach(field => {
-                        const val =
-                            existingDetails[i] && existingDetails[i][field]
-                                ? existingDetails[i][field]
-                                : "";
+                        //const value = existingDetails[i]?.[field] || existingDetails[i]?.[field.toLowerCase()] || "";
+                        const detailRow = existingDetails[i] || {};
+
+                        const value = Object.keys(detailRow).find(
+                            k => k.toLowerCase() === field.toLowerCase()
+                        )
+                            ? detailRow[
+                            Object.keys(detailRow).find(
+                                k => k.toLowerCase() === field.toLowerCase()
+                            )
+                            ]
+                            : "";
+
                         html += `
                 <td>
-                    <input type="text" 
+                    <input type="text"
                            class="form-control detail-input"
                            data-index="${i}"
                            data-field="${field}"
-                           value="${val}">
+                           value="${value}">
                 </td>
             `;
                     });
+
                     html += `</tr>`;
                 }
 
@@ -893,35 +905,158 @@
 
                 document.getElementById("detailFormArea").innerHTML = html;
 
-                 methods.attachDetailInputEvents(product);
+                methods.attachDetailInputEvents(product);
 
-
-                // -------------------------------------------------------
-                // 7. OPEN MODAL
-                // -------------------------------------------------------
+                // -------------------------------
+                // OPEN MODAL
+                // -------------------------------
                 const modalEl = document.getElementById("detailModal");
                 const modal = new bootstrap.Modal(modalEl);
                 modal.show();
 
-                // -------------------------------------------------------
-                // 8. Save: Merge values back into original row
-                // -------------------------------------------------------
+                // Save button
                 document.getElementById("detailSaveBtn").onclick = (e) => {
                     e.preventDefault();
                     methods.saveDetailEntries();
                     modal.hide();
                 };
 
-                // -------------------------------------------------------
-                // 9. FIX SCROLL ISSUE — Restore main modal scroll
-                // -------------------------------------------------------
+                // Fix scroll restore
                 modalEl.addEventListener("hidden.bs.modal", () => {
                     const mainModal = document.getElementById("MainModal");
-                    if (mainModal.classList.contains("show")) {
+                    if (mainModal && mainModal.classList.contains("show")) {
                         document.body.classList.add("modal-open");
                     }
                 });
             },
+    //        openDetailModal:  (RowIndex) => {
+    //            debugger;
+
+
+    //            if (RowIndex === -1) {
+    //                console.error("Row not found for PO:", saleItemId);
+    //                return;
+    //            }
+
+    //            //state.currentDetailSaleItemId = saleItemId;
+    //            state.currentDetailRowIndex = RowIndex;
+
+    //            const originalRow = state.secondaryData[RowIndex];
+
+    //            // -------------------------------------------------------
+    //            // -------------------------------------------------------
+    //            state.activeDetailRow = JSON.parse(JSON.stringify(originalRow));
+
+    //            const rowData = state.activeDetailRow;
+
+    //            // -------------------------------------------------------
+    //            // 3. LOAD PRODUCT
+    //            // -------------------------------------------------------
+    //            const product = state.productListLookupData.find(p => p.id === rowData.productId);
+    //            if (!product) {
+    //                Swal.fire("Error", "Product not found.", "error");
+    //                return;
+    //            }
+
+    //            // -------------------------------------------------------
+    //            // 4. CHECK RECEIVED QUANTITY FIRST
+    //            // -------------------------------------------------------
+    //            const qty = parseFloat(rowData.requestStock || 0);
+
+    //            if (!qty || qty <= 0) {
+    //                document.getElementById("detailFormArea").innerHTML = `
+    //        <div class="alert alert-warning text-center p-2">
+    //            <strong>No Quantity Entered.</strong><br/>
+    //            Please enter Received Quantity first.
+    //        </div>
+    //    `;
+    //                Swal.fire({
+    //                    icon: "error",
+    //                    title: "Validation Error",
+    //                    text: "Please enter received quantity before adding attributes."
+    //                });
+    //                return;
+    //            }
+
+    //            // -------------------------------------------------------
+    //            // 5. BUILD FIELDS BASED ON PRODUCT CONFIG
+    //            // -------------------------------------------------------
+    //            let fields = [];
+    //            if (product.imei1) fields.push("imeI1");
+    //            if (product.imei2) fields.push("imeI2");
+    //            if (product.serviceNo) fields.push("serviceNo");
+
+    //            const existingDetails = rowData.detailEntries || [];
+
+    //            // -------------------------------------------------------
+    //            // 6. BUILD HTML TABLE
+    //            // -------------------------------------------------------
+    //            let html = `
+    //    <table class="table table-bordered table-sm">
+    //        <thead>
+    //            <tr>
+    //                ${fields.map(f => `<th>${f}</th>`).join("")}
+    //            </tr>
+    //        </thead>
+    //        <tbody>
+    //`;
+
+    //            for (let i = 0; i < qty; i++) {
+    //                html += `<tr>`;
+    //                fields.forEach(field => {
+    //                    const val =
+    //                        existingDetails[i] && existingDetails[i][field]
+    //                            ? existingDetails[i][field]
+    //                            : "";
+    //                    html += `
+    //            <td>
+    //                <input type="text" 
+    //                       class="form-control detail-input"
+    //                       data-index="${i}"
+    //                       data-field="${field}"
+    //                       value="${val}">
+    //            </td>
+    //        `;
+    //                });
+    //                html += `</tr>`;
+    //            }
+
+    //            html += `
+    //        </tbody>
+    //    </table>
+    //`;
+
+    //            document.getElementById("detailFormArea").innerHTML = html;
+
+    //             methods.attachDetailInputEvents(product);
+
+
+    //            // -------------------------------------------------------
+    //            // 7. OPEN MODAL
+    //            // -------------------------------------------------------
+    //            const modalEl = document.getElementById("detailModal");
+    //            const modal = new bootstrap.Modal(modalEl);
+    //            modal.show();
+
+    //            // -------------------------------------------------------
+    //            // 8. Save: Merge values back into original row
+    //            // -------------------------------------------------------
+    //            document.getElementById("detailSaveBtn").onclick = (e) => {
+    //                e.preventDefault();
+    //                methods.saveDetailEntries();
+    //                modal.hide();
+    //            };
+
+    //            // -------------------------------------------------------
+    //            // 9. FIX SCROLL ISSUE — Restore main modal scroll
+    //            // -------------------------------------------------------
+    //            modalEl.addEventListener("hidden.bs.modal", () => {
+    //                const mainModal = document.getElementById("MainModal");
+    //                if (mainModal.classList.contains("show")) {
+    //                    document.body.classList.add("modal-open");
+    //                }
+    //            });
+    //        },
             showInlineError: (input, message) => {
                 let errorEl = input.nextElementSibling;
 
@@ -974,10 +1109,12 @@
                     // KEYDOWN (restrict characters)
                     // ---------------------------
                     input.addEventListener("keydown", (e) => {
-                        const field = input.dataset.field;
+                        //const field = input.dataset.field
+                        const field = input.dataset.field.toLowerCase();
+
                         const key = e.key;
 
-                        if (field === "IMEI1" || field === "IMEI2") {
+                        if (field.toUpperCase() === "IMEI1" || field.toUpperCase() === "IMEI2") {
                             const isDigit =
                                 /^\d$/.test(key) ||
                                 ["Backspace", "Delete", "ArrowLeft", "ArrowRight", "Tab"].includes(key);
@@ -1004,23 +1141,167 @@
                 });
             },
 
-            handleDetailValueChange:  async (input, product) => {
+            //handleDetailValueChange:  async (input, product) => {
+            //    const value = input.value.trim();
+            //    const field = input.dataset.field;
+            //    const index = parseInt(input.dataset.index, 10);
+
+            //    // ---------------------------
+            //    // IMEI VALIDATION
+            //    // ---------------------------
+            //    if (field.toUpperCase() === "IMEI1" || field.toUpperCase() === "IMEI2") {
+
+            //        if (value.length > 0 && value.length < 15) {
+            //            methods.showInlineError(input, `${field} must be 15 digits`);
+            //            return;
+            //        }
+
+            //        if (value.length === 15 && !/^\d{15}$/.test(value)) {
+            //            methods.showInlineError(input, `${field} must contain only digits`);
+            //            return;
+            //        }
+            //    }
+
+            //    if (!value) {
+            //        methods.clearInlineError(input);
+            //        return;
+            //    }
+
+            //    // ---------------------------
+            //    // BUILD IDENTIFIER PAYLOAD
+            //    // ---------------------------
+            //    let imei1Value = '';
+            //    let imei2Value = '';
+            //    let serviceNoValue = '';
+
+            //    if (field === "imeI1") imei1Value = value;
+            //    if (field === "imeI2") imei2Value = value;
+            //    if (field === "serviceNo") serviceNoValue = value;
+
+            //    try {
+            //        const response =await services.GetProductAttributesByProductId(
+            //            {
+            //                imei1: imei1Value,
+            //                imei2: imei2Value,
+            //                serviceNo: serviceNoValue
+            //            },
+            //            product.id
+            //        );
+
+            //        const data = response?.data?.content;
+
+            //        // ❌ NO MATCH
+            //        if (!data || !data.attributes || data.attributes.length === 0) {
+            //            methods.showInlineError(input, "No matching stock found");
+            //            return;
+            //        }
+
+            //        // ✅ EXACT MATCH (backend already filtered)
+            //        const matched = data.attributes[0];
+
+            //        // ---------------------------
+            //        // ENSURE STATE
+            //        // ---------------------------
+            //        if (!state.activeDetailRow.detailEntries) {
+            //            state.activeDetailRow.detailEntries = [];
+            //        }
+            //        if (!state.activeDetailRow.detailEntries[index]) {
+            //            state.activeDetailRow.detailEntries[index] = {};
+            //        }
+
+            //        // Save current value
+            //        state.activeDetailRow.detailEntries[index][field] = value;
+
+            //        // ---------------------------
+            //        // AUTO-BIND REMAINING FIELDS (NEW)
+            //        // ---------------------------
+            //         methods.autoBindRemainingFieldsFromApi(
+            //            index,
+            //            matched,
+            //            field
+            //        );
+
+            //        methods.clearInlineError(input);
+
+            //        //document.getElementById("detailSaveBtn").onclick = () => {
+            //        //    methods.saveDetailEntries();
+            //        //    modal.hide();
+            //        //};
+
+
+            //    } catch (error) {
+            //        console.error("❌ IMEI lookup failed:", error);
+            //        Swal.fire({
+            //            icon: "error",
+            //            title: "Error",
+            //            text: "Failed to fetch product stock",
+            //            timer: 2000
+            //        });
+            //    }
+            //},
+
+
+            //autoBindRemainingFieldsFromApi:  (index, matched, matchedField) => {
+
+            //    const fieldMap = {
+            //        imeI1: matched.imeI1,
+            //        imeI2: matched.imeI2,
+            //        serviceNo: matched.serviceNo
+            //    };
+
+            //    Object.keys(fieldMap).forEach(field => {
+
+            //        if (field === matchedField) return;
+
+            //        const val = fieldMap[field];
+            //        if (!val) return;
+
+            //        //if (state.activeDetailRow.detailEntries[index][field]) return;
+
+            //        // Save to state
+            //        state.activeDetailRow.detailEntries[index][field] = val;
+
+            //        // Bind to UI
+            //        const input = document.querySelector(
+            //            `.detail-input[data-index="${index}"][data-field="${field}"]`
+            //        );
+
+            //        if (input) {
+            //            input.value = val;
+            //            //input.readOnly = true;
+            //            input.classList.add("auto-filled");
+            //        }
+            //    });
+
+            //    // Lock the entered field also
+            //    const matchedInput = document.querySelector(
+            //        `.detail-input[data-index="${index}"][data-field="${matchedField}"]`
+            //    );
+
+            //    if (matchedInput) {
+            //        matchedInput.readOnly = true;
+            //        matchedInput.classList.add("auto-filled");
+            //    }
+            //},
+            handleDetailValueChange: async (input, product) => {
+                debugger;
                 const value = input.value.trim();
-                const field = input.dataset.field;
+                //const field = input.dataset.field; // always camelCase now
+                const field = input.dataset.field.toLowerCase(); // always camelCase now
                 const index = parseInt(input.dataset.index, 10);
 
                 // ---------------------------
-                // IMEI VALIDATION
+                // IMEI VALIDATION (CASE SAFE)
                 // ---------------------------
-                if (field === "imeI1" || field === "imeI2") {
+                if (field === "imei1" || field === "imei2") {
 
                     if (value.length > 0 && value.length < 15) {
-                        methods.showInlineError(input, `${field} must be 15 digits`);
+                        methods.showInlineError(input, `${field.toUpperCase()} must be 15 digits`);
                         return;
                     }
 
                     if (value.length === 15 && !/^\d{15}$/.test(value)) {
-                        methods.showInlineError(input, `${field} must contain only digits`);
+                        methods.showInlineError(input, `${field.toUpperCase()} must contain only digits`);
                         return;
                     }
                 }
@@ -1031,18 +1312,19 @@
                 }
 
                 // ---------------------------
-                // BUILD IDENTIFIER PAYLOAD
+                // BUILD IDENTIFIER PAYLOAD (CASE SAFE)
                 // ---------------------------
-                let imei1Value = '';
-                let imei2Value = '';
-                let serviceNoValue = '';
+                let imei1Value = "";
+                let imei2Value = "";
+                let serviceNoValue = "";
 
-                if (field === "imeI1") imei1Value = value;
-                if (field === "imeI2") imei2Value = value;
+                if (field === "imei1") imei1Value = value;
+                if (field === "imei2") imei2Value = value;
                 if (field === "serviceNo") serviceNoValue = value;
 
                 try {
-                    const response =await services.GetProductAttributesByProductId(
+
+                    const response = await services.GetProductAttributesByProductId(
                         {
                             imei1: imei1Value,
                             imei2: imei2Value,
@@ -1058,27 +1340,29 @@
                         methods.showInlineError(input, "No matching stock found");
                         return;
                     }
+                    debugger;
 
-                    // ✅ EXACT MATCH (backend already filtered)
+                    // ✅ MATCH FOUND
                     const matched = data.attributes[0];
 
                     // ---------------------------
-                    // ENSURE STATE
+                    // ENSURE STATE STRUCTURE
                     // ---------------------------
                     if (!state.activeDetailRow.detailEntries) {
                         state.activeDetailRow.detailEntries = [];
                     }
+
                     if (!state.activeDetailRow.detailEntries[index]) {
                         state.activeDetailRow.detailEntries[index] = {};
                     }
 
-                    // Save current value
+                    // Save entered value
                     state.activeDetailRow.detailEntries[index][field] = value;
 
                     // ---------------------------
-                    // AUTO-BIND REMAINING FIELDS (NEW)
+                    // AUTO BIND REMAINING FIELDS
                     // ---------------------------
-                     methods.autoBindRemainingFieldsFromApi(
+                    methods.autoBindRemainingFieldsFromApi(
                         index,
                         matched,
                         field
@@ -1086,14 +1370,10 @@
 
                     methods.clearInlineError(input);
 
-                    //document.getElementById("detailSaveBtn").onclick = () => {
-                    //    methods.saveDetailEntries();
-                    //    modal.hide();
-                    //};
-
-
                 } catch (error) {
-                    console.error("❌ IMEI lookup failed:", error);
+
+                    console.error("IMEI lookup failed:", error);
+
                     Swal.fire({
                         icon: "error",
                         title: "Error",
@@ -1102,13 +1382,14 @@
                     });
                 }
             },
+            autoBindRemainingFieldsFromApi: (index, matched, matchedField) => {
 
-
-            autoBindRemainingFieldsFromApi:  (index, matched, matchedField) => {
-
+                // ---------------------------
+                // SAFE FIELD MAP (camelCase only)
+                // ---------------------------
                 const fieldMap = {
-                    imeI1: matched.imeI1,
-                    imeI2: matched.imeI2,
+                    imei1: matched.imei1 || matched.imeI1,
+                    imei2: matched.imei2 || matched.imeI2,
                     serviceNo: matched.serviceNo
                 };
 
@@ -1119,9 +1400,12 @@
                     const val = fieldMap[field];
                     if (!val) return;
 
-                    //if (state.activeDetailRow.detailEntries[index][field]) return;
+                    // Ensure state structure
+                    if (!state.activeDetailRow.detailEntries[index]) {
+                        state.activeDetailRow.detailEntries[index] = {};
+                    }
 
-                    // Save to state
+                    // Save into state
                     state.activeDetailRow.detailEntries[index][field] = val;
 
                     // Bind to UI
@@ -1131,50 +1415,91 @@
 
                     if (input) {
                         input.value = val;
-                        //input.readOnly = true;
                         input.classList.add("auto-filled");
+                    //    input.readOnly = true;
                     }
                 });
 
-                // Lock the entered field also
+                // ---------------------------
+                // Lock matched input also
+                // ---------------------------
                 const matchedInput = document.querySelector(
                     `.detail-input[data-index="${index}"][data-field="${matchedField}"]`
                 );
 
                 if (matchedInput) {
-                    matchedInput.readOnly = true;
+                    //matchedInput.readOnly = true;
                     matchedInput.classList.add("auto-filled");
                 }
             },
-            saveDetailEntries:  () => {
-                
+            //saveDetailEntries:  () => {
+
+
+            //    const rowIndex = state.currentDetailRowIndex;
+            //    let entries = [];
+            //    const inputs = document.querySelectorAll(".detail-input");
+
+            //    inputs.forEach(input => {
+            //        const i = input.dataset.index;
+            //        const f = input.dataset.field;
+
+            //        if (!entries[i]) entries[i] = {};
+            //        entries[i][f] = input.value;
+            //    });
+
+            //    state.secondaryData[rowIndex].detailEntries = entries;
+
+            //    const rowData = state.secondaryData[rowIndex];
+
+            //    if (rowData.detailEntries.length !== rowData.requestStock) {
+            //        Swal.fire({
+            //            icon: "error",
+            //            title: "Requested stock not matching with Attributes length",
+            //        });
+            //        return;
+            //    }
+            //    secondaryGrid.refresh(state.secondaryData);
+
+            //    console.log("Saved:", entries);
+            //},
+            saveDetailEntries: () => {
 
                 const rowIndex = state.currentDetailRowIndex;
-                let entries = [];
+                if (rowIndex == null) return;
+
+                const entries = [];
                 const inputs = document.querySelectorAll(".detail-input");
 
                 inputs.forEach(input => {
-                    const i = input.dataset.index;
-                    const f = input.dataset.field;
+                    const index = parseInt(input.dataset.index);
+                    //const field = input.dataset.field;
+                    const field = input.dataset.field.toLowerCase();
 
-                    if (!entries[i]) entries[i] = {};
-                    entries[i][f] = input.value;
+
+                    if (!entries[index]) entries[index] = {};
+
+                    entries[index][field] = input.value.trim();
                 });
-
-                state.secondaryData[rowIndex].detailEntries = entries;
 
                 const rowData = state.secondaryData[rowIndex];
 
-                if (rowData.detailEntries.length !== rowData.requestStock) {
+                rowData.detailEntries = entries.filter(e => e); // remove empty gaps
+
+                // -------------------------------
+                // Validate quantity match
+                // -------------------------------
+                if (rowData.detailEntries.length !== parseInt(rowData.requestStock)) {
                     Swal.fire({
                         icon: "error",
-                        title: "Requested stock not matching with Attributes length",
+                        title: "Quantity mismatch",
+                        text: "Requested stock does not match attribute rows."
                     });
                     return;
                 }
+
                 secondaryGrid.refresh(state.secondaryData);
 
-                console.log("Saved:", entries);
+                console.log("Saved detail entries:", rowData.detailEntries);
             },
             collectDetailAttributes: (row) => {
                 const Attributes = [];
@@ -1208,10 +1533,12 @@
                 // -------------------------------
                 (row.detailEntries || []).forEach((entry, index) => {
 
-                    const imei1 = (entry.imeI1 || "").trim();
-                    const imei2 = (entry.imeI2 || "").trim();
-                    const serviceNo = (entry.serviceNo || "").trim();
-
+                    //const imei1 = (entry.imeI1 || "").trim();
+                    //const imei2 = (entry.imeI2 || "").trim();
+                    //const serviceNo = (entry.serviceNo || "").trim();
+                    const imei1 = (entry.imei1 || entry.imeI1 || null).trim();
+                    const imei2 = (entry.imei2 || entry.imeI2 || null).trim();
+                    const serviceNo = (entry.serviceno || entry.serviceNo || null).trim();
                     // -------------------------------
                     // REQUIRED FIELD VALIDATION
                     // -------------------------------
@@ -1622,11 +1949,18 @@
                             state.mainTitle = 'Add Transfer Out';
                             state.isAddMode = true;
                             resetFormState();
+                            state.secondaryData = [];
+                            // Create new grid properly
+                            if (secondaryGrid.obj == null) {
+                                await secondaryGrid.create(state.secondaryData);
+                            } else {
+                                secondaryGrid.refresh();
+                            }
                             //setDefaultDate();
                             state.showComplexDiv = true;
                             mainModal.obj.show();
                         }
-
+                        
                         if (args.item.id === 'EditCustom') {
                             state.deleteMode = false;
                             state.isAddMode = false;
@@ -1939,8 +2273,13 @@
 
                                     // ── HELPER C: Open attribute modal + auto-add next row ───
                                     const openAttributeModalWithAutoNext = async (rowData) => {
-                                        let rowIndex = state.secondaryData
-                                            .findIndex(r => r === rowData || (r.id && r.id === rowData.id));
+                                        debugger;
+                                        //let rowIndex = state.secondaryData
+                                        //    .findIndex(r => r === rowData || (r.id && r.id === rowData.id));
+                                        let rowIndex = state.secondaryData.findIndex(r =>
+                                           ( r.productId === rowData.productId &&
+                                                r.pluCode === rowData.pluCode) || (r.id && r.id === rowData.id)
+                                        );
                                         let injected = false;
 
                                         if (rowIndex === -1) {
@@ -2002,7 +2341,7 @@
                                                 ...state.secondaryData,
                                                 ...secondaryGrid.manualBatchChanges.addedRecords
                                             ];
-                                            const duplicateRow = allGridData.find(r => r.productId === productId);
+                                            const duplicateRow = allGridData.find(r => r.pluCode === enteredPLU);
 
                                             if (duplicateRow) {
                                                 // ════════════════ DUPLICATE PATH ═════════════════
@@ -2449,8 +2788,15 @@
                 if (secondaryGrid.obj) {
                     secondaryGrid.obj.setProperties({ dataSource: state.secondaryData });
                 }
+            },//  CLEAR BATCH CHANGES (after successful save)
+            destroy: () => {
+                if (secondaryGrid.obj) {
+                    secondaryGrid.obj.destroy();
+                    secondaryGrid.obj = null;
+                }
             }
         };
+
         //const secondaryGrid = {
         //    obj: null,
         //    productObj: null,

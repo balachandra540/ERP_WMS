@@ -1219,13 +1219,21 @@ const App = {
             const changedRecords = batchChanges.changedRecords || [];
             const deletedRecords = batchChanges.deletedRecords || [];
 
-            // Match function for row identification
+            //// Match function for row identification
+            //const matchRecord = (a, b) => {
+            //    if (a.id && b.id) return a.id === b.id;
+            //    if (a.purchaseOrderItemId && b.purchaseOrderItemId)
+            //        return a.purchaseOrderItemId === b.purchaseOrderItemId;
+            //    return false;
+            //};
             const matchRecord = (a, b) => {
                 if (a.id && b.id) return a.id === b.id;
-                if (a.purchaseOrderItemId && b.purchaseOrderItemId)
-                    return a.purchaseOrderItemId === b.purchaseOrderItemId;
+                if (!a.id && !b.id) {
+                    return a.productId === b.productId && a.pluCode === b.pluCode && a.unitPrice === b.unitPrice;
+                }
                 return false;
             };
+
 
             // --- APPLY CHANGED RECORDS ---
             for (let changed of changedRecords) {
@@ -2077,7 +2085,7 @@ const App = {
                         totalAfterTax: Number(item.totalAfterTax),
                         total: item.total,
                         summary: item.summary,
-                        Attributes: item.detailEntries,
+                        Attributes: item.detailEntries || item.attributes,
                     }));
                     // ----------------------------------------------------
                     // Order-Level Summary Totals (Formatted for API)
@@ -2218,37 +2226,163 @@ const App = {
                 }
 
             },
-            openDetailModal: async (RowIndex) => {
-                debugger;
+    //        openDetailModal: async (RowIndex) => {
+    //            debugger;
 
+
+    //            if (RowIndex === -1) {
+    //                console.error("Row not found for PO:", saleItemId);
+    //                return;
+    //            }
+
+    //            //state.currentDetailSaleItemId = saleItemId;
+    //            state.currentDetailRowIndex = RowIndex;
+
+    //            const originalRow = state.secondaryData[RowIndex];
+
+    //            // -------------------------------------------------------
+    //            // -------------------------------------------------------
+    //            state.activeDetailRow = JSON.parse(JSON.stringify(originalRow));
+
+    //            const rowData = state.activeDetailRow;
+
+    //            // -------------------------------------------------------
+    //            // 3. LOAD PRODUCT
+    //            // -------------------------------------------------------
+    //            const product = state.productListLookupData.find(p => p.id === rowData.productId);
+    //            if (!product) {
+    //                Swal.fire("Error", "Product not found.", "error");
+    //                return;
+    //            }
+
+    //            // -------------------------------------------------------
+    //            // 4. CHECK RECEIVED QUANTITY FIRST
+    //            // -------------------------------------------------------
+    //            const qty = parseFloat(rowData.quantity || 0);
+
+    //            if (!qty || qty <= 0) {
+    //                document.getElementById("detailFormArea").innerHTML = `
+    //        <div class="alert alert-warning text-center p-2">
+    //            <strong>No Quantity Entered.</strong><br/>
+    //            Please enter Received Quantity first.
+    //        </div>
+    //    `;
+    //                Swal.fire({
+    //                    icon: "error",
+    //                    title: "Validation Error",
+    //                    text: "Please enter received quantity before adding attributes."
+    //                });
+    //                return;
+    //            }
+
+    //            // -------------------------------------------------------
+    //            // 5. BUILD FIELDS BASED ON PRODUCT CONFIG
+    //            // -------------------------------------------------------
+    //            let fields = [];
+    //            if (product.imei1) fields.push("imeI1");
+    //            if (product.imei2) fields.push("imeI2");
+    //            if (product.serviceNo) fields.push("serviceNo");
+
+    //            const existingDetails = rowData.attributes || rowData.detailEntries || [];
+
+    //            // -------------------------------------------------------
+    //            // 6. BUILD HTML TABLE
+    //            // -------------------------------------------------------
+    //            let html = `
+    //    <table class="table table-bordered table-sm">
+    //        <thead>
+    //            <tr>
+    //                ${fields.map(f => `<th>${f}</th>`).join("")}
+    //            </tr>
+    //        </thead>
+    //        <tbody>
+    //`;
+
+    //            for (let i = 0; i < qty; i++) {
+    //                html += `<tr>`;
+    //                fields.forEach(field => {
+    //                    const val =
+    //                        existingDetails[i] && existingDetails[i][field]
+    //                            ? existingDetails[i][field]
+    //                            : "";
+    //                    html += `
+    //            <td>
+    //                <input type="text"
+    //                       class="form-control detail-input"
+    //                       data-index="${i}"
+    //                       data-field="${field.toLowerCase()}"
+    //                       value="${val}">
+    //            </td>
+    //        `;
+    //                });
+    //                html += `</tr>`;
+    //            }
+
+    //            html += `
+    //        </tbody>
+    //    </table>
+    //`;
+
+    //            document.getElementById("detailFormArea").innerHTML = html;
+
+    //            await methods.attachDetailInputEvents(product);
+
+
+    //            // -------------------------------------------------------
+    //            // 7. OPEN MODAL
+    //            // -------------------------------------------------------
+    //            const modalEl = document.getElementById("detailModal");
+    //            const modal = new bootstrap.Modal(modalEl);
+    //            modal.show();
+
+    //            // -------------------------------------------------------
+    //            // 8. Save: Merge values back into original row
+    //            // -------------------------------------------------------
+    //            document.getElementById("detailSaveBtn").onclick = (e) => {
+    //                e.preventDefault();
+    //                methods.saveDetailEntries();
+    //                modal.hide();
+    //            };
+
+    //            // -------------------------------------------------------
+    //            // 9. FIX SCROLL ISSUE — Restore main modal scroll
+    //            // -------------------------------------------------------
+    //            modalEl.addEventListener("hidden.bs.modal", () => {
+    //                const mainModal = document.getElementById("MainModal");
+    //                if (mainModal.classList.contains("show")) {
+    //                    document.body.classList.add("modal-open");
+    //                }
+    //            });
+            //        },
+            openDetailModal: async (RowIndex) => {
 
                 if (RowIndex === -1) {
-                    console.error("Row not found for PO:", saleItemId);
+                    console.error("Row not found.");
                     return;
                 }
 
-                //state.currentDetailSaleItemId = saleItemId;
                 state.currentDetailRowIndex = RowIndex;
 
                 const originalRow = state.secondaryData[RowIndex];
 
-                // -------------------------------------------------------
-                // -------------------------------------------------------
+                // Deep clone
                 state.activeDetailRow = JSON.parse(JSON.stringify(originalRow));
-
                 const rowData = state.activeDetailRow;
 
                 // -------------------------------------------------------
-                // 3. LOAD PRODUCT
+                // 1. LOAD PRODUCT
                 // -------------------------------------------------------
-                const product = state.productListLookupData.find(p => p.id === rowData.productId);
+                const product = state.productListLookupData.find(
+                    p => p.id === rowData.productId
+                );
+
                 if (!product) {
                     Swal.fire("Error", "Product not found.", "error");
                     return;
                 }
 
                 // -------------------------------------------------------
-                // 4. CHECK RECEIVED QUANTITY FIRST
+                // 2. CHECK RECEIVED QUANTITY
                 // -------------------------------------------------------
                 const qty = parseFloat(rowData.quantity || 0);
 
@@ -2259,6 +2393,7 @@ const App = {
                 Please enter Received Quantity first.
             </div>
         `;
+
                     Swal.fire({
                         icon: "error",
                         title: "Validation Error",
@@ -2268,23 +2403,35 @@ const App = {
                 }
 
                 // -------------------------------------------------------
-                // 5. BUILD FIELDS BASED ON PRODUCT CONFIG
+                // 3. BUILD FIELD LIST (ALL LOWERCASE)
                 // -------------------------------------------------------
                 let fields = [];
-                if (product.imei1) fields.push("imeI1");
-                if (product.imei2) fields.push("imeI2");
-                if (product.serviceNo) fields.push("serviceNo");
-
-                const existingDetails = rowData.attributes || rowData.detailEntries || [];
+                if (product.imei1) fields.push("imei1");
+                if (product.imei2) fields.push("imei2");
+                if (product.serviceNo) fields.push("serviceno");
 
                 // -------------------------------------------------------
-                // 6. BUILD HTML TABLE
+                // 4. NORMALIZE EXISTING DETAILS (CASE-INSENSITIVE SAFE)
+                // -------------------------------------------------------
+                const existingDetails =
+                    rowData.attributes || rowData.detailEntries || [];
+
+                const normalizedDetails = existingDetails.map(entry => {
+                    const normalized = {};
+                    Object.keys(entry || {}).forEach(key => {
+                        normalized[key.toLowerCase()] = entry[key];
+                    });
+                    return normalized;
+                });
+
+                // -------------------------------------------------------
+                // 5. BUILD HTML TABLE
                 // -------------------------------------------------------
                 let html = `
         <table class="table table-bordered table-sm">
             <thead>
                 <tr>
-                    ${fields.map(f => `<th>${f}</th>`).join("")}
+                    ${fields.map(f => `<th>${f.toUpperCase()}</th>`).join("")}
                 </tr>
             </thead>
             <tbody>
@@ -2292,21 +2439,24 @@ const App = {
 
                 for (let i = 0; i < qty; i++) {
                     html += `<tr>`;
+
                     fields.forEach(field => {
                         const val =
-                            existingDetails[i] && existingDetails[i][field]
-                                ? existingDetails[i][field]
+                            normalizedDetails[i] && normalizedDetails[i][field]
+                                ? normalizedDetails[i][field]
                                 : "";
+
                         html += `
                 <td>
-                    <input type="text" 
+                    <input type="text"
                            class="form-control detail-input"
                            data-index="${i}"
-                           data-field="${field.toLowerCase()}"
+                           data-field="${field}"
                            value="${val}">
                 </td>
             `;
                     });
+
                     html += `</tr>`;
                 }
 
@@ -2319,16 +2469,15 @@ const App = {
 
                 await methods.attachDetailInputEvents(product);
 
-
                 // -------------------------------------------------------
-                // 7. OPEN MODAL
+                // 6. OPEN MODAL
                 // -------------------------------------------------------
                 const modalEl = document.getElementById("detailModal");
                 const modal = new bootstrap.Modal(modalEl);
                 modal.show();
 
                 // -------------------------------------------------------
-                // 8. Save: Merge values back into original row
+                // 7. SAVE HANDLER
                 // -------------------------------------------------------
                 document.getElementById("detailSaveBtn").onclick = (e) => {
                     e.preventDefault();
@@ -2337,11 +2486,11 @@ const App = {
                 };
 
                 // -------------------------------------------------------
-                // 9. FIX SCROLL ISSUE — Restore main modal scroll
+                // 8. FIX SCROLL ISSUE
                 // -------------------------------------------------------
                 modalEl.addEventListener("hidden.bs.modal", () => {
                     const mainModal = document.getElementById("MainModal");
-                    if (mainModal.classList.contains("show")) {
+                    if (mainModal && mainModal.classList.contains("show")) {
                         document.body.classList.add("modal-open");
                     }
                 });
@@ -2571,45 +2720,116 @@ const App = {
                     matchedInput.classList.add("auto-filled");
                 }
             },
-            saveDetailEntries: async (item) => {
-                //const poItemId = state.currentDetailPOItemId;
-                //const rowIndex = state.secondaryData.findIndex(
-                //    item => item.purchaseOrderItemId === poItemId
-                //);
-
-                //if (rowIndex === -1) {
-                //    console.error("Cannot save — row not found");
-                //    return;
-                //}
+            saveDetailEntries: async () => {
 
                 const rowIndex = state.currentDetailRowIndex;
+
+                if (rowIndex === undefined || rowIndex === null) {
+                    console.error("Cannot save — row index not found");
+                    return;
+                }
+
+                const rowData = state.secondaryData[rowIndex];
+                const qty = parseInt(rowData.quantity || 0);
+
                 let entries = [];
                 const inputs = document.querySelectorAll(".detail-input");
 
+                // -------------------------------------------------------
+                // 1. BUILD ENTRIES (FORCE LOWERCASE FIELDS)
+                // -------------------------------------------------------
                 inputs.forEach(input => {
-                    const i = input.dataset.index;
-                    const f = input.dataset.field;
 
-                    if (!entries[i]) entries[i] = {};
-                    entries[i][f] = input.value;
+                    const index = parseInt(input.dataset.index);
+                    const field = (input.dataset.field || "").toLowerCase();
+                    const value = (input.value || "").trim();
+
+                    if (!entries[index]) entries[index] = {};
+
+                    entries[index][field] = value;
                 });
 
-                state.secondaryData[rowIndex].detailEntries = entries;
+                // -------------------------------------------------------
+                // 2. REMOVE UNDEFINED ROWS (SAFETY CLEAN)
+                // -------------------------------------------------------
+                entries = entries.filter(e => e !== undefined);
 
-                const rowData = state.secondaryData[rowIndex];
-
-                if (rowData.detailEntries.length !== rowData.quantity) {
+                // -------------------------------------------------------
+                // 3. VALIDATE QUANTITY MATCH
+                // -------------------------------------------------------
+                if (entries.length !== qty) {
                     Swal.fire({
                         icon: "error",
-                        title: "Quantity not matching with Attributes length",
-                        //    html: errors.join("<br>")
+                        title: "Quantity mismatch",
+                        text: `Expected ${qty} entries but found ${entries.length}.`
                     });
                     return;
                 }
+
+                // -------------------------------------------------------
+                // 4. OPTIONAL: VALIDATE EMPTY ROWS
+                // -------------------------------------------------------
+                const hasEmptyRow = entries.some(entry =>
+                    Object.values(entry).every(val => !val)
+                );
+
+                if (hasEmptyRow) {
+                    Swal.fire({
+                        icon: "error",
+                        title: "Incomplete Entries",
+                        text: "All attribute rows must be filled."
+                    });
+                    return;
+                }
+
+                // -------------------------------------------------------
+                // 5. SAVE (ALL LOWERCASE KEYS)
+                // -------------------------------------------------------
+                rowData.detailEntries = entries;
+
                 secondaryGrid.refresh(state.secondaryData);
 
                 console.log("Saved:", entries);
             },
+            //saveDetailEntries: async (item) => {
+            //    //const poItemId = state.currentDetailPOItemId;
+            //    //const rowIndex = state.secondaryData.findIndex(
+            //    //    item => item.purchaseOrderItemId === poItemId
+            //    //);
+
+            //    //if (rowIndex === -1) {
+            //    //    console.error("Cannot save — row not found");
+            //    //    return;
+            //    //}
+
+            //    const rowIndex = state.currentDetailRowIndex;
+            //    let entries = [];
+            //    const inputs = document.querySelectorAll(".detail-input");
+
+            //    inputs.forEach(input => {
+            //        const i = input.dataset.index;
+            //        const f = input.dataset.field;
+
+            //        if (!entries[i]) entries[i] = {};
+            //        entries[i][f] = input.value;
+            //    });
+
+            //    state.secondaryData[rowIndex].detailEntries = entries;
+
+            //    const rowData = state.secondaryData[rowIndex];
+
+            //    if (rowData.detailEntries.length !== rowData.quantity) {
+            //        Swal.fire({
+            //            icon: "error",
+            //            title: "Quantity not matching with Attributes length",
+            //            //    html: errors.join("<br>")
+            //        });
+            //        return;
+            //    }
+            //    secondaryGrid.refresh(state.secondaryData);
+
+            //    console.log("Saved:", entries);
+            //},
             collectDetailAttributes: (row) => {
                 const Attributes = [];
                 const errors = [];
@@ -4870,6 +5090,7 @@ const App = {
                             disableHtmlEncode: false,
 
                             valueAccessor: (field, data) => {
+                                debugger;
                                 const product = state.productListLookupData.find(p => p.id === data.productId);
                                 if (!product) return '';
                                 debugger;
@@ -4878,11 +5099,9 @@ const App = {
 
                                 if (!canShow) return '';   // hide link, not column
 
-                                return `
-        <a href="#" class="view-details" data-id="${data?.purchaseOrderItemId}">
-            Attributes
-        </a>
-    `;
+                                return `<a href="#" class="view-details" data-id="${data?.pluCode}">
+                                    Attributes
+                                        </a>`;
                             },
                             // Needed to allow HTML inside cell
                             allowEditing: false
