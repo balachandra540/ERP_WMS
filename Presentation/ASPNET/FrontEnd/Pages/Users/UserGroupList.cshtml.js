@@ -207,15 +207,46 @@
                     ],
 
                     toolbarClick: async (args) => {
+                        const action = args.item.id;
 
-                        const row = mainGrid.obj.getSelectedRecords()[0];
+                        // Add action does not require a selected row
+                        if (action === 'AddCustom') {
+                            resetFormState();
+                            state.mainTitle = 'Add User Group';
+                            state.deleteMode = false;
+                            mainModal.obj.show();
+                            return;
+                        }
 
-                        if (!row) return;
+                        // For Edit, Delete, and Roles, a row MUST be selected
+                        const selectedRecords = mainGrid.obj.getSelectedRecords();
+                        if (selectedRecords.length === 0) {
+                            Swal.fire('Notice', 'Please select a record first.', 'info');
+                            return;
+                        }
 
-                        if (args.item.id === 'RolesCustom') {
+                        const row = selectedRecords[0];
 
+                        if (action === 'EditCustom') {
                             state.id = row.id;
-
+                            state.name = row.name;
+                            state.description = row.description;
+                            state.isActive = row.isActive;
+                            state.mainTitle = 'Edit User Group';
+                            state.deleteMode = false;
+                            mainModal.obj.show();
+                        }
+                        else if (action === 'DeleteCustom') {
+                            state.id = row.id;
+                            state.name = row.name;
+                            state.description = row.description;
+                            state.isActive = row.isActive;
+                            state.mainTitle = 'Delete User Group';
+                            state.deleteMode = true;
+                            mainModal.obj.show();
+                        }
+                        else if (action === 'RolesCustom') {
+                            state.id = row.id;
                             await methods.loadRolesForGroup(row.id);
 
                             roleModal.obj.show();
@@ -261,27 +292,34 @@
                     ],
 
                     rowSelected: (args) => {
-                        handler.updateRole(args.data.name, true);
+                        // isInteracted ensures this only fires when a USER clicks it,
+                        // not when the grid auto-selects rows on load
+                        if (args.isInteracted) {
+                            handler.updateRole(args.data.name, true);
+                        }
                     },
 
                     rowDeselected: (args) => {
-                        handler.updateRole(args.data.name, false);
+                        if (args.isInteracted) {
+                            handler.updateRole(args.data.name, false);
+                        }
                     },
 
                     dataBound: () => {
-
                         const selectedIndexes = [];
 
                         roleGrid.obj.getCurrentViewRecords()
                             .forEach((row, index) => {
-
-                                if (state.assignedRoles
-                                    .includes(row.name)) {
+                                if (state.assignedRoles.includes(row.name)) {
                                     selectedIndexes.push(index);
                                 }
                             });
 
-                        roleGrid.obj.selectRows(selectedIndexes);
+                        // Select rows programmatically 
+                        // (will not trigger DB update thanks to args.isInteracted above)
+                        if (selectedIndexes.length > 0) {
+                            roleGrid.obj.selectRows(selectedIndexes);
+                        }
                     }
                 });
 
