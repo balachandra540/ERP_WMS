@@ -645,7 +645,7 @@
                 try {
                     state.isSubmitting = true;
                     await new Promise(resolve => setTimeout(resolve, 300));
-
+                    debugger;
                     if (!validateForm()) {
                         return;
                     }
@@ -705,9 +705,11 @@
                             // No need for separate secondary calls; all handled in single request
                         }
                     }
-
+                    const responseCode = response?.data?.code ?? response?.code;
+                    const responseMessage = response?.data?.message ?? response?.message;
+                    const responseData = response?.data?.content?.data ?? response?.data?.data ?? response?.data;
                     // **HANDLE RESPONSE**
-                    if (response.data.code === 200) {
+                    if (responseCode === 200) {
                         await methods.populateMainData();
                         mainGrid.refresh();
 
@@ -745,11 +747,12 @@
 
                         // Clear deleted items after success
                         state.deletedItems = [];
-                    } else {
+                    }
+                    else {
                         Swal.fire({
                             icon: 'error',
                             title: state.deleteMode ? 'Delete Failed' : 'Save Failed',
-                            text: response.data.message ?? 'Please check your data.',
+                            text: responseMessage ?? 'Please check your data.',
                             confirmButtonText: 'Try Again'
                         });
                     }

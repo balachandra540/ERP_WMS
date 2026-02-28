@@ -105,13 +105,19 @@ public partial class InventoryTransactionService
         CancellationToken cancellationToken = default
         )
     {
+        //var childs = await _queryContext
+        //    .InventoryTransaction
+        //    .AsNoTracking()
+        //    .ApplyIsDeletedFilter(false)
+        //    .Where(x => x.ModuleId == moduleId && x.ModuleName == moduleName)
+        //    .ToListAsync(cancellationToken);
         var childs = await _queryContext
-            .InventoryTransaction
-            .AsNoTracking()
-            .ApplyIsDeletedFilter(false)
-            .Where(x => x.ModuleId == moduleId && x.ModuleName == moduleName)
-            .ToListAsync(cancellationToken);
-
+    .InventoryTransaction
+    .AsNoTracking()
+    .ApplyIsDeletedFilter(false)
+    .Include(x => x.InventoryTransactionAttributesDetails)
+    .Where(x => x.ModuleId == moduleId && x.ModuleName == moduleName)
+    .ToListAsync(cancellationToken);
         return childs;
     }
 }

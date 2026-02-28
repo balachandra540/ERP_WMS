@@ -12,6 +12,8 @@ namespace Application.Features.TransferInManager.Commands;
 public class UpdateTransferInResult
 {
     public TransferIn? Data { get; set; }
+    public InventoryTransaction? InventoryTransactionData { get; set; }
+
 }
 
 public class UpdateTransferInRequest : IRequest<UpdateTransferInResult>
@@ -92,7 +94,7 @@ public class UpdateTransferInHandler : IRequestHandler<UpdateTransferInRequest, 
         entity.UpdatedById = request.UpdatedById;
         entity.TransferReceiveDate = _securityService.ConvertToIst(request.TransferReceiveDate);
 
-        entity.TransferReceiveDate = _securityService.ConvertToIst(request.TransferReceiveDate);
+        //entity.TransferReceiveDate = _securityService.ConvertToIst(request.TransferReceiveDate);
 
         entity.Status = (TransferStatus)int.Parse(request.Status!);
         entity.Description = request.Description;
@@ -114,7 +116,7 @@ public class UpdateTransferInHandler : IRequestHandler<UpdateTransferInRequest, 
 
             inventoryTransactions.Add(inventoryTransaction);
         }
-
+        
         foreach (var item in request.DeletedItems)
         {
             await _inventoryTransactionService.TransferInDeleteInvenTrans(
@@ -125,7 +127,9 @@ public class UpdateTransferInHandler : IRequestHandler<UpdateTransferInRequest, 
 
         return new UpdateTransferInResult
         {
-            Data = entity
+            Data = entity,
+            //InventoryTransactionData = inventoryTransactions
+
         };
     }
 }

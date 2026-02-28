@@ -3513,7 +3513,7 @@ const App = {
                             textAlign: 'Right',
                             format: 'N0',
                             editType: 'numericedit',
-                            edit: { params: { decimals: 2, min: 0, step: 0.01 } },
+                            edit: { params: { decimals: 2, min: 0, step: 1 } },
                             validationRules: {
                                 required: true,
                                 custom: [(args) => {
@@ -3526,7 +3526,7 @@ const App = {
                                 }, 'Received Qty cannot exceed Remaining Qty']
                             }
                         },
-                        // 🌟🌟 ADDED ATTRIBUTE 1 — READ ONLY
+                        // ADDED ATTRIBUTE 1 — READ ONLY
                         {
                             field: 'attribute1DetailId',
                             headerText: 'Attribute 1',
@@ -3539,7 +3539,7 @@ const App = {
                             }
                         },
 
-                        // 🌟🌟 ADDED ATTRIBUTE 2 — READ ONLY
+                        // ADDED ATTRIBUTE 2 — READ ONLY
                         {
                             field: 'attribute2DetailId',
                             headerText: 'Attribute 2',

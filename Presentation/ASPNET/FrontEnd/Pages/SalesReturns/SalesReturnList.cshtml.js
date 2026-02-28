@@ -369,6 +369,7 @@
                     query += `serviceNo=${serviceNo}&`;
                     query += `productId=${productId}&`;
                     query += `locationId=${location}&`;
+                    query += `issalesreturn=true&`;
 
                     // remove last &
                     query = query.endsWith("&") ? query.slice(0, -1) : query;
@@ -430,96 +431,7 @@
                 const response = await services.getWarehouseListLookupData();
                 state.warehouseListLookupData = response?.data?.content?.data.filter(warehouse => warehouse.systemWarehouse === false) || [];
             },
-    //        openDetailModal: async (RowIndex, rowData) => {
-    //            // Save the index for the save operation later
-    //            state.currentDetailRowIndex = RowIndex;
-
-    //            // Use the rowData passed from the Grid directly
-    //            if (!rowData) {
-    //                console.error("Row data not found!");
-    //                return;
-    //            }
-
-    //            // Clone the data for the active modal state
-    //            state.activeDetailRow = JSON.parse(JSON.stringify(rowData));
-    //            const activeRow = state.activeDetailRow;
-
-    //            // 3. LOAD PRODUCT (Find product from your lookup list)
-    //            const product = state.productListLookupData.find(p => p.id === activeRow.productId);
-    //            if (!product) {
-    //                Swal.fire("Error", "Product not found. Please select a product in the grid first.", "error");
-    //                return;
-    //            }
-
-    //            const qty = parseFloat(activeRow.quantity || 0);
-    //            if (qty <= 0) {
-    //                Swal.fire("Validation Error", "Please enter a quantity before adding attributes.", "error");
-    //                return;
-    //            }
-
-
-    //            // -------------------------------------------------------
-    //            // 5. BUILD FIELDS BASED ON PRODUCT CONFIG
-    //            // -------------------------------------------------------
-    //            let fields = [];
-    //            if (product.imei1) fields.push("imeI1");
-    //            if (product.imei2) fields.push("imeI2");
-    //            if (product.serviceNo) fields.push("serviceNo");
-
-    //            const existingDetails = rowData.attributes || [];
-
-    //            // -------------------------------------------------------
-    //            // 6. BUILD HTML TABLE
-    //            // -------------------------------------------------------
-    //            let html = `
-    //    <table class="table table-bordered table-sm">
-    //        <thead>
-    //            <tr>
-    //                ${fields.map(f => `<th>${f}</th>`).join("")}
-    //            </tr>
-    //        </thead>
-    //        <tbody>
-    //`;
-
-    //            for (let i = 0; i < qty; i++) {
-    //                html += `<tr>`;
-    //                fields.forEach(field => {
-    //                    const val =
-    //                        existingDetails[i] && existingDetails[i][field]
-    //                            ? existingDetails[i][field]
-    //                            : "";
-    //                    html += `
-    //            <td>
-    //                <input type="text"
-    //                       class="form-control detail-input"
-    //                       data-index="${i}"
-    //                       data-field="${field}"
-    //                       value="${val}">
-    //            </td>
-    //        `;
-    //                });
-    //                html += `</tr>`;
-    //            }
-
-    //            html += `
-    //        </tbody>
-    //    </table>
-    //`;
-
-    //            document.getElementById("detailFormArea").innerHTML = html;
-    //            // 🔥 ADD THIS: Connect the Save Button
-    //            const saveBtn = document.getElementById("detailSaveBtn");
-    //            if (saveBtn) {
-    //                saveBtn.onclick = (e) => {
-    //                    e.preventDefault();
-    //                    methods.saveDetailEntries();
-    //                };
-    //            }
-    //            await methods.attachDetailInputEvents(product);
-    //            const modalEl = document.getElementById("detailModal");
-    //            const modal = new bootstrap.Modal(modalEl);
-    //            modal.show();
-            //        },
+    
 
             openDetailModal: async (RowIndex, rowData) => {
                 state.currentDetailRowIndex = RowIndex;
@@ -642,7 +554,7 @@
 
                 document.getElementById("detailFormArea").innerHTML = html;
 
-                // 🔥 Save Button
+                //  Save Button
                 const saveBtn = document.getElementById("detailSaveBtn");
                 if (saveBtn) {
                     saveBtn.onclick = (e) => {
@@ -654,114 +566,21 @@
                 await methods.attachDetailInputEvents(product);
 
                 const modalEl = document.getElementById("detailModal");
+                // -------------------------------------------------------
+                // 8. FIX SCROLL ISSUE
+                // -------------------------------------------------------
+                modalEl.addEventListener("hidden.bs.modal", () => {
+                    const mainModal = document.getElementById("MainModal");
+                    if (mainModal && mainModal.classList.contains("show")) {
+                        document.body.classList.add("modal-open");
+                    }
+                });
+
                 const modal = new bootstrap.Modal(modalEl);
                 modal.show();
             },
 
-    //        openDetailModal: async (RowIndex, rowData) => {
-    //            state.currentDetailRowIndex = RowIndex;
-
-    //            if (!rowData) {
-    //                console.error("Row data not found!");
-    //                return;
-    //            }
-
-    //            state.activeDetailRow = JSON.parse(JSON.stringify(rowData));
-    //            const activeRow = state.activeDetailRow;
-
-    //            // 🔹 Find product
-    //            const product = state.productListLookupData.find(p => p.id === activeRow.productId);
-    //            if (!product) {
-    //                Swal.fire("Error", "Product not found. Please select a product in the grid first.", "error");
-    //                return;
-    //            }
-
-    //            const qty = parseInt(activeRow.orderQuantity || 0);
-    //            if (qty <= 0) {
-    //                Swal.fire("Validation Error", "Please enter a orderQuantity before adding attributes.", "error");
-    //                return;
-    //            }
-
-    //            // -------------------------------------------------------
-    //            // 🔹 Build fields based on product config
-    //            // -------------------------------------------------------
-    //            let fields = [];
-    //            if (product.imei1) fields.push("imeI1");
-    //            if (product.imei2) fields.push("imeI2");
-    //            if (product.serviceNo) fields.push("serviceNo");
-
-    //            const existingDetails = rowData.attributes || [];
-
-    //            // -------------------------------------------------------
-    //            // 🔹 Build HTML Table (WITH CHECKBOX)
-    //            // -------------------------------------------------------
-    //            let html = `
-    //    <table class="table table-bordered table-sm">
-    //        <thead>
-    //            <tr>
-    //                <th style="width:60px;">✔</th>
-    //                ${fields.map(f => `<th>${f}</th>`).join("")}
-    //            </tr>
-    //        </thead>
-    //        <tbody>
-    //`;
-
-    //            for (let i = 0; i < qty; i++) {
-    //                const row = existingDetails[i] || {};
-    //                const checked = row.isChecked ? "checked" : "";
-
-    //                html += `<tr>`;
-
-    //                // ✅ Checkbox column
-    //                html += `
-    //        <td class="text-center">
-    //            <input type="checkbox"
-    //                   class="form-check-input detail-checkbox"
-    //                   data-index="${i}"
-    //                   ${checked}>
-    //        </td>
-    //    `;
-
-    //                // 🔹 Dynamic fields
-    //                fields.forEach(field => {
-    //                    const val = row[field] || "";
-    //                    html += `
-    //            <td>
-    //                <input type="text"
-    //                       class="form-control detail-input"
-    //                       data-index="${i}"
-    //                       data-field="${field}"
-    //                       value="${val}">
-    //            </td>
-    //        `;
-    //                });
-
-    //                html += `</tr>`;
-    //            }
-
-    //            html += `
-    //        </tbody>
-    //    </table>
-    //`;
-
-    //            document.getElementById("detailFormArea").innerHTML = html;
-
-    //            // 🔥 Save Button
-    //            const saveBtn = document.getElementById("detailSaveBtn");
-    //            if (saveBtn) {
-    //                saveBtn.onclick = (e) => {
-    //                    e.preventDefault();
-    //                    methods.saveDetailEntries();
-    //                };
-    //            }
-
-    //            await methods.attachDetailInputEvents(product);
-
-    //            const modalEl = document.getElementById("detailModal");
-    //            const modal = new bootstrap.Modal(modalEl);
-    //            modal.show();
-    //        },
-
+   
             showInlineError: (input, message) => {
                 let errorEl = input.nextElementSibling;
 
@@ -814,10 +633,12 @@
                     // KEYDOWN (restrict characters)
                     // ---------------------------
                     input.addEventListener("keydown", (e) => {
-                        const field = input.dataset.field;
+                        //const field = input.dataset.field;
+                        const field = input.dataset.field?.toLowerCase();
                         const key = e.key;
 
-                        if (field === "IMEI1" || field === "IMEI2") {
+                        /*if (field === "IMEI1" || field === "IMEI2") {*/
+                        if (field === "imei1" || field === "imei2") {
                             const isDigit =
                                 /^\d$/.test(key) ||
                                 ["Backspace", "Delete", "ArrowLeft", "ArrowRight", "Tab"].includes(key);
@@ -846,13 +667,15 @@
 
             handleDetailValueChange: async (input, product) => {
                 const value = input.value.trim();
-                const field = input.dataset.field;
+                //const field = input.dataset.field;
+                const field = input.dataset.field?.toLowerCase();
                 const index = parseInt(input.dataset.index, 10);
 
                 // ---------------------------
                 // IMEI VALIDATION
                 // ---------------------------
-                if (field === "IMEI1" || field === "IMEI2") {
+                //if (field === "IMEI1" || field === "IMEI2") {
+                if (field === "imei1" || field === "imei2") {
 
                     if (value.length > 0 && value.length < 15) {
                         methods.showInlineError(input, `${field} must be 15 digits`);
@@ -877,9 +700,12 @@
                 let imei2Value = '';
                 let serviceNoValue = '';
 
-                if (field === "IMEI1") imei1Value = value;
-                if (field === "IMEI2") imei2Value = value;
-                if (field === "ServiceNo") serviceNoValue = value;
+                //if (field === "IMEI1") imei1Value = value;
+                //if (field === "IMEI2") imei2Value = value;
+                //if (field === "ServiceNo") serviceNoValue = value;
+                if (field === "imei1") imei1Value = value;
+                if (field === "imei2") imei2Value = value;
+                if (field === "serviceno") serviceNoValue = value;
 
                 try {
                     const response = await services.GetProductStockByProductId(
@@ -946,10 +772,15 @@
 
             autoBindRemainingFieldsFromApi: async (index, matched, matchedField) => {
 
+                //const fieldMap = {
+                //    IMEI1: matched.imeI1,
+                //    IMEI2: matched.imeI2,
+                //    ServiceNo: matched.serviceNo
+                //};
                 const fieldMap = {
-                    IMEI1: matched.imeI1,
-                    IMEI2: matched.imeI2,
-                    ServiceNo: matched.serviceNo
+                    imei1: matched.imeI1,
+                    imei2: matched.imeI2,
+                    serviceNo: matched.serviceNo
                 };
 
                 Object.keys(fieldMap).forEach(field => {
@@ -986,53 +817,7 @@
                     matchedInput.classList.add("auto-filled");
                 }
             },
-            //saveDetailEntries: () => {
-            //    debugger;
-            //    const rowIndex = state.currentDetailRowIndex;
-
-            //    // 1. Validation check for the index
-            //    if (rowIndex === undefined || rowIndex === null || rowIndex < 0) {
-            //        console.error("No valid row index found.");
-            //        return;
-            //    }
-
-            //    // 2. Collect entries from modal inputs
-            //    let entries = [];
-            //    const inputs = document.querySelectorAll(".detail-input");
-            //    inputs.forEach(input => {
-            //        const i = input.dataset.index;
-            //        const f = input.dataset.field;
-            //        if (!entries[i]) entries[i] = {};
-
-            //        // Normalize field names
-            //        const normalizedField = f.toUpperCase() === "IMEI1" ? "IMEI1" :
-            //            f.toUpperCase() === "IMEI2" ? "IMEI2" :
-            //                f.toUpperCase() === "SERVICENO" ? "ServiceNo" : f;
-            //        entries[i][normalizedField] = input.value;
-            //    });
-
-            //    // 3. 🔥 GET DATA FROM GRID (Since state.secondaryData is empty)
-            //    // This retrieves the actual row object currently displayed in the grid
-            //    const gridRowData = secondaryGrid.obj.getRowsObject()[rowIndex].data;
-
-            //    // 4. Attach the attributes to that object
-            //    gridRowData.detailEntries = entries;
-
-            //    // 5. Update the Grid UI and notify the manual batch tracker
-            //    secondaryGrid.obj.updateRow(rowIndex, gridRowData);
-
-            //    // 6. Sync back to state if you need it for prepareSecondaryDataForSubmission
-            //    if (state.secondaryData.length > 0) {
-            //        state.secondaryData[rowIndex] = gridRowData;
-            //    }
-
-            //    // 7. Close Modal
-            //    const modalEl = document.getElementById("detailModal");
-            //    const modal = bootstrap.Modal.getInstance(modalEl);
-            //    if (modal) modal.hide();
-
-            //    Swal.fire({ icon: 'success', title: 'Attributes updated', timer: 1000, showConfirmButton: false });
-            //},
+           
             saveDetailEntries: () => {
 
                 const rowIndex = state.currentDetailRowIndex;
@@ -1060,7 +845,8 @@
                         const value = input.value?.trim();
 
                         if (value) {
-                            entry[field.toUpperCase()] = value;
+                            //    entry[field.toUpperCase()] = value;
+                            entry[field.toLowerCase()] = value;
                         }
                     });
 
@@ -1076,11 +862,17 @@
 
                     if (isChecked) {
                         selectedCount++;
+                        //selectedEntries.push({
+                        //    RowIndex: index,
+                        //    IMEI1: entry.IMEI1 || null,
+                        //    IMEI2: entry.IMEI2 || null,
+                        //    ServiceNo: entry.SERVICENO || null
+                        //});
                         selectedEntries.push({
                             RowIndex: index,
-                            IMEI1: entry.IMEI1 || null,
-                            IMEI2: entry.IMEI2 || null,
-                            ServiceNo: entry.SERVICENO || null
+                            IMEI1: entry.imei1 || null,
+                            IMEI2: entry.imei2 || null,
+                            ServiceNo: entry.serviceno || null
                         });
                     }
                 });
@@ -1210,6 +1002,7 @@
 
                 return { Attributes, errors };
             },
+
             populateSecondaryData: async (salesReturnId, deliveryOrderId) => {
                 try {
                     if (salesReturnId) {
@@ -1222,19 +1015,45 @@
                                 warehouseId: item.warehouseId,
                                 productId: item.productId,
 
-                                // ✅ ORDER QTY (from original delivery order movement)
                                 orderQuantity: Number(item.orderQuantity ?? item.movement ?? 0),
-
-                                // ✅ USER ENTERED RETURN QTY (already saved)
                                 returnQuantity: Number(item.movement ?? 0),
-
-                                // backend-required field
                                 movement: Number(item.movement ?? 0),
+
+                                // ✅ Attach attributes from backend
+                                attributes: (item.inventoryTransactionAttributesDetails || [])
+                                    .map(attr => ({
+                                        id: attr.id,
+                                        goodsReceiveItemDetailsId: attr.goodsReceiveItemDetailsId,
+                                        imei1: attr.imei1,
+                                        imei2: attr.imei2,
+                                        serviceNo: attr.serviceNo
+                                    })),
 
                                 createdAtUtc: item.createdAtUtc
                                     ? new Date(item.createdAtUtc)
                                     : null
+
                             })) || [];
+
+                        //state.secondaryData =
+                        //    response?.data?.content?.data?.map(item => ({
+                        //        id: item.id,
+                        //        warehouseId: item.warehouseId,
+                        //        productId: item.productId,
+
+                        //        // ✅ ORDER QTY (from original delivery order movement)
+                        //        orderQuantity: Number(item.orderQuantity ?? item.movement ?? 0),
+
+                        //        // ✅ USER ENTERED RETURN QTY (already saved)
+                        //        returnQuantity: Number(item.movement ?? 0),
+
+                        //        // backend-required field
+                        //        movement: Number(item.movement ?? 0),
+
+                        //        createdAtUtc: item.createdAtUtc
+                        //            ? new Date(item.createdAtUtc)
+                        //            : null
+                        //    })) || [];
 
                     } else {
                         // ✅ NEW MODE → Load from Delivery Order
@@ -1301,6 +1120,8 @@
                 state.errors.returnDate = '';
                 state.errors.deliveryOrderId = '';
                 state.errors.status = '';
+                if (secondaryGrid.obj)
+                    secondaryGrid.destroy();
             },
             onMainModalShown: () => {
                 if (state.isAddMode) {
@@ -1311,76 +1132,53 @@
 
             },
             prepareSecondaryDataForSubmission: function () {
+                debugger;
+                const batchChanges = secondaryGrid.obj.getBatchChanges();
+                let currentSecondaryData = [...state.secondaryData];
+                const addedRecords = batchChanges.addedRecords || [];
+                const changedRecords = batchChanges.changedRecords || [];
 
-                const batchChanges = secondaryGrid.getBatchChanges();
-
-                // 1️⃣ Merge grid state
-                let currentSecondaryData =
-                    state.id !== "" ? [...state.secondaryData] : [];
-
-                const added = batchChanges.addedRecords || [];
-                const changed = batchChanges.changedRecords || [];
-                const deleted = batchChanges.deletedRecords || [];
-
-                const match = (a, b) => (a.id && b.id ? a.id === b.id : false);
-
-                // Apply edits
-                changed.forEach(row => {
-                    const idx = currentSecondaryData.findIndex(item => match(item, row));
-                    if (idx !== -1) currentSecondaryData[idx] = { ...currentSecondaryData[idx], ...row };
-                });
-
-                // Add new
-                currentSecondaryData.push(...added);
-
-                // Remove deleted
-                if (deleted.length > 0) {
-                    currentSecondaryData = currentSecondaryData.filter(item =>
-                        !deleted.some(del => match(item, del))
-                    );
-                }
-
-                // 2️⃣ Map to DTO + Attach Attributes
-                let validationError = null;
-
-                const itemsDto = currentSecondaryData.map((item, index) => {
-
-                    const { Attributes, errors } =
-                        methods.collectDetailAttributes(item);
-
-                    // ❌ Attribute validation errors
-                    if (errors.length > 0 && !validationError) {
-                        validationError = `Row ${index + 1}: ${errors[0]}`;
+                const matchRecord = (a, b) => {
+                    if (a.id && b.id) return a.id === b.id;
+                    if (!a.id && !b.id) {
+                        return a.productId === b.productId && a.pluCode === b.pluCode;
                     }
+                    return false;
+                };
+                const filterFields = (item) => {
+                    const { Attributes, errors } = methods.collectDetailAttributes(item);
+                    if (errors.length > 0) throw new Error("ATTRIBUTE_VALIDATION_FAILED");
 
-                    // ❌ Return qty mismatch
-                    if (
-                        item.returnQuantity > 0 &&
-                        Attributes.length !== Number(item.returnQuantity)
-                    ) {
-                        validationError =
-                            `Row ${index + 1}: Selected attributes (${Attributes.length}) ` +
-                            `must match Return Qty (${item.returnQuantity})`;
-                    }
+                   
+                    item.__validatedAttributes = Attributes;
 
                     return {
-                        id: item.id || null,
-                        warehouseId: item.warehouseId,
+                        id: item.id ?? null,
                         productId: item.productId,
-
-                        // 🔥 movement = returnQuantity
-                        movement: Number(item.returnQuantity),
-
-                        // 🔥 attach ONLY selected attributes
-                        attributes: Attributes
+                        warehouseId: item.warehouseid || item.warehouseId,
+                        movement: parseFloat(item.returnQuantity || 0),
+                        attributes: Attributes 
                     };
-                });
-
-                return {
-                    itemsDto,
-                    deletedItems: deleted.map(x => ({ id: x.id })),
-                    error: validationError
                 };
+                // Process records
+                for (let changed of changedRecords) {
+                    const index = currentSecondaryData.findIndex(item => matchRecord(item, changed));
+                    index !== -1 ? (currentSecondaryData[index] = { ...currentSecondaryData[index], ...filterFields(changed) })
+                        : currentSecondaryData.push(filterFields(changed));
+                }
+                for (let added of addedRecords) {
+                    const index = currentSecondaryData.findIndex(item => matchRecord(item, added));
+                    index !== -1 ? (currentSecondaryData[index] = { ...currentSecondaryData[index], ...filterFields(added) })
+                        : currentSecondaryData.push(filterFields(added));
+                }
+
+                let deletedRecords = (batchChanges.deletedRecords || []).flat(Infinity);
+                if (deletedRecords.length > 0) {
+                    currentSecondaryData = currentSecondaryData.filter(item => !deletedRecords.some(del => matchRecord(item, del)));
+                }
+                const validItems = currentSecondaryData.filter(item => item.productId && item.returnQuantity > 0);
+                          
+                return { validItems, deletedRecords };
             }
 
         };
@@ -1530,22 +1328,31 @@
                     return;
                 }
 
-                // 🔥 Prepare payload WITH attributes
-                const {
-                    itemsDto,
-                    deletedItems,
-                    error
-                } = methods.prepareSecondaryDataForSubmission();
+                let SecondaryDataresult;
 
-                if (error) {
-                    Swal.fire({
-                        icon: 'error',
-                        title: 'Validation Error',
-                        text: error
-                    });
-                    return;
+                try {
+                    SecondaryDataresult = methods.prepareSecondaryDataForSubmission();
+                } catch (e) {
+                    if (e.message === "ATTRIBUTE_VALIDATION_FAILED") {
+                        console.warn("Submission stopped due to validation error");
+                        Swal.fire({
+                            icon: "error",
+                            title: "Validation Failed",
+                            html: "Submission stopped due to Attributes validation error"
+                        });
+                        return;
+                    }
+                    throw e;
                 }
 
+                const { validItems, deletedRecords } = SecondaryDataresult;
+                const itemsDto = validItems.map(item => ({
+                    Id: item.id || null,
+                    productId: item.productId,
+                    movement: item.returnQuantity,
+                    Attributes: item.detailEntries || item.attributes,
+                    warehouseId: item.warehouseId
+                }));
                 const userId = StorageManager.getUserId();
                 let response;
 
@@ -1738,7 +1545,11 @@
                                 state.deliveryOrderId = selectedRecord.deliveryOrderId ?? '';
                                 state.status = String(selectedRecord.status ?? '');
                                 await methods.populateSecondaryData(selectedRecord.id);
-                                secondaryGrid.refresh();
+                                if (secondaryGrid.obj == null) {
+                                    await secondaryGrid.create(state.secondaryData);
+                                } else {
+                                    secondaryGrid.refresh();
+                                }
                                 state.showComplexDiv = true;
                                 mainModal.obj.show();
                             }
@@ -2026,6 +1837,21 @@
                     secondaryGrid.obj.setProperties({
                         dataSource: state.secondaryData
                     });
+                }
+            },
+            
+            //  CLEAR BATCH CHANGES (after successful save)
+            clearBatchChanges: () => {
+                secondaryGrid.manualBatchChanges = {
+                    addedRecords: [],
+                    changedRecords: [],
+                    deletedRecords: []
+                };
+            },
+            destroy: () => {
+                if (secondaryGrid.obj) {
+                    secondaryGrid.obj.destroy();
+                    secondaryGrid.obj = null;
                 }
             }
         };

@@ -240,6 +240,8 @@ public class GetProductStockByProductIdRequest
     public string? IMEI2 { get; init; }
     public string? ServiceNo { get; init; }
     public string warehouseId { get; init; }
+    public bool IsSalesReturn { get; init; } = false;  //  ADD THIS
+
 }
 
 public class GetProductStockByProductIdHandler
@@ -253,9 +255,10 @@ public class GetProductStockByProductIdHandler
     }
 
     public async Task<ProductStockSummaryDto?> Handle(
-        GetProductStockByProductIdRequest request,
-        CancellationToken cancellationToken)
+    GetProductStockByProductIdRequest request,
+    CancellationToken cancellationToken)
     {
+        //var query =
         var result = await
         (
             from it in _context.InventoryTransaction
@@ -276,14 +279,13 @@ public class GetProductStockByProductIdHandler
                 on grid.GoodsReceiveItemId equals gri.Id
 
             where it.Status == InventoryTransactionStatus.Confirmed
-                   && it.WarehouseId == request.warehouseId
+                  && it.WarehouseId == request.warehouseId
                   && it.ProductId == request.ProductId
-          // 🔥 EXACT MATCH USING ANY ONE IDENTIFIER
-          && (
-                (!string.IsNullOrEmpty(request.IMEI1) && grid.IMEI1 == request.IMEI1)
-             || (!string.IsNullOrEmpty(request.IMEI2) && grid.IMEI2 == request.IMEI2)
-             || (!string.IsNullOrEmpty(request.ServiceNo) && grid.ServiceNo == request.ServiceNo)
-          )
+                  && (
+                        (!string.IsNullOrEmpty(request.IMEI1) && grid.IMEI1 == request.IMEI1)
+                     || (!string.IsNullOrEmpty(request.IMEI2) && grid.IMEI2 == request.IMEI2)
+                     || (!string.IsNullOrEmpty(request.ServiceNo) && grid.ServiceNo == request.ServiceNo)
+                  )
 
             group new { it, gri, grid } by it.ProductId into g
 
@@ -324,9 +326,17 @@ public class GetProductStockByProductIdHandler
                     .Where(a => a.Quantity > 0)
                     .ToList()
             }
-        )
+        //    ;
+
+        //// Only this part changed
+        //var result = await query
+        //    .Where(x =>
+        //        request.IsSalesReturn
+        //            ? x.TotalMovement < 0   // must have been sold
+        //            : x.TotalStock > 0      // must have stock for sale
+            )
         .Where(x => x.TotalStock > 0)
-        .FirstOrDefaultAsync(cancellationToken);
+            .FirstOrDefaultAsync(cancellationToken);
 
         return result;
     }

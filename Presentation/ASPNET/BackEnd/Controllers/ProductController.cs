@@ -210,6 +210,7 @@ public class ProductController : BaseApiController
         [FromQuery] string? serviceNo,
         [FromQuery] string productId,
         [FromQuery] string locationId,
+        [FromQuery] bool issalesreturn,
 
         CancellationToken cancellationToken)
     {
@@ -219,7 +220,8 @@ public class ProductController : BaseApiController
             IMEI2 = imei2,
             ServiceNo = serviceNo,
             ProductId = productId,   
-            warehouseId = locationId
+            warehouseId = locationId,
+            IsSalesReturn =issalesreturn
         };
 
         var response = await _sender.Send(request, cancellationToken);
