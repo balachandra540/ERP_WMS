@@ -464,37 +464,41 @@ namespace Application.Features.GoodsReceiveManager.Queries
             // 3️⃣ Fetch Inventory Transaction History
             // ---------------------------------------------------------
             var history = await _queryContext.InventoryTransactionAttributesDetails
-                .AsNoTracking()
-                .Where(x => x.GoodsReceiveItemDetailsId == grItem.Id)
-                .Select(x => x.InventoryTransaction)
-                .OrderBy(x => x.MovementDate)
-                .Select(t => new TransactionHistoryDto
-                {
-                    ModuleName = t.ModuleName,
-                    ModuleCode = t.ModuleCode,
-                    MovementDate = t.MovementDate,
+     .AsNoTracking()
+     .Where(x =>
+         !x.IsDeleted &&
+         x.GoodsReceiveItemDetailsId == grItem.Id &&
+         !x.InventoryTransaction.IsDeleted
+     )
+     .Select(x => x.InventoryTransaction)
+     .OrderBy(x => x.MovementDate)
+     .Select(t => new TransactionHistoryDto
+     {
+         ModuleName = t.ModuleName,
+         ModuleCode = t.ModuleCode,
+         MovementDate = t.MovementDate,
 
-                    WarehouseId = t.WarehouseId,
-                    WarehouseName = t.Warehouse != null ? t.Warehouse.Name : null,
+         WarehouseId = t.WarehouseId,
+         WarehouseName = t.Warehouse != null ? t.Warehouse.Name : null,
 
-                    WarehouseFromId = t.WarehouseFromId,
-                    WarehouseFromName = t.WarehouseFrom != null ? t.WarehouseFrom.Name : null,
+         WarehouseFromId = t.WarehouseFromId,
+         WarehouseFromName = t.WarehouseFrom != null ? t.WarehouseFrom.Name : null,
 
-                    WarehouseToId = t.WarehouseToId,
-                    WarehouseToName = t.WarehouseTo != null ? t.WarehouseTo.Name : null,
+         WarehouseToId = t.WarehouseToId,
+         WarehouseToName = t.WarehouseTo != null ? t.WarehouseTo.Name : null,
 
-                    CreatedUserId = t.CreatedById,
+         CreatedUserId = t.CreatedById,
                     //CreatedUserName = t.CreatedBy != null ? t.CreatedBy.UserName : null,
 
-                    Movement = t.Movement,
-                    Stock = t.Stock,
+         Movement = t.Movement,
+         Stock = t.Stock,
 
-                    // ⭐ Direction Logic
-                    MovementDirection = t.Movement > 0 ? "IN"
-                      : t.Movement < 0 ? "OUT"
-                      : "N/A"
-                })
-                .ToListAsync(ct);
+         MovementDirection =
+             t.Movement > 0 ? "IN"
+             : t.Movement < 0 ? "OUT"
+             : "N/A"
+     })
+     .ToListAsync(ct);
 
             // ---------------------------------------------------------
             // 4️⃣ Compose response

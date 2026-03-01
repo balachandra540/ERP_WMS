@@ -384,12 +384,12 @@
             getInventoryTransactionAttributes: async (moduleId, productId) => {
                 try {
                     const response = await AxiosManager.get(
-                        '/GoodsReceive/GetInventoryTransactionAttributes',
+                        '/GoodsReceive/GetInventoryTransactionAttributes?moduleId=' + moduleId + '&productId=' + productId,
                         {
-                            params: {
-                                moduleId: moduleId,
-                                productId: productId
-                            }
+                            //params: {
+                            //    moduleId: moduleId,
+                            //    productId: productId
+                            //}
                         }
                     );
                     return response;
@@ -492,14 +492,20 @@
                 let fields = [];
                 if (product.imei1) fields.push("imei1");
                 if (product.imei2) fields.push("imei2");
-                if (product.serviceNo) fields.push("serviceNo");
+                if (product.serviceNo) fields.push("serviceno");
 
                 // 🔹 Use API data first, fallback to existing row data
                 const existingDetails =
                     apiAttributes.length > 0
                         ? apiAttributes
                         : (rowData.attributes || []);
-
+                const normalizedDetails = existingDetails.map(entry => {
+                    const normalized = {};
+                    Object.keys(entry || {}).forEach(key => {
+                        normalized[key.toLowerCase()] = entry[key];
+                    });
+                    return normalized;
+                });
                 // -------------------------------------------------------
                 // 🔹 Build HTML Table (WITH CHECKBOX)
                 // -------------------------------------------------------
@@ -515,7 +521,7 @@
     `;
 
                 for (let i = 0; i < qty; i++) {
-                    const row = existingDetails[i] || {};
+                    const row = normalizedDetails[i] || {};
                     const checked = row.isChecked ? "checked" : "";
 
                     html += `<tr>`;
@@ -841,7 +847,7 @@
 
                     let entry = {};
                     inputs.forEach(input => {
-                        const field = input.dataset.field;
+                        const field = input.dataset.field.toLowerCase();
                         const value = input.value?.trim();
 
                         if (value) {
@@ -1004,6 +1010,7 @@
             },
 
             populateSecondaryData: async (salesReturnId, deliveryOrderId) => {
+                debugger;
                 try {
                     if (salesReturnId) {
                         // ✅ EDIT MODE → Load existing Sales Return items
